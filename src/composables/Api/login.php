@@ -23,52 +23,40 @@ error_reporting(E_ALL);
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
 // =====================================================
-$db_host = '127.0.0.1';
-$db_name = 'aliad2663340';
-$db_user = 'aliad2663340';
-$db_pass = 'Stock2025@';
-$db_charset = 'utf8mb4';
+$configDbPath = __DIR__ . '/config_database.php';
 
-// Essayer plusieurs méthodes de connexion
-$connectionMethods = [
-    ['host' => '127.0.0.1', 'socket' => null],
-    ['host' => 'localhost', 'socket' => null],
-    ['host' => 'localhost', 'socket' => '/var/run/mysqld/mysqld.sock'],
-    ['host' => 'localhost', 'socket' => '/tmp/mysql.sock'],
-    ['host' => 'mysql4202.lwspanel.com', 'socket' => null],
-];
-
-$bdd = null;
-$lastError = null;
-
-foreach ($connectionMethods as $method) {
-    try {
-        if ($method['socket']) {
-            $dsn = "mysql:unix_socket={$method['socket']};dbname={$db_name};charset={$db_charset}";
-        } else {
-            $dsn = "mysql:host={$method['host']};dbname={$db_name};charset={$db_charset}";
-        }
-        
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ];
-        
-        $bdd = new PDO($dsn, $db_user, $db_pass, $options);
-        break;
-    } catch (PDOException $e) {
-        $lastError = $e;
-        continue;
-    }
+if (!file_exists($configDbPath)) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Erreur de configuration: fichier config_database.php non trouvé',
+        'error' => 'Le fichier config_database.php est manquant sur le serveur',
+        'path_searched' => $configDbPath,
+        'hint' => 'Assurez-vous que le fichier config_database.php est déployé dans le même répertoire que login.php'
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
 }
 
-if ($bdd === null) {
+require_once $configDbPath;
+
+if (!function_exists('createDatabaseConnection')) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Erreur de configuration: fonction createDatabaseConnection() non disponible',
+        'error' => 'La fonction createDatabaseConnection() n\'a pas été chargée depuis config_database.php'
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+
+try {
+    $bdd = createDatabaseConnection();
+} catch (PDOException $e) {
     http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Erreur de connexion à la base de données',
-        'error' => $lastError ? $lastError->getMessage() : 'Aucune méthode de connexion n\'a fonctionné'
+        'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;
 }
@@ -77,13 +65,28 @@ if ($bdd === null) {
 // FONCTIONS UTILITAIRES
 // =====================================================
 
+// Inclure la configuration
+require_once __DIR__ . '/config.php';
+
+// Inclure middleware_auth pour utiliser generateJWT
+require_once __DIR__ . '/functions/middleware_auth.php';
+
 /**
- * Générer un token d'authentification avec slug de l'entreprise
+ * Générer un token JWT sécurisé à partir des données utilisateur
  */
-function generateAuthToken($userId, $slug) {
-    $timestamp = time();
-    $tokenData = $userId . ':' . $slug . ':' . $timestamp;
-    return base64_encode($tokenData);
+function generateAuthToken($userData) {
+    $secret = JWT_SECRET;
+    
+    // Préparer les données utilisateur au format attendu
+    $userDataFormatted = [
+        'user_id' => (int)$userData['id_utilisateur'],
+        'user_first_name' => $userData['prenom'] ?? '',
+        'user_email' => $userData['email'],
+        'user_role' => strtolower($userData['role']),
+        'user_enterprise_id' => (int)$userData['id_entreprise']
+    ];
+    
+    return generateJWT($userDataFormatted, $secret);
 }
 
 /**
@@ -170,13 +173,12 @@ try {
     
     // Login utilisateur
     $user = loginUser($bdd, $data['email'], $data['password']);
-    $slug = $user['slug'] ?? '';
-    $token = generateAuthToken($user['id_utilisateur'], $slug);
+    $token = generateAuthToken($user);
     
     $resultat = [
         'user' => $user,
         'token' => $token,
-        'expires_in' => 86400 // 24 heures en secondes
+        'expires_in' => JWT_EXPIRATION // Durée d'expiration en secondes
     ];
     
     $bdd->commit();

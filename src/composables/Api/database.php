@@ -1,4 +1,11 @@
 <?php
+/**
+ * Classe Database - Gestion de la connexion à la base de données
+ * Utilise config_database.php pour les paramètres de connexion
+ */
+
+// database.php est dans config/, donc config_database.php est dans le répertoire parent
+require_once __DIR__ . '/../config_database.php';
 
 class Database {
     private $pdo;
@@ -8,20 +15,16 @@ class Database {
     }
 
     private function connect() {
-        $host = '213.255.195.35';
-        $dbname = 'aliad2663340';
-        $user = 'aliad2663340';
-        $password = 'Stock2025@';
-
         try {
-            $this->pdo = new PDO("mysql:host=$host;dbname=$dbname", $user, $password, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
+            // Utiliser la fonction utilitaire de config_database.php
+            $this->pdo = createDatabaseConnection();
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Erreur de connexion à la base de données', 'error' => $e->getMessage()]);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Erreur de connexion à la base de données', 
+                'error' => $e->getMessage()
+            ]);
             exit;
         }
     }

@@ -20,50 +20,37 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // Configuration base de données
-$db_name = 'aliad2663340';
-$db_user = 'aliad2663340';
-$db_pass = 'Stock2025@';
-$db_charset = 'utf8mb4';
+$configDbPath = __DIR__ . '/config_database.php';
 
-// Connexion à la base de données
-$connectionMethods = [
-    ['host' => '127.0.0.1', 'socket' => null],
-    ['host' => 'localhost', 'socket' => null],
-    ['host' => 'localhost', 'socket' => '/var/run/mysqld/mysqld.sock'],
-    ['host' => 'localhost', 'socket' => '/tmp/mysql.sock'],
-    ['host' => 'mysql4202.lwspanel.com', 'socket' => null],
-];
-
-$bdd = null;
-$lastError = null;
-
-foreach ($connectionMethods as $method) {
-    try {
-        if ($method['socket']) {
-            $dsn = "mysql:unix_socket={$method['socket']};dbname={$db_name};charset={$db_charset}";
-        } else {
-            $dsn = "mysql:host={$method['host']};dbname={$db_name};charset={$db_charset}";
-        }
-        
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ];
-        
-        $bdd = new PDO($dsn, $db_user, $db_pass, $options);
-        break;
-    } catch (PDOException $e) {
-        $lastError = $e;
-        continue;
-    }
-}
-
-if ($bdd === null) {
+if (!file_exists($configDbPath)) {
     http_response_code(500);
     echo json_encode([
         'success' => false, 
-        'message' => 'Erreur de connexion à la base de données'
+        'message' => 'Erreur de configuration: fichier config_database.php non trouvé',
+        'error' => 'Le fichier config_database.php est manquant sur le serveur'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+require_once $configDbPath;
+
+if (!function_exists('createDatabaseConnection')) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Erreur de configuration: fonction createDatabaseConnection() non disponible'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+try {
+    $bdd = createDatabaseConnection();
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Erreur de connexion à la base de données',
+        'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }

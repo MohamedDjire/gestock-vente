@@ -23,62 +23,41 @@ error_reporting(E_ALL);
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
 // =====================================================
-// Configuration base de données
-$db_name = 'aliad2663340';
-$db_user = 'aliad2663340';
-$db_pass = 'Stock2025@';
-$db_charset = 'utf8mb4';
+$configDbPath = __DIR__ . '/config_database.php';
 
-// Essayer plusieurs méthodes de connexion
-$connectionMethods = [
-    ['host' => '127.0.0.1', 'socket' => null],  // TCP/IP avec 127.0.0.1 (essayer en premier)
-    ['host' => 'localhost', 'socket' => null],  // localhost en TCP/IP
-    ['host' => 'localhost', 'socket' => '/var/run/mysqld/mysqld.sock'],  // Socket Unix standard
-    ['host' => 'localhost', 'socket' => '/tmp/mysql.sock'],  // Socket Unix alternatif
-    ['host' => 'mysql4202.lwspanel.com', 'socket' => null],  // Nom d'hôte du serveur
-];
-
-$bdd = null;
-$lastError = null;
-
-foreach ($connectionMethods as $method) {
-    try {
-        if ($method['socket']) {
-            // Connexion avec socket Unix spécifié
-            $dsn = "mysql:unix_socket={$method['socket']};dbname={$db_name};charset={$db_charset}";
-        } else {
-            // Connexion TCP/IP
-            $dsn = "mysql:host={$method['host']};dbname={$db_name};charset={$db_charset}";
-        }
-        
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ];
-        
-        $bdd = new PDO($dsn, $db_user, $db_pass, $options);
-        // Si on arrive ici, la connexion a réussi
-        break;
-    } catch (PDOException $e) {
-        $lastError = $e;
-        continue; // Essayer la méthode suivante
-    }
+if (!file_exists($configDbPath)) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Erreur de configuration: fichier config_database.php non trouvé',
+        'error' => 'Le fichier config_database.php est manquant sur le serveur',
+        'path_searched' => $configDbPath
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
 }
 
-// Si aucune méthode n'a fonctionné, lancer l'erreur
-if ($bdd === null) {
+require_once $configDbPath;
+
+if (!function_exists('createDatabaseConnection')) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'message' => 'Erreur de configuration: fonction createDatabaseConnection() non disponible'
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+
+try {
+    $bdd = createDatabaseConnection();
+} catch (PDOException $e) {
     http_response_code(500);
     $errorInfo = [
         'success' => false, 
         'message' => 'Erreur de connexion à la base de données',
-        'error' => $lastError ? $lastError->getMessage() : 'Aucune méthode de connexion n\'a fonctionné',
-        'error_code' => $lastError ? $lastError->getCode() : 0,
-        'database' => $db_name,
-        'user' => $db_user,
-        'tried_methods' => array_map(function($m) {
-            return $m['socket'] ? "socket: {$m['socket']}" : "host: {$m['host']}";
-        }, $connectionMethods),
+        'error' => $e->getMessage(),
+        'error_code' => $e->getCode(),
+        'database' => defined('DB_NAME') ? DB_NAME : 'Non défini',
+        'user' => defined('DB_USER') ? DB_USER : 'Non défini',
         'suggestion' => 'Vérifiez les paramètres de connexion dans votre panneau d\'hébergement ou contactez le support.'
     ];
     
@@ -90,115 +69,25 @@ if ($bdd === null) {
 // FONCTIONS UTILITAIRES
 // =====================================================
 
-/**
- * Générer un token d'authentification avec slug de l'entreprise
- */
-function generateAuthToken($userId, $slug) {
-    $timestamp = time();
-    $tokenData = $userId . ':' . $slug . ':' . $timestamp;
-    return base64_encode($tokenData);
-}
+// Inclure middleware_auth pour utiliser generateJWT et authenticateAndAuthorize
+require_once __DIR__ . '/functions/middleware_auth.php';
 
 /**
- * Authentifier et autoriser un utilisateur
+ * Générer un token JWT sécurisé à partir des données utilisateur
  */
-function authenticateAndAuthorize($bdd, $enterpriseId = null) {
-    $headers = getallheaders();
-    $token = null;
+function generateAuthToken($userData) {
+    $secret = JWT_SECRET;
     
-    if (isset($headers['Authorization'])) {
-        $authHeader = $headers['Authorization'];
-        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-            $token = $matches[1];
-        } else {
-            $token = $authHeader;
-        }
-    } elseif (isset($headers['authorization'])) {
-        $authHeader = $headers['authorization'];
-        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-            $token = $matches[1];
-        } else {
-            $token = $authHeader;
-        }
-    } elseif (isset($_GET['token'])) {
-        $token = $_GET['token'];
-    }
-    
-    if (!$token) {
-        throw new Exception("Token d'authentification requis", 401);
-    }
-    
-    $decoded = base64_decode($token);
-    $parts = explode(':', $decoded);
-    
-    // Format du token: userId:slug:timestamp
-    if (count($parts) !== 3) {
-        // Support de l'ancien format (userId:timestamp) pour compatibilité
-        if (count($parts) === 2) {
-            $userId = $parts[0];
-            $timestamp = $parts[1];
-            $slug = null; // Ancien format sans slug
-        } else {
-            throw new Exception("Token invalide", 401);
-        }
-    } else {
-        $userId = $parts[0];
-        $slug = $parts[1];
-        $timestamp = $parts[2];
-    }
-    
-    if (time() - $timestamp > 86400) {
-        throw new Exception("Token expiré", 401);
-    }
-    
-    $stmt = $bdd->prepare("
-        SELECT 
-            u.id_utilisateur,
-            u.id_entreprise,
-            u.nom,
-            u.prenom,
-            u.username,
-            u.email,
-            u.role,
-            u.statut,
-            e.statut AS entreprise_statut,
-            e.slug AS entreprise_slug
-        FROM stock_utilisateur u
-        INNER JOIN stock_entreprise e ON u.id_entreprise = e.id_entreprise
-        WHERE u.id_utilisateur = :id AND u.statut = 'actif'
-    ");
-    
-    $stmt->execute(['id' => $userId]);
-    $user = $stmt->fetch();
-    
-    if (!$user) {
-        throw new Exception("Utilisateur non trouvé ou inactif", 401);
-    }
-    
-    if ($user['entreprise_statut'] !== 'actif') {
-        throw new Exception("L'entreprise associée à ce compte est inactive", 403);
-    }
-    
-    // Vérifier que le slug du token correspond au slug de l'entreprise
-    if ($slug !== null && $user['entreprise_slug'] !== $slug) {
-        throw new Exception("Token invalide - Le slug de l'entreprise ne correspond pas", 401);
-    }
-    
-    if ($enterpriseId !== null && $user['id_entreprise'] != $enterpriseId) {
-        if ($user['role'] !== 'Admin' && $user['role'] !== 'SuperAdmin') {
-            throw new Exception("Accès non autorisé à cette entreprise", 403);
-        }
-    }
-    
-    return [
-        'id' => $user['id_utilisateur'],
-        'user_id' => $user['id_utilisateur'],
-        'enterprise_id' => $user['id_entreprise'],
-        'user_enterprise_id' => $user['id_entreprise'],
-        'user_role' => strtolower($user['role']),
-        'role' => $user['role'],
-        'enterprise_slug' => $user['entreprise_slug'] ?? null
+    // Préparer les données utilisateur au format attendu
+    $userDataFormatted = [
+        'user_id' => (int)$userData['id_utilisateur'],
+        'user_first_name' => $userData['prenom'] ?? '',
+        'user_email' => $userData['email'],
+        'user_role' => strtolower($userData['role']),
+        'user_enterprise_id' => (int)$userData['id_entreprise']
     ];
+    
+    return generateJWT($userDataFormatted, $secret);
 }
 
 /**
@@ -614,8 +503,7 @@ try {
         }
         
         $user = loginUser($bdd, $data['email'], $data['password']);
-        $slug = $user['slug'] ?? '';
-        $token = generateAuthToken($user['id_utilisateur'], $slug);
+        $token = generateAuthToken($user);
         
         $resultat = ['user' => $user, 'token' => $token];
     } else {

@@ -17,9 +17,9 @@ error_reporting(E_ALL);
 
 
 // Inclure les fichiers nécessaires
-include 'database.php';
-include 'functions_entreprise.php';
-include 'middleware_auth.php';
+include 'config/database.php';
+include 'functions/functions_entreprise.php';
+include 'functions/middleware_auth.php';
 include 'config.php';
 
 
@@ -42,12 +42,28 @@ try {
     // Route spéciale pour générer un token de test (GET?action=token&user_id=...)
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'token' && isset($_GET['user_id'])) {
         $userId = (int)$_GET['user_id'];
-        $payload = [
-            'sub' => $userId,
-            'iat' => time(),
-            'exp' => time() + 3600 // 1h de validité
+        // Récupérer les données utilisateur depuis la base
+        $stmt = $bdd->prepare("
+            SELECT u.id_utilisateur, u.prenom, u.email, u.role, u.id_entreprise
+            FROM stock_utilisateur u
+            WHERE u.id_utilisateur = :id
+        ");
+        $stmt->execute(['id' => $userId]);
+        $user = $stmt->fetch();
+        
+        if (!$user) {
+            throw new Exception("Utilisateur non trouvé");
+        }
+        
+        $userData = [
+            'user_id' => (int)$user['id_utilisateur'],
+            'user_first_name' => $user['prenom'] ?? '',
+            'user_email' => $user['email'],
+            'user_role' => strtolower($user['role']),
+            'user_enterprise_id' => (int)$user['id_entreprise']
         ];
-        $token = generateJWT($payload, JWT_SECRET);
+        
+        $token = generateJWT($userData, JWT_SECRET);
         echo json_encode(['success' => true, 'token' => $token]);
         exit;
     }

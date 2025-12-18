@@ -1,19 +1,42 @@
 
 
 <?php
-require_once 'config.php';
+require_once __DIR__ . '/../config.php';
 /**
  * Middleware d'authentification et d'autorisation JWT (sans dépendance externe)
  */
 
 
-function generateJWT($payload, $secret) {
-    $header = ['alg' => 'HS256', 'typ' => 'JWT'];
-    $base64UrlHeader = rtrim(strtr(base64_encode(json_encode($header)), '+/', '-_'), '=');
-    $base64UrlPayload = rtrim(strtr(base64_encode(json_encode($payload)), '+/', '-_'), '=');
+function generateJWT($userData, $secret) {
+    // Créer l'en-tête
+    $header = [
+        'typ' => 'JWT',
+        'alg' => 'HS256'
+    ];
+    
+    // Créer la charge utile (payload)
+    $payload = [
+        'sub' => $userData['user_id'],                    // ID de l'utilisateur
+        'name' => $userData['user_first_name'],          // Nom de l'utilisateur
+        'email' => $userData['user_email'],              // Email de l'utilisateur
+        'role' => $userData['user_role'],                // Rôle de l'utilisateur
+        'enterprise_id' => $userData['user_enterprise_id'], // ID de l'entreprise
+        'iat' => time(),                                 // Émis à (timestamp)
+        'exp' => time() + JWT_EXPIRATION                 // Expiration (timestamp)
+    ];
+    
+    // Encoder l'en-tête et la charge utile en Base64Url
+    $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($header)));
+    $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
+    
+    // Créer la signature
     $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, $secret, true);
-    $base64UrlSignature = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
-    return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+    $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+    
+    // Créer le token
+    $jwt = $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+    
+    return $jwt;
 }
 
 function authenticateAndAuthorize($bdd, $enterpriseId = null) {
@@ -85,11 +108,28 @@ function authenticateAndAuthorize($bdd, $enterpriseId = null) {
 function verifyJWT($token, $secret) {
     $parts = explode('.', $token);
     if (count($parts) !== 3) return false;
-    $header = base64_decode(strtr($parts[0], '-_', '+/'));
-    $payload = base64_decode(strtr($parts[1], '-_', '+/'));
+    
+    // Reconstruire le header et payload pour vérifier la signature
+    // (on utilise les parties originales du token)
+    $base64UrlHeader = $parts[0];
+    $base64UrlPayload = $parts[1];
     $signatureProvided = $parts[2];
-    $validSignature = rtrim(strtr(base64_encode(hash_hmac('sha256', "$parts[0].$parts[1]", $secret, true)), '+/', '-_'), '=');
-    if (!hash_equals($validSignature, $signatureProvided)) return false;
-    $data = json_decode($payload, true);
+    
+    // Vérifier la signature
+    $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, $secret, true);
+    $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+    
+    if (!hash_equals($base64UrlSignature, $signatureProvided)) return false;
+    
+    // Décoder le payload (ajouter le padding si nécessaire pour base64_decode)
+    $payload = str_replace(['-', '_'], ['+', '/'], $base64UrlPayload);
+    // Ajouter le padding manquant
+    $padding = strlen($payload) % 4;
+    if ($padding) {
+        $payload .= str_repeat('=', 4 - $padding);
+    }
+    $decodedPayload = base64_decode($payload);
+    $data = json_decode($decodedPayload, true);
+    
     return $data ?: false;
 }
