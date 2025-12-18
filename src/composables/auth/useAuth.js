@@ -23,12 +23,16 @@ export function useAuth() {
     error.value = null
 
     try {
+      console.log('🔐 Tentative de connexion:', { email })
       const response = await apiService.post('/login.php', {
         email,
         password
       })
 
-      if (response.success && response.data) {
+      // Debug: afficher la réponse complète
+      console.log('✅ Réponse API login reçue:', response)
+
+      if (response && response.success && response.data) {
         const { token: authToken, user: userData, expires_in } = response.data
         
         // Sauvegarder dans le storage
@@ -40,9 +44,11 @@ export function useAuth() {
 
         return { success: true, user: userData }
       } else {
-        throw new Error(response.message || 'Erreur lors de la connexion')
+        const errorMessage = response?.message || response?.error || 'Erreur lors de la connexion'
+        throw new Error(errorMessage)
       }
     } catch (err) {
+      console.error('Erreur login:', err)
       error.value = err.message || 'Une erreur est survenue lors de la connexion'
       return { success: false, error: error.value }
     } finally {

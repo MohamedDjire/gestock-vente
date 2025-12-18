@@ -231,8 +231,8 @@ const handleSignUp = async () => {
   const result = await signUp(signUpData)
   
   if (result.success) {
-    // Redirection sera gérée par les routes du dashboard
-    // router.push('/dashboard')
+    // Rediriger vers le dashboard après inscription réussie
+    router.push({ name: 'Dashboard' })
   }
 }
 </script>

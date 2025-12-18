@@ -6,8 +6,7 @@ import Dashboard from '../pages/Dashboard.vue'
 const routes = [
   {
     path: '/',
-    name: 'Dashboard',
-    component: Dashboard
+    redirect: '/login'
   },
   {
     path: '/login',
@@ -18,6 +17,11 @@ const routes = [
     path: '/signup',
     name: 'SignUp',
     component: SignUp
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: Dashboard
   }
 ]
 

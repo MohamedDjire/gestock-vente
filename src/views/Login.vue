@@ -34,7 +34,7 @@
           <div class="form-group">
             <div class="form-label-row">
               <label for="password">Mot de passe</label>
-              <router-link to="/forgot-password" class="forgot-link">Oublié ?</router-link>
+              <a href="#" class="forgot-link" @click.prevent>Oublié ?</a>
             </div>
             <input
               id="password"
@@ -135,11 +135,18 @@ const formData = ref({
 })
 
 const handleLogin = async () => {
+  console.log('📝 Données du formulaire:', {
+    email: formData.value.email,
+    passwordLength: formData.value.password?.length
+  })
+  
   const result = await login(formData.value.email, formData.value.password)
   
   if (result.success) {
-    // Redirection sera gérée par les routes du dashboard
-    // router.push('/dashboard')
+    // Rediriger vers le dashboard après connexion réussie
+    router.push({ name: 'Dashboard' })
+  } else {
+    console.error('❌ Échec de la connexion:', result.error)
   }
 }
 </script>
