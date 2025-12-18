@@ -1,12 +1,12 @@
 <template>
   <nav class="sidebar">
     <div class="logo">
-      <span class="logo-icon">☁️</span>
-      <span class="logo-text">VENTES</span>
+      <span class="logo-icon" style="font-size:2.2rem;">🌥️</span>
+      <span class="logo-text" style="font-size:2.1rem; font-weight:900; color:#ffe082;">PROSTOCK</span>
     </div>
     <ul class="menu">
       <li class="active"><span class="icon">🏠</span> Dashboard</li>
-    
+      
     </ul>
     <div class="upgrade-box">
       <div class="upgrade-illustration">🚀</div>
@@ -21,6 +21,7 @@
 </script>
 
 <style scoped>
+/* Sidebar moderne, fond vert foncé, logo jaune, icônes */
 .sidebar {
   width: 250px;
   background: #1a5f4a;
@@ -28,26 +29,31 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem 1rem 1rem 1rem;
+  padding: 2.5rem 1rem 1rem 1rem;
   height: 100vh;
   min-height: 100vh;
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  border-radius: 0;
+  border-radius: 0 32px 32px 0;
   z-index: 10;
   overflow-y: auto;
 }
 .logo {
   display: flex;
   align-items: center;
-  font-size: 2rem;
+  font-size: 2.2rem;
   font-weight: bold;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 .logo-icon {
-  margin-right: 0.5rem;
+  margin-right: 0.7rem;
+}
+.logo-text {
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.03em;
 }
 .menu {
   list-style: none;
@@ -57,12 +63,12 @@
 .menu li {
   display: flex;
   align-items: center;
-  padding: 1rem;
-  border-radius: 10px;
-  margin-bottom: 0.5rem;
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  margin-bottom: 0.7rem;
   cursor: pointer;
-  font-size: 1.1rem;
-  transition: background 0.2s;
+  font-size: 1.13rem;
+  transition: background 0.2s, color 0.2s;
 }
 .menu li.active, .menu li:hover {
   background: #fff;
@@ -70,7 +76,7 @@
 }
 .icon {
   margin-right: 1rem;
-  font-size: 1.3rem;
+  font-size: 1.35rem;
 }
 .upgrade-box {
   background: #fff;
