@@ -1,13 +1,20 @@
 <?php
 /**
- * Configuration de la base de données
+ * Configuration et gestion de la base de données
  * 
- * Ce fichier contient toutes les informations de connexion à la base de données.
+ * Ce fichier contient :
+ * - Les constantes de configuration (DB_HOST, DB_NAME, etc.)
+ * - La fonction createDatabaseConnection()
+ * - La classe Database (optionnelle, utilise createDatabaseConnection)
+ * 
  * IMPORTANT: Ne commitez jamais ce fichier avec des informations de production en clair.
  * Utilisez des variables d'environnement ou un fichier .env pour la production.
  */
 
-// Configuration principale de la base de données
+// =====================================================
+// CONFIGURATION DE LA BASE DE DONNÉES
+// =====================================================
+
 if (!defined('DB_HOST')) {
     define('DB_HOST', '127.0.0.1');
 }
@@ -36,11 +43,16 @@ if (!defined('DB_CONNECTION_METHODS')) {
     ]);
 }
 
+// =====================================================
+// FONCTION DE CONNEXION
+// =====================================================
+
 /**
  * Fonction utilitaire pour créer une connexion PDO
  * Essaie plusieurs méthodes de connexion jusqu'à ce qu'une fonctionne
  * 
- * @return PDO|null Retourne l'instance PDO ou null si toutes les méthodes échouent
+ * @return PDO Retourne l'instance PDO
+ * @throws PDOException Si toutes les méthodes de connexion échouent
  */
 function createDatabaseConnection() {
     $db_name = DB_NAME;
@@ -82,6 +94,40 @@ function createDatabaseConnection() {
     }
     
     return $bdd;
+}
+
+// =====================================================
+// CLASSE DATABASE (OPTIONNELLE)
+// =====================================================
+
+/**
+ * Classe Database - Wrapper autour de createDatabaseConnection()
+ * Utilisée principalement par api_entreprise.php
+ */
+class Database {
+    private $pdo;
+
+    public function __construct() {
+        $this->connect();
+    }
+
+    private function connect() {
+        try {
+            $this->pdo = createDatabaseConnection();
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Erreur de connexion à la base de données', 
+                'error' => $e->getMessage()
+            ]);
+            exit;
+        }
+    }
+
+    public function getPdo() {
+        return $this->pdo;
+    }
 }
 
 ?>

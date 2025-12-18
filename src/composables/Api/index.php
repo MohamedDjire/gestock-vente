@@ -23,29 +23,8 @@ error_reporting(E_ALL);
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
 // =====================================================
-$configDbPath = __DIR__ . '/config_database.php';
-
-if (!file_exists($configDbPath)) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false, 
-        'message' => 'Erreur de configuration: fichier config_database.php non trouvé',
-        'error' => 'Le fichier config_database.php est manquant sur le serveur',
-        'path_searched' => $configDbPath
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    exit;
-}
-
-require_once $configDbPath;
-
-if (!function_exists('createDatabaseConnection')) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false, 
-        'message' => 'Erreur de configuration: fonction createDatabaseConnection() non disponible'
-    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    exit;
-}
+// Sur le serveur: config/database.php
+require_once __DIR__ . '/config/database.php';
 
 try {
     $bdd = createDatabaseConnection();
