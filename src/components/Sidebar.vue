@@ -6,10 +6,7 @@
     </div>
     <ul class="menu">
       <li class="active"><span class="icon">🏠</span> Dashboard</li>
-      <li><span class="icon">📄</span> Claims</li>
-      <li><span class="icon">🧾</span> Biller Queue</li>
-      <li><span class="icon">⭐</span> Subscription</li>
-      <li><span class="icon">❤️</span> Health</li>
+    
     </ul>
     <div class="upgrade-box">
       <div class="upgrade-illustration">🚀</div>
@@ -40,6 +37,7 @@
   bottom: 0;
   border-radius: 0;
   z-index: 10;
+  overflow-y: auto;
 }
 .logo {
   display: flex;

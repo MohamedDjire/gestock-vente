@@ -46,6 +46,7 @@ import SalesChart from '../components/SalesChart.vue'
   min-width: 0;
   height: 100vh;
   overflow: auto;
+  margin-left: 250px;
 }
 .dashboard-wrapper {
   background: #fff;

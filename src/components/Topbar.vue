@@ -7,15 +7,21 @@
     <div class="topbar-actions">
       <span class="notif-icon">🔔</span>
       <div class="profile">
-        <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="profile" />
-        <span class="profile-name">Utilisateur</span>
+        <img :src="user?.avatar || 'https://randomuser.me/api/portraits/lego/1.jpg'" alt="profile" />
+        <span class="profile-name">{{ user?.nom || 'Utilisateur' }}</span>
       </div>
     </div>
   </header>
 </template>
 
 <script setup>
-// Statique pour la topbar
+import { useStorage } from '../composables/storage/useStorage'
+import { ref, onMounted } from 'vue'
+const { getUser } = useStorage()
+const user = ref(null)
+onMounted(() => {
+  user.value = getUser()
+})
 </script>
 
 <style scoped>
