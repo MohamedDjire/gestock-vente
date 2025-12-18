@@ -193,10 +193,11 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth } from '../composables/auth/useAuth.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const router = useRouter()
-const { signUp, loading, error } = useAuth()
+const authStore = useAuthStore()
+const { signUp, loading, error } = authStore
 
 const formData = ref({
   nom: '',

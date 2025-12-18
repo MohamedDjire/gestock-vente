@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '../../stores/auth.js'
 
 /**
  * Service API pour les appels HTTP
@@ -24,13 +25,24 @@ const apiClient = axios.create({
   }
 })
 
-// Intercepteur pour ajouter le token aux requêtes
+// Intercepteur pour ajouter le token aux requêtes et vérifier l'expiration
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('prostock_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    // Utiliser le store pour vérifier l'expiration et récupérer le token
+    const authStore = useAuthStore()
+    
+    // Vérifier l'expiration avant chaque requête
+    if (authStore.token && authStore.isTokenExpired()) {
+      console.warn('⚠️ Token expiré, nettoyage automatique')
+      authStore.logout()
+      return Promise.reject(new Error('Token expiré'))
     }
+    
+    // Ajouter le token aux headers si disponible
+    if (authStore.token) {
+      config.headers.Authorization = `Bearer ${authStore.token}`
+    }
+    
     return config
   },
   (error) => {
@@ -56,6 +68,13 @@ apiClient.interceptors.response.use(
       // Erreur de réponse du serveur
       const status = error.response.status
       const data = error.response.data
+      
+      // Si erreur 401 (Unauthorized), le token est probablement invalide ou expiré
+      if (status === 401) {
+        console.warn('⚠️ Erreur 401 - Token invalide ou expiré, nettoyage automatique...')
+        const authStore = useAuthStore()
+        authStore.logout()
+      }
       
       // Afficher plus de détails en console pour le débogage
       console.error('❌ Erreur API:', {

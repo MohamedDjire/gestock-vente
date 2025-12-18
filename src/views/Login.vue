@@ -127,7 +127,8 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/auth/useAuth.js'
 
 const router = useRouter()
-const { login, loading, error } = useAuth()
+const authStore = useAuthStore()
+const { login, loading, error } = authStore
 
 const formData = ref({
   email: '',
