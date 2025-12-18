@@ -125,6 +125,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/auth/useAuth.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -136,10 +137,6 @@ const formData = ref({
 })
 
 const handleLogin = async () => {
-  console.log('📝 Données du formulaire:', {
-    email: formData.value.email,
-    passwordLength: formData.value.password?.length
-  })
   
   const result = await login(formData.value.email, formData.value.password)
   

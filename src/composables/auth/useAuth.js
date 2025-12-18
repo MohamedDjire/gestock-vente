@@ -21,9 +21,7 @@ export function useAuth() {
     loading.value = true
     error.value = null
     try {
-      console.log('🔐 Tentative de connexion:', { email })
       const response = await apiService.post('/login.php', { email, password })
-      console.log('✅ Réponse API login reçue:', response)
       if (response && response.success && response.data) {
         const { token: authToken, user: userData, expires_in } = response.data
         storage.saveAuthData(authToken, userData, expires_in)
