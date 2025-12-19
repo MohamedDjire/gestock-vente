@@ -12,17 +12,13 @@ export const useAuthStore = defineStore('auth', () => {
   // ÉTAT (STATE)
   // =====================================================
   const token = ref(localStorage.getItem('prostock_token') || null)
-  const user = ref((() => {
+  const user = ref(null)
+  try {
     const userStr = localStorage.getItem('prostock_user')
-    if (userStr) {
-      try {
-        return JSON.parse(userStr)
-      } catch (e) {
-        return null
-      }
-    }
-    return null
-  })())
+    if (userStr) user.value = JSON.parse(userStr)
+  } catch (e) {
+    user.value = null
+  }
   const loading = ref(false)
   const error = ref(null)
 

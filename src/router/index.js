@@ -34,28 +34,30 @@ const router = createRouter({
   routes
 })
 
-// Garde de navigation pour vérifier l'authentification
+// Garde de navigation fusionnée : expiration du token + redirection selon l'authentification
 router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
-  
+  const authStore = useAuthStore();
+  const token = localStorage.getItem('prostock_token');
+
   // Vérifier l'expiration du token avant chaque navigation
   if (authStore.token) {
     if (authStore.isTokenExpired()) {
-      console.warn('⚠️ Token expiré lors de la navigation, déconnexion...')
-      authStore.logout()
-      next({ name: 'Login' })
-      return
+      console.warn('⚠️ Token expiré lors de la navigation, déconnexion...');
+      authStore.logout();
+      next({ name: 'Login' });
+      return;
     }
   }
-  
+
   // Vérifier si la route nécessite une authentification
   // Si oui et que l'utilisateur n'est pas authentifié, rediriger vers login
+  // Permettre l'accès à login même si connecté (pas de redirection automatique vers dashboard)
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next({ name: 'Login' })
+    next({ name: 'Login' });
   } else {
     // Permettre l'accès à toutes les autres routes (y compris login même si connecté)
-    next()
+    next();
   }
-})
+});
 
 export default router

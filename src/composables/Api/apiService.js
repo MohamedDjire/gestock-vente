@@ -10,12 +10,6 @@ import axios from 'axios'
 // Pour override : créez un fichier .env avec VITE_API_BASE_URL=votre-url
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock'
 
-// Afficher l'URL de l'API en mode développement pour le débogage
-if (import.meta.env.DEV) {
-  console.log('🔗 URL de l\'API configurée:', API_BASE_URL)
-  console.log('💡 Pour changer l\'URL, créez un fichier .env avec: VITE_API_BASE_URL=votre-url')
-}
-
 // Créer une instance axios
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -69,14 +63,6 @@ apiClient.interceptors.request.use(
 // Intercepteur pour gérer les erreurs de réponse
 apiClient.interceptors.response.use(
   (response) => {
-    // En mode développement, afficher la réponse pour le débogage
-    if (import.meta.env.DEV) {
-      console.log('✅ Réponse API reçue:', {
-        url: response.config?.url,
-        status: response.status,
-        data: response.data
-      })
-    }
     return response.data
   },
   (error) => {

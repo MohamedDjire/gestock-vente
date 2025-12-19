@@ -136,10 +136,6 @@ const formData = ref({
 })
 
 const handleLogin = async () => {
-  console.log('📝 Données du formulaire:', {
-    email: formData.value.email,
-    passwordLength: formData.value.password?.length
-  })
   
   const result = await login(formData.value.email, formData.value.password)
   
