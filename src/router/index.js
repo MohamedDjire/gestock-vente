@@ -7,7 +7,7 @@ import Dashboard from '../pages/Dashboard.vue'
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard'
+    redirect: '/login'
   },
   {
     path: '/login',
@@ -34,7 +34,7 @@ const router = createRouter({
   routes
 })
 
-// Garde de navigation : vérification de l'authentification et expiration du token
+// Garde de navigation fusionnée : expiration du token + redirection selon l'authentification
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore();
 
@@ -42,22 +42,18 @@ router.beforeEach((to, from, next) => {
   if (authStore.token && authStore.isTokenExpired()) {
     console.warn('⚠️ Token expiré lors de la navigation, déconnexion...');
     authStore.logout();
-    // Si on essaie d'accéder à une route protégée, rediriger vers login
-    if (to.meta.requiresAuth) {
-      next({ name: 'Login' });
-    } else {
-      next();
-    }
+    next({ name: 'Login' });
     return;
   }
 
+  // Si déjà connecté, empêcher l'accès à login/signup et rediriger vers dashboard
+  if ((to.name === 'Login' || to.name === 'SignUp') && authStore.isAuthenticated) {
+    next({ name: 'Dashboard' });
+  }
   // Si la route nécessite l'authentification et que l'utilisateur n'est pas connecté
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    // Rediriger vers login pour se connecter
+  else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login' });
   } else {
-    // Permettre l'accès à toutes les autres routes
-    // Login et SignUp restent accessibles même si connecté (pas de redirection automatique)
     next();
   }
 });
