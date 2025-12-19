@@ -102,7 +102,7 @@ import SalesChart from '../components/SalesChart.vue'
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 2.5rem;
+  gap: 2.2rem;
   width: 100%;
   box-sizing: border-box;
   background: #f6f7fa;
