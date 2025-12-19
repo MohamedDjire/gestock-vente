@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { useAuthStore } from '../../stores/auth.js'
 
 /**
  * Service API pour les appels HTTP
@@ -28,19 +27,36 @@ const apiClient = axios.create({
 // Intercepteur pour ajouter le token aux requêtes et vérifier l'expiration
 apiClient.interceptors.request.use(
   (config) => {
-    // Utiliser le store pour vérifier l'expiration et récupérer le token
-    const authStore = useAuthStore()
+    // Récupérer le token depuis localStorage (évite la dépendance circulaire)
+    const token = localStorage.getItem('prostock_token')
     
-    // Vérifier l'expiration avant chaque requête
-    if (authStore.token && authStore.isTokenExpired()) {
-      console.warn('⚠️ Token expiré, nettoyage automatique')
-      authStore.logout()
-      return Promise.reject(new Error('Token expiré'))
-    }
-    
-    // Ajouter le token aux headers si disponible
-    if (authStore.token) {
-      config.headers.Authorization = `Bearer ${authStore.token}`
+    if (token) {
+      // Décoder le JWT pour vérifier l'expiration
+      try {
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+          if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+            // Token expiré, nettoyer et rediriger
+            console.warn('⚠️ Token expiré, nettoyage automatique')
+            localStorage.removeItem('prostock_token')
+            localStorage.removeItem('prostock_user')
+            localStorage.removeItem('prostock_expires_at')
+            
+            // Rediriger vers login si on est dans le navigateur
+            if (typeof window !== 'undefined' && window.location) {
+              window.location.href = '/login'
+            }
+            
+            return Promise.reject(new Error('Token expiré'))
+          }
+        }
+      } catch (e) {
+        console.error('Erreur lors de la vérification du token:', e)
+      }
+      
+      // Ajouter le token aux headers
+      config.headers.Authorization = `Bearer ${token}`
     }
     
     return config
@@ -72,8 +88,14 @@ apiClient.interceptors.response.use(
       // Si erreur 401 (Unauthorized), le token est probablement invalide ou expiré
       if (status === 401) {
         console.warn('⚠️ Erreur 401 - Token invalide ou expiré, nettoyage automatique...')
-        const authStore = useAuthStore()
-        authStore.logout()
+        localStorage.removeItem('prostock_token')
+        localStorage.removeItem('prostock_user')
+        localStorage.removeItem('prostock_expires_at')
+        
+        // Rediriger vers login si on est dans le navigateur
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.href = '/login'
+        }
       }
       
       // Afficher plus de détails en console pour le débogage

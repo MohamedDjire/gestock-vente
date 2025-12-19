@@ -12,7 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   // ÉTAT (STATE)
   // =====================================================
   const token = ref(localStorage.getItem('prostock_token') || null)
-  const user = ref(() => {
+  const user = ref((() => {
     const userStr = localStorage.getItem('prostock_user')
     if (userStr) {
       try {
@@ -22,7 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
     return null
-  }())
+  })())
   const loading = ref(false)
   const error = ref(null)
 
@@ -38,8 +38,8 @@ export const useAuthStore = defineStore('auth', () => {
     
     // Vérifier l'expiration du token JWT
     if (isTokenExpired()) {
-      // Token expiré, nettoyer automatiquement
-      logout()
+      // Token expiré, nettoyer automatiquement (mais ne pas appeler logout dans computed)
+      // logout() sera appelé ailleurs pour éviter les effets de bord
       return false
     }
     
@@ -209,8 +209,14 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('prostock_user')
     localStorage.removeItem('prostock_expires_at')
     
-    // Rediriger vers la page de login
-    router.push({ name: 'Login' })
+    // Rediriger vers la page de login (seulement si router est disponible)
+    if (router && typeof router.push === 'function') {
+      router.push({ name: 'Login' }).catch(() => {
+        // Ignorer les erreurs de navigation
+      })
+    } else if (typeof window !== 'undefined' && window.location) {
+      window.location.href = '/login'
+    }
   }
 
   /**

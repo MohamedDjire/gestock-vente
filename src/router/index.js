@@ -49,12 +49,11 @@ router.beforeEach((to, from, next) => {
   }
   
   // Vérifier si la route nécessite une authentification
+  // Si oui et que l'utilisateur n'est pas authentifié, rediriger vers login
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login' })
-  } else if (to.name === 'Login' && authStore.isAuthenticated) {
-    // Si déjà connecté, rediriger vers le dashboard
-    next({ name: 'Dashboard' })
   } else {
+    // Permettre l'accès à toutes les autres routes (y compris login même si connecté)
     next()
   }
 })
