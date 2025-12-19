@@ -1,7 +1,9 @@
 <template>
   <div class="sales-chart">
     <h3>Sales Over the Years</h3>
-    <canvas ref="chartCanvas"></canvas>
+    <div class="chart-container">
+      <canvas ref="chartCanvas"></canvas>
+    </div>
   </div>
 </template>
 
@@ -52,20 +54,51 @@ onMounted(async () => {
 
 <style scoped>
 .sales-chart {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 2px 12px #0001;
-  padding: 1.5rem 1.5rem 2rem 1.5rem;
-  margin-bottom: 2rem;
-  height: 270px;
+  background: #f6faf9;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px 0 rgba(26, 95, 74, 0.18);
+  padding: 2.8rem 2.8rem 2.2rem 2.8rem;
+  margin-bottom: 2.5rem;
+  min-height: 440px;
+  transition: box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  flex: 1 1 180px;
+  min-width: 200px;
+  max-width: 400px;
+  width: 100%;
+  height: auto;
+  border: 2px solid #1a5f4a22;
+  box-sizing: border-box;
 }
 h3 {
   color: #1a5f4a;
   margin-bottom: 1rem;
   font-size: 1.1rem;
 }
+.chart-container {
+  flex: 1;
+  min-height: 0;
+  height: 370px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px 0 rgba(26, 95, 74, 0.1);
+  border: 1.5px solid #1a5f4a18;
+  padding: 1.2rem 1.2rem 1.2rem 1.2rem;
+  box-sizing: border-box;
+}
 canvas {
   width: 100% !important;
-  height: 180px !important;
+  height: 340px !important;
+  max-height: 340px !important;
+  min-height: 320px !important;
+  background: transparent;
+  z-index: 2;
 }
 </style>
