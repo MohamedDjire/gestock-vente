@@ -35,9 +35,9 @@ const variationColor = computed(() => {
 <style scoped>
 /* Fond vert, texte clair */
 .stat-card {
-  background: linear-gradient(135deg, #1a5f4a 80%, #218c6a 100%);
+  background: #fff;
   border-radius: 20px;
-  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.10);
+  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.08);
   padding: 1.3rem 1.3rem 1rem 1.3rem;
   flex: 1 1 180px;
   display: flex;
@@ -46,6 +46,8 @@ const variationColor = computed(() => {
   min-width: 200px;
   max-width: 400px;
   transition: box-shadow 0.2s;
+  color: #222;
+  border: 1.5px solid #f0f0f0;
 }
 .stat-header {
   display: flex;
@@ -54,7 +56,7 @@ const variationColor = computed(() => {
   margin-bottom: 0.5rem;
 }
 .stat-title {
-  color: #fff;
+  color: #1a5f4a;
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: 0.01em;
@@ -66,24 +68,19 @@ const variationColor = computed(() => {
   filter: brightness(1.1);
 }
 .stat-value {
-  font-size: 2.2rem;
+  color: #222;
+  font-size: 2.1rem;
   font-weight: 800;
-  margin-bottom: 0.5rem;
-  color: #fff;
+  margin-bottom: 0.3rem;
 }
 .stat-footer {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  margin-top: 0.2rem;
-  color: #b6f7d6;
-  display: flex;
-  align-items: center;
-  gap: 0.3em;
 }
-.green {
-  color: #b6f7d6;
+.stat-footer.green {
+  color: #218c6a;
 }
-.red {
-  color: #ffd6d6;
+.stat-footer.red {
+  color: #e14b4b;
 }
 </style>

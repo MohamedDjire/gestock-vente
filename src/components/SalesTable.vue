@@ -22,26 +22,8 @@
           <td>105</td>
           <td><span class="badge gold">Gold</span></td>
         </tr>
-        <tr>
-          <td class="user-cell">
-            <img class="avatar" src="https://randomuser.me/api/portraits/men/33.jpg" alt="" />
-            Cordell Edwards
-          </td>
-          <td>$1567.80</td>
-          <td>95</td>
-          <td>60</td>
-          <td><span class="badge silver">Silver</span></td>
-        </tr>
-        <tr>
-          <td class="user-cell">
-            <img class="avatar" src="https://randomuser.me/api/portraits/men/34.jpg" alt="" />
-            Derrick Spencer
-          </td>
-          <td>$1640.26</td>
-          <td>120</td>
-          <td>75</td>
-          <td><span class="badge silver">Silver</span></td>
-        </tr>
+       
+      
         <tr>
           <td class="user-cell">
             <img class="avatar" src="https://randomuser.me/api/portraits/women/35.jpg" alt="" />

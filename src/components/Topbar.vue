@@ -1,9 +1,6 @@
 <template>
   <header class="topbar">
-    <div class="search-box">
-      <input type="text" placeholder="Search" />
-      <span class="search-icon">🔍</span>
-    </div>
+   
     <div class="topbar-actions">
       <span class="notif-icon">🔔</span>
       <div class="profile">
@@ -36,24 +33,7 @@ onMounted(() => {
   border-radius: 0 32px 0 0;
   min-height: 70px;
 }
-.search-box {
-  display: flex;
-  align-items: center;
-  background: #f5f6fa;
-  border-radius: 12px;
-  padding: 0.5rem 1.1rem;
-}
-.search-box input {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 1rem;
-  margin-right: 0.5rem;
-}
-.search-icon {
-  color: #1a5f4a;
-  font-size: 1.25rem;
-}
+
 .topbar-actions {
   display: flex;
   align-items: center;

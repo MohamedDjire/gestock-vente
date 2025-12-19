@@ -68,7 +68,7 @@ import SalesChart from '../components/SalesChart.vue'
   display: flex;
   min-height: 100vh;
   width: 100vw;
-  background: #f3f4f8;
+  background: #f6f7fa;
   overflow-x: auto;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
 }
@@ -81,6 +81,7 @@ import SalesChart from '../components/SalesChart.vue'
   overflow: auto;
   margin-left: 250px;
   max-width: 100vw;
+  background: #f6f7fa;
 }
 .dashboard-wrapper {
   background: #fff;
@@ -104,6 +105,7 @@ import SalesChart from '../components/SalesChart.vue'
   gap: 2.5rem;
   width: 100%;
   box-sizing: border-box;
+  background: #f6f7fa;
 }
 .dashboard-title {
   font-size: 2rem;
@@ -125,27 +127,31 @@ import SalesChart from '../components/SalesChart.vue'
   flex-wrap: wrap;
 }
 .chart-row {
-  flex: 2 1 340px;
+  flex: 2 1 0%;
   width: 100%;
-  min-width: 320px;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: stretch;
 }
 .team-block {
-  flex: 1 1 320px;
+  flex: 2 1 0%;
   display: flex;
   align-items: stretch;
   justify-content: flex-end;
-  min-width: 320px;
+  min-width: 0;
+  max-width: 100%;
+  height: 90%;
 }
 .team-card {
-  background: linear-gradient(135deg, #1a5f4a 80%, #218c6a 100%);
+  background: #e9ecef;
   border-radius: 24px;
-  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.10);
+  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.08);
   padding: 2rem 2rem 1.5rem 2rem;
-  min-width: 260px;
-  max-width: 400px;
-  color: #fff;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  color: #1a2a2a;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
@@ -156,18 +162,19 @@ import SalesChart from '../components/SalesChart.vue'
   font-size: 1.1rem;
   font-weight: 700;
   margin-bottom: 0.2rem;
+  color: #218c6a;
 }
 .team-progress {
   font-size: 2.1rem;
   font-weight: 800;
   margin-bottom: 0.2rem;
-  color: #fff;
+  color: #218c6a;
 }
 .team-achieved {
   font-size: 1rem;
   font-weight: 600;
   margin-left: 0.5rem;
-  color: #b6f7d6;
+  color: #1a5f4a;
 }
 .team-avatars {
   display: flex;
@@ -183,8 +190,8 @@ import SalesChart from '../components/SalesChart.vue'
   border: 2px solid #fff;
 }
 .team-more {
-  background: #fff2;
-  color: #fff;
+  background: #e0e0e0;
+  color: #1a5f4a;
   font-weight: 700;
   border-radius: 50%;
   padding: 0.3em 0.7em;
@@ -193,13 +200,13 @@ import SalesChart from '../components/SalesChart.vue'
 .team-queue {
   font-size: 1rem;
   font-weight: 600;
-  color: #fff;
+  color: #1a2a2a;
 }
 .team-queue-value {
   font-size: 1.1rem;
   font-weight: 700;
   margin-left: 0.5em;
-  color: #ffe082;
+  color: #218c6a;
 }
 .team-queue-variation {
   font-size: 1rem;

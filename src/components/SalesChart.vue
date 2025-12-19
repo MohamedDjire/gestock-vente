@@ -59,15 +59,15 @@ onMounted(async () => {
   box-shadow: 0 8px 32px 0 rgba(26, 95, 74, 0.18);
   padding: 2.8rem 2.8rem 2.2rem 2.8rem;
   margin-bottom: 2.5rem;
-  min-height: 440px;
+  min-height: 260px;
   transition: box-shadow 0.2s;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  flex: 1 1 180px;
-  min-width: 200px;
-  max-width: 400px;
+  flex: 2 1 0%;
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
   height: auto;
   border: 2px solid #1a5f4a22;
@@ -81,7 +81,7 @@ h3 {
 .chart-container {
   flex: 1;
   min-height: 0;
-  height: 370px;
+  height: 200px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -93,11 +93,11 @@ h3 {
   padding: 1.2rem 1.2rem 1.2rem 1.2rem;
   box-sizing: border-box;
 }
-canvas {
+.chart-container canvas {
   width: 100% !important;
-  height: 340px !important;
-  max-height: 340px !important;
-  min-height: 320px !important;
+  height: 180px !important;
+  max-height: 200px !important;
+  min-height: 120px !important;
   background: transparent;
   z-index: 2;
 }

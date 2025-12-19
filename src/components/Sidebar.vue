@@ -5,8 +5,12 @@
       <span class="logo-text" style="font-size:2.1rem; font-weight:900; color:#ffe082;">PROSTOCK</span>
     </div>
     <ul class="menu">
-      <li class="active"><span class="icon">🏠</span> Dashboard</li>
-      
+      <li v-for="item in menuItems" :key="item.name" :class="{ active: item.route === $route.path }">
+        <router-link :to="item.route" class="menu-link">
+          <span class="icon" v-if="item.icon">{{ item.icon }}</span>
+          {{ item.name }}
+        </router-link>
+      </li>
     </ul>
     <div class="upgrade-box">
       <div class="upgrade-illustration">🚀</div>
@@ -17,13 +21,27 @@
 </template>
 
 <script setup>
-// Statique pour le menu
+import { ref } from 'vue'
+import { useRoute } from 'vue-router'
+
+const $route = useRoute()
+
+const menuItems = [
+  { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
+  { name: 'Produits & Stocks', route: '/produits', icon: '📦' },
+  { name: 'Ventes', route: '/ventes', icon: '🛒' },
+  { name: 'Facturation', route: '/factures', icon: '📄' },
+  { name: 'Comptabilité', route: '/compta', icon: '💰' },
+  { name: 'Clients & Fournisseurs', route: '/contacts', icon: '👥' },
+  { name: 'Journal d’activités', route: '/logs', icon: '📝' },
+  { name: 'Paramètres', route: '/settings', icon: '⚙️' }
+]
 </script>
 
 <style scoped>
 /* Sidebar moderne, fond vert foncé, logo jaune, icônes */
 .sidebar {
-  width: 250px;
+  width: 280px;
   background: #1a5f4a;
   color: #fff;
   display: flex;
@@ -59,54 +77,56 @@
   list-style: none;
   padding: 0;
   width: 100%;
+  margin-bottom: 2.5rem;
 }
-.menu li {
+.menu-link {
   display: flex;
   align-items: center;
-  padding: 1rem 1.2rem;
+  gap: 0.7em;
+  color: #fff;
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.8em 1.2em;
   border-radius: 12px;
-  margin-bottom: 0.7rem;
-  cursor: pointer;
-  font-size: 1.13rem;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.18s, color 0.18s;
 }
-.menu li.active, .menu li:hover {
-  background: #fff;
-  color: #1a5f4a;
+.menu-link:hover,
+.menu .active .menu-link {
+  background: #218c6a;
+  color: #ffe082;
 }
 .icon {
-  margin-right: 1rem;
-  font-size: 1.35rem;
+  font-size: 1.3em;
 }
 .upgrade-box {
-  background: #fff;
-  color: #1a5f4a;
-  border-radius: 18px;
-  padding: 1.2rem 1rem;
   margin-top: auto;
+  background: #ffe08222;
+  border-radius: 16px;
+  padding: 1.2em 1em;
   text-align: center;
   width: 100%;
-  box-shadow: 0 2px 12px #0001;
 }
 .upgrade-illustration {
-  font-size: 2.2rem;
-  margin-bottom: 0.5rem;
+  font-size: 2.1em;
+  margin-bottom: 0.3em;
 }
 .upgrade-text {
-  font-weight: 500;
-  margin-bottom: 0.5rem;
+  font-size: 1.1em;
+  font-weight: 700;
+  margin-bottom: 0.5em;
 }
 .upgrade-btn {
-  background: #1a5f4a;
-  color: #fff;
+  background: #ffe082;
+  color: #1a5f4a;
   border: none;
   border-radius: 8px;
-  padding: 0.5rem 1.2rem;
-  font-weight: bold;
+  padding: 0.5em 1.2em;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.18s;
 }
 .upgrade-btn:hover {
-  background: #144a39;
+  background: #fff7c2;
 }
 </style>
