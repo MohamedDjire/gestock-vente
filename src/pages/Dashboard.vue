@@ -69,7 +69,7 @@ import SalesChart from '../components/SalesChart.vue'
   min-height: 100vh;
   width: 100vw;
   background: #f3f4f8;
-  overflow: hidden;
+  overflow-x: auto;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
 }
 .main-content {
@@ -80,27 +80,30 @@ import SalesChart from '../components/SalesChart.vue'
   height: 100vh;
   overflow: auto;
   margin-left: 250px;
+  max-width: 100vw;
 }
 .dashboard-wrapper {
   background: #fff;
   border-radius: 0 32px 32px 0;
   box-shadow: 0 8px 32px 0 rgba(26,95,74,0.10);
-  height: 100vh;
+  min-height: 100vh;
   width: 100%;
   min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: auto;
   transition: box-shadow 0.2s;
 }
 .dashboard-content {
   flex: 1;
   padding: 2.5rem 2.5rem 0 2.5rem;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 .dashboard-title {
   font-size: 2rem;
@@ -113,36 +116,41 @@ import SalesChart from '../components/SalesChart.vue'
   display: flex;
   gap: 2.5rem;
   margin-bottom: 0;
+  flex-wrap: wrap;
 }
 .dashboard-bottom-row {
   display: flex;
   gap: 2.5rem;
   margin-top: 2.5rem;
+  flex-wrap: wrap;
 }
 .chart-row {
-  flex: 2;
+  flex: 2 1 340px;
   width: 100%;
+  min-width: 320px;
   display: flex;
   align-items: stretch;
 }
 .team-block {
-  flex: 1;
+  flex: 1 1 320px;
   display: flex;
   align-items: stretch;
   justify-content: flex-end;
+  min-width: 320px;
 }
 .team-card {
-  background: linear-gradient(135deg, #5f3ccf 80%, #1a5f4a 100%);
+  background: linear-gradient(135deg, #1a5f4a 80%, #218c6a 100%);
   border-radius: 24px;
   box-shadow: 0 6px 24px 0 rgba(26,95,74,0.10);
   padding: 2rem 2rem 1.5rem 2rem;
-  min-width: 320px;
+  min-width: 260px;
   max-width: 400px;
   color: #fff;
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
   align-items: flex-start;
+  box-sizing: border-box;
 }
 .team-title {
   font-size: 1.1rem;
@@ -206,5 +214,40 @@ import SalesChart from '../components/SalesChart.vue'
 .table-row > * {
   flex: 1 1 100%;
   width: 100%;
+}
+@media (max-width: 1100px) {
+  .main-content {
+    margin-left: 0;
+  }
+  .dashboard-wrapper {
+    border-radius: 0;
+  }
+  .dashboard-content {
+    padding: 1.2rem 0.5rem 0 0.5rem;
+    gap: 1.2rem;
+  }
+  .stats-row, .dashboard-bottom-row {
+    gap: 1rem;
+  }
+}
+@media (max-width: 800px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+  .main-content {
+    margin-left: 0;
+    width: 100vw;
+  }
+  .dashboard-content {
+    padding: 0.5rem 0.2rem 0 0.2rem;
+  }
+  .stats-row, .dashboard-bottom-row {
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  .chart-row, .team-block {
+    min-width: 0;
+    width: 100%;
+  }
 }
 </style>
