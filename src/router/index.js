@@ -2,9 +2,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import Login from '../views/Login.vue'
 import SignUp from '../views/SignUp.vue'
+
 import Dashboard from '../pages/Dashboard.vue'
 import Products from '../pages/Products.vue'
 import ComingSoon from '../pages/ComingSoon.vue'
+import Clients from '../pages/Clients.vue'
 
 const routes = [
   {
@@ -70,6 +72,12 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/clients',
+    name: 'Clients',
+    component: Clients,
     meta: { requiresAuth: true }
   }
 ]

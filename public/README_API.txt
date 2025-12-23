@@ -1,0 +1,1 @@
+Place ici tous tes fichiers PHP d'API (ex: api/clients.php, api/database.php, etc.) pour qu'ils soient accessibles par le serveur web.

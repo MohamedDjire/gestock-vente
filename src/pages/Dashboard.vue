@@ -6,30 +6,28 @@
         <Topbar />
         <div class="dashboard-content">
           <h2 class="dashboard-title">Overview</h2>
-          <div class="table-row">
-            <SalesTable />
-          </div>
+
           <div class="stats-row">
             <StatCard 
-              title="Product sold" 
+              title="Vente total" 
               :value="'25.1k'" 
               :variation="1.1" 
-              icon="https://cdn-icons-png.flaticon.com/512/1040/1040230.png" />
+              icon="💰" />
             <StatCard 
-              title="Total Profit" 
-              :value="'$2,435k'" 
-              :variation="-3.5" 
-              icon="https://cdn-icons-png.flaticon.com/512/1828/1828884.png" />
+              title="Vente du jour" 
+              :value="'2.3k'" 
+              :variation="0.8" 
+              icon="📈" />
             <StatCard 
-              title="Total No. of Claim" 
-              :value="'3.5M'" 
-              :variation="1.1" 
-              icon="https://cdn-icons-png.flaticon.com/512/747/747376.png" />
+              title="Total produit" 
+              :value="'1,200'" 
+              :variation="0.0" 
+              icon="📦" />
             <StatCard 
-              title="New Customer" 
-              :value="'43.5k'" 
-              :variation="1.1" 
-              icon="https://cdn-icons-png.flaticon.com/512/747/747376.png" />
+              title="Stocks en rupture" 
+              :value="'12'" 
+              :variation="-2.1" 
+              icon="⚠️" />
           </div>
           <div class="dashboard-bottom-row">
             <div class="chart-row">
@@ -48,6 +46,9 @@
                 <div class="team-queue">Cleared Queue <span class="team-queue-value">1.4k</span> <span class="team-queue-variation">+15%</span></div>
               </div>
             </div>
+          </div>
+          <div class="table-row">
+            <SalesTable />
           </div>
         </div>
       </div>
