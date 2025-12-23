@@ -13,7 +13,17 @@
       </li>
     </ul>
     <div class="upgrade-box">
-      <button class="upgrade-btn" @click="logout">Déconnexion</button>
+      <button class="upgrade-btn" @click="showLogoutModal = true">Déconnexion</button>
+    </div>
+    <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+      <div class="modal-logout">
+        <div class="modal-title">Déconnexion</div>
+        <div class="modal-message">Êtes-vous sûr de vouloir vous déconnecter&nbsp;?</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showLogoutModal = false">Annuler</button>
+          <button class="btn-primary" @click="logout">Se déconnecter</button>
+        </div>
+      </div>
     </div>
   </nav>
 </template>
@@ -24,6 +34,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 const $route = useRoute()
 const router = useRouter()
+const showLogoutModal = ref(false)
 
 const menuItems = [
   { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
@@ -37,14 +48,82 @@ const menuItems = [
 ]
 
 function logout() {
-  if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
-    localStorage.clear();
-    router.push('/login');
-  }
+  localStorage.clear();
+  showLogoutModal.value = false;
+  router.push('/login').then(() => {
+    window.location.reload();
+  });
 }
 </script>
 
 <style scoped>
+/* Modale de déconnexion */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-logout {
+  background: #fff;
+  color: #1a5f4a;
+  border-radius: 16px;
+  padding: 2.5rem 2rem 2rem 2rem;
+  min-width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.modal-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.modal-message {
+  font-size: 1.05rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+.modal-actions {
+  display: flex;
+  gap: 1.2rem;
+}
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.btn-secondary:hover {
+  background: #e5e7eb;
+}
+.btn-primary {
+  background: #1a5f4a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.btn-primary:hover {
+  background: #145040;
+}
 /* Sidebar moderne, fond vert foncé, logo jaune, icônes */
 .sidebar {
   width: 280px;

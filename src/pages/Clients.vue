@@ -84,29 +84,31 @@
                 </button>
               </div>
               <form @submit.prevent="submitForm" class="modal-form">
+                <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
                 <div class="form-row">
                   <div class="form-group">
                     <label>Nom *</label>
                     <input v-model="form.nom" placeholder="Nom" required class="form-input" />
                   </div>
                   <div class="form-group">
-                    <label>Prénom</label>
-                    <input v-model="form.prenom" placeholder="Prénom" class="form-input" />
+                    <label>Prénom *</label>
+                    <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
                   </div>
                 </div>
-                <div class="form-group">
-                  <label>Entreprise *</label>
-                  <input v-model="form.entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
-                </div>
+
                 <div class="form-row">
                   <div class="form-group">
-                    <label>Email *</label>
-                    <input v-model="form.email" type="email" placeholder="email@exemple.com" required class="form-input" />
+                    <label>Email</label>
+                    <input v-model="form.email" type="email" placeholder="email@exemple.com" class="form-input" />
                   </div>
                   <div class="form-group">
                     <label>Téléphone</label>
                     <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" class="form-input" />
                   </div>
+                </div>
+                <div class="form-group">
+                  <label>Adresse</label>
+                  <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
                 </div>
                 <div class="form-group">
                   <label>Statut</label>
@@ -130,21 +132,21 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import apiClient from '../composables/api/apiClient'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
-const APIURL='https://aliadjame.com/api-stock/clients.php'
 
 const clients = ref([])
 const search = ref('')
 const showAddForm = ref(false)
+const formError = ref('')
 const editingClient = ref(null)
 const form = ref({
   nom: '',
   prenom: '',
   email: '',
   telephone: '',
-  entreprise: '',
+  adresse: '',
   statut: 'actif',
 })
 
@@ -152,8 +154,9 @@ const id_utilisateur = 1
 const id_entreprise = 1
 
 const fetchClients = async () => {
-  const res = await axios.get(APIURL)
+  const res = await apiClient.get('/clients.php')
   clients.value = res.data
+  console.log('Clients rechargés', clients.value)
 }
 
 onMounted(fetchClients)
@@ -168,24 +171,49 @@ const filteredClients = computed(() => {
 })
 
 const submitForm = async () => {
-  const data = { ...form.value, id_utilisateur, id_entreprise }
-  if (editingClient.value) {
-    await axios.put(APIURL, { ...data, id: editingClient.value.id })
-  } else {
-    await axios.post(APIURL, data)
+  formError.value = '';
+  let response;
+  try {
+    if (editingClient.value) {
+      const data = {
+        ...form.value,
+        id_utilisateur,
+        id_entreprise,
+        id: editingClient.value.id
+      };
+      response = await apiClient.post('/clients.php?_method=PUT', data);
+    } else {
+      const data = { ...form.value, id_utilisateur, id_entreprise };
+      response = await apiClient.post('/clients.php', data);
+    }
+    if (response.data && response.data.error && response.data.message && response.data.message.includes('Duplicate entry')) {
+      formError.value = "L'email est déjà utilisé par un autre client.";
+      return;
+    }
+    closeForm();
+    fetchClients();
+  } catch (e) {
+    formError.value = "Erreur lors de l'envoi du formulaire.";
   }
-  closeForm()
-  fetchClients()
 }
 
 const editClient = (client) => {
   editingClient.value = client
-  form.value = { ...client }
+  form.value = {
+    nom: client.nom || '',
+    prenom: client.prenom || '',
+    email: client.email || '',
+    telephone: client.telephone || '',
+    adresse: client.adresse || '',
+    statut: client.statut || 'actif',
+  }
 }
 
 const deleteClient = async (id) => {
   if (confirm('Supprimer ce client ?')) {
-    await axios.delete(APIURL, { data: { id } })
+    // Utilise la méthode DELETE et passe l'id dans l'URL
+    const response = await apiClient.delete(`/clients.php?id=${id}`)
+    console.log('Réponse suppression', response.data)
     fetchClients()
   }
 }
@@ -193,7 +221,7 @@ const deleteClient = async (id) => {
 const closeForm = () => {
   showAddForm.value = false
   editingClient.value = null
-  form.value = { nom: '', prenom: '', email: '', telephone: '', entreprise: '', statut: 'actif' }
+  form.value = { nom: '', prenom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
 }
 </script>
 
