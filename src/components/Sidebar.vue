@@ -28,7 +28,7 @@ const $route = useRoute()
 
 const menuItems = [
   { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
-  { name: 'Produits & Stocks', route: '/produits', icon: '📦' },
+  { name: 'Produits & Stocks', route: '/products', icon: '📦' },
   { name: 'Ventes', route: '/ventes', icon: '🛒' },
   { name: 'Facturation', route: '/factures', icon: '📄' },
   { name: 'Comptabilité', route: '/compta', icon: '💰' },

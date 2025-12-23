@@ -1,7 +1,14 @@
 
 
 <?php
-require_once __DIR__ . '/../config.php';
+// Charger config.php (JWT_SECRET et JWT_EXPIRATION)
+// Sur le serveur: config.php est à la racine de l'API
+// En local: config.php est dans le même dossier
+$configPath = __DIR__ . '/../config.php';
+if (!file_exists($configPath)) {
+    $configPath = __DIR__ . '/config.php';
+}
+require_once $configPath;
 /**
  * Middleware d'authentification et d'autorisation JWT (sans dépendance externe)
  */

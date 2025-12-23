@@ -2,12 +2,13 @@
   <div class="stat-card">
     <div class="stat-header">
       <span class="stat-icon" v-if="icon">
-        <img :src="icon" alt="icon" />
+        <img v-if="isImage" :src="icon" alt="icon" />
+        <span v-else class="stat-emoji">{{ icon }}</span>
       </span>
       <span class="stat-title">{{ title }}</span>
     </div>
     <div class="stat-value">{{ value }}</div>
-    <div class="stat-footer" :class="variationColor">
+    <div class="stat-footer" v-if="variation !== null && variation !== undefined" :class="variationColor">
       <span v-if="variation > 0">+{{ variation }}%</span>
       <span v-else>{{ variation }}%</span>
     </div>
@@ -22,6 +23,11 @@ const props = defineProps({
   value: [String, Number],
   variation: Number,
   icon: String,
+})
+
+const isImage = computed(() => {
+  if (!props.icon) return false
+  return props.icon.startsWith('http') || props.icon.startsWith('data:') || props.icon.includes('/')
 })
 
 // Couleur de variation
@@ -66,6 +72,9 @@ const variationColor = computed(() => {
   height: 28px;
   object-fit: contain;
   filter: brightness(1.1);
+}
+.stat-emoji {
+  font-size: 1.5rem;
 }
 .stat-value {
   color: #222;

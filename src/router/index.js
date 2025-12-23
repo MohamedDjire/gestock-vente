@@ -3,6 +3,8 @@ import { useAuthStore } from '../stores/auth.js'
 import Login from '../views/Login.vue'
 import SignUp from '../views/SignUp.vue'
 import Dashboard from '../pages/Dashboard.vue'
+import Products from '../pages/Products.vue'
+import ComingSoon from '../pages/ComingSoon.vue'
 
 const routes = [
   {
@@ -25,6 +27,49 @@ const routes = [
     path: '/dashboard',
     name: 'Dashboard',
     component: Dashboard,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/products',
+    name: 'Products',
+    component: Products,
+    meta: { requiresAuth: true }
+  },
+  // Routes placeholder pour les fonctionnalités à venir
+  {
+    path: '/ventes',
+    name: 'Ventes',
+    component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/factures',
+    name: 'Factures',
+    component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/compta',
+    name: 'Compta',
+    component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/contacts',
+    name: 'Contacts',
+    component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/logs',
+    name: 'Logs',
+    component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: ComingSoon,
     meta: { requiresAuth: true }
   }
 ]
