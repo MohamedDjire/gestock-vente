@@ -2,7 +2,12 @@
   <div class="stat-card">
     <div class="stat-header">
       <span class="stat-icon" v-if="icon">
-        <img :src="icon" alt="icon" />
+        <template v-if="icon.startsWith('http')">
+          <img :src="icon" alt="icon" />
+        </template>
+        <template v-else>
+          {{ icon }}
+        </template>
       </span>
       <span class="stat-title">{{ title }}</span>
     </div>
@@ -52,20 +57,25 @@ const variationColor = computed(() => {
 .stat-header {
   display: flex;
   align-items: center;
-  gap: 0.7em;
+  gap: 1em;
   margin-bottom: 0.5rem;
 }
 .stat-title {
   color: #1a5f4a;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   letter-spacing: 0.01em;
 }
 .stat-icon img {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   filter: brightness(1.1);
+}
+.stat-icon {
+  font-size: 2.1rem;
+  display: flex;
+  align-items: center;
 }
 .stat-value {
   color: #222;

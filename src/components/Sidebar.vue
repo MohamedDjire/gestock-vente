@@ -13,29 +13,35 @@
       </li>
     </ul>
     <div class="upgrade-box">
-      <div class="upgrade-illustration">🚀</div>
-      <div class="upgrade-text">Want to upgrade</div>
-      <button class="upgrade-btn">Upgrade now</button>
+      <button class="upgrade-btn" @click="logout">Déconnexion</button>
     </div>
   </nav>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const $route = useRoute()
+const router = useRouter()
 
 const menuItems = [
   { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
   { name: 'Produits & Stocks', route: '/produits', icon: '📦' },
   { name: 'Ventes', route: '/ventes', icon: '🛒' },
-  { name: 'Facturation', route: '/factures', icon: '📄' },
   { name: 'Comptabilité', route: '/compta', icon: '💰' },
-  { name: 'Clients & Fournisseurs', route: '/contacts', icon: '👥' },
+  { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
+  { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
   { name: 'Journal d’activités', route: '/logs', icon: '📝' },
   { name: 'Paramètres', route: '/settings', icon: '⚙️' }
 ]
+
+function logout() {
+  if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
+    localStorage.clear();
+    router.push('/login');
+  }
+}
 </script>
 
 <style scoped>
