@@ -7,6 +7,7 @@ import Dashboard from '../pages/Dashboard.vue'
 import Products from '../pages/Products.vue'
 import ComingSoon from '../pages/ComingSoon.vue'
 import Clients from '../pages/Clients.vue'
+import Entrepot from '../pages/Entrepot.vue'
 
 const routes = [
   {
@@ -35,6 +36,12 @@ const routes = [
     path: '/products',
     name: 'Products',
     component: Products,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/entrepot',
+    name: 'Entrepot',
+    component: Entrepot,
     meta: { requiresAuth: true }
   },
   // Routes placeholder pour les fonctionnalités à venir

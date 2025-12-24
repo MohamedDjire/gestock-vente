@@ -7,9 +7,14 @@
         <div class="dashboard-content">
           <div class="products-header">
             <h2 class="dashboard-title">Produits & Stocks</h2>
-            <button @click="openCreateModal" class="btn-primary">
-              <span>+</span> Nouveau Produit
-            </button>
+            <div style="display: flex; gap: 1rem;">
+              <button @click="goToEntrepot" class="btn-secondary" style="background: #3b82f6; color: white;">
+                <span>🏭</span> Gérer les Entrepôts
+              </button>
+              <button @click="openCreateModal" class="btn-primary">
+                <span>+</span> Nouveau Produit
+              </button>
+            </div>
           </div>
 
         <!-- Vue synthétique comme la maquette -->
@@ -202,9 +207,11 @@
                 </tr>
                 <tr v-else v-for="product in filteredProducts" :key="product.id_produit">
                   <td><strong>{{ product.code_produit }}</strong></td>
-                  <td class="product-name">
-                    <span class="product-icon" :title="product.nom">{{ getProductIcon(product) }}</span>
-                    {{ product.nom }}
+                  <td style="vertical-align: middle;">
+                    <span class="product-name">
+                      <span class="product-icon" :title="product.nom">{{ getProductIcon(product) }}</span>
+                      {{ product.nom }}
+                    </span>
                   </td>
                   <td>{{ formatCurrency(product.prix_achat) }}</td>
                   <td>{{ formatCurrency(product.prix_vente) }}</td>
@@ -678,11 +685,13 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
 import StatCard from '../components/StatCard.vue'
 
+const router = useRouter()
 const products = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -1385,6 +1394,10 @@ const getSortieTypeLabel = (type) => {
   return labels[type] || type
 }
 
+const goToEntrepot = () => {
+  router.push('/entrepot')
+}
+
 onMounted(() => {
   loadProducts()
 })
@@ -1472,6 +1485,24 @@ onMounted(() => {
 
 .btn-primary:hover {
   background: #134e3a;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
 }
 
 .products-filters {
@@ -1822,6 +1853,7 @@ onMounted(() => {
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
+  line-height: 1.5;
 }
 
 .products-table tbody tr {
@@ -1839,7 +1871,7 @@ onMounted(() => {
 .product-name {
   font-weight: 600;
   color: #1a1a1a;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   vertical-align: middle;
@@ -1848,6 +1880,9 @@ onMounted(() => {
 
 .product-icon {
   font-size: 1.2rem;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
 }
 
 /* Masquer la variation % des StatCard si présente */

@@ -4,15 +4,15 @@
  * Endpoint: /api-stock/api_produit.php
  */
 
-// Activer la gestion des erreurs et définir les headers
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+// Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
+@header('Content-Type: application/json');
+@header('Access-Control-Allow-Origin: *');
+@header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+@header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 // Répondre immédiatement aux requêtes OPTIONS (préflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+    @http_response_code(200);
     exit;
 }
 
@@ -39,7 +39,7 @@ if (!file_exists($dbFile)) {
 require_once $dbFile;
 
 if (!function_exists('createDatabaseConnection')) {
-    http_response_code(500);
+    @http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fonction createDatabaseConnection() introuvable',
@@ -67,7 +67,7 @@ try {
 // En local: middleware_auth.php (à la racine)
 $middlewareFile = __DIR__ . '/functions/middleware_auth.php';
 if (!file_exists($middlewareFile)) {
-    http_response_code(500);
+    @http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fichier functions/middleware_auth.php introuvable sur le serveur',
@@ -79,7 +79,7 @@ if (!file_exists($middlewareFile)) {
 require_once $middlewareFile;
 
 if (!function_exists('authenticateAndAuthorize')) {
-    http_response_code(500);
+    @http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fonction authenticateAndAuthorize() introuvable',
@@ -393,10 +393,11 @@ try {
     
 } catch (Exception $e) {
     $bdd->rollBack();
-    http_response_code($e->getCode() ?: 400);
+    @http_response_code($e->getCode() ?: 400);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
         'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
 }
+

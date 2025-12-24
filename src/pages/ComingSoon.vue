@@ -62,3 +62,4 @@ const title = computed(() => titles[route.path] || 'Page en construction')
   color: #6b7280;
 }
 </style>
+

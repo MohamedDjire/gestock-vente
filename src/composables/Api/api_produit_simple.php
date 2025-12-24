@@ -85,3 +85,4 @@ echo json_encode([
     'message' => 'API fonctionne correctement',
     'enterprise_id' => $enterpriseId
 ], JSON_UNESCAPED_UNICODE);
+
