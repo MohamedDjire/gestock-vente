@@ -29,9 +29,7 @@
             <table class="clients-table">
               <thead>
                 <tr>
-                  <th>Nom</th>
-                  <th>Prénom</th>
-                  <th>Entreprise</th>
+                  <th>Nom complet</th>
                   <th>Email</th>
                   <th>Téléphone</th>
                   <th>Ajouté par</th>
@@ -41,11 +39,12 @@
               </thead>
               <tbody>
                 <tr v-for="client in filteredClients" :key="client.id">
-                  <td class="font-medium">{{ client.nom }}</td>
-                  <td>{{ client.prenom }}</td>
-                  <td>{{ client.nom_entreprise }}</td>
-                  <td class="text-muted">{{ client.email }}</td>
-                  <td class="text-muted">{{ client.telephone }}</td>
+                  <td class="font-medium">
+                    <span v-if="client.type === 'entreprise'">{{ client.nom_entreprise }}</span>
+                    <span v-else>{{ client.nom }} {{ client.prenom }}</span>
+                  </td>
+                  <td>{{ client.email }}</td>
+                  <td>{{ client.telephone }}</td>
                   <td>{{ client.nom_utilisateur }}</td>
                   <td>
                     <span :class="['status-badge', client.statut === 'actif' ? 'status-active' : 'status-inactive']">
@@ -59,7 +58,7 @@
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                       </svg>
                     </button>
-                    <button @click="deleteClient(client.id)" class="btn-icon btn-danger" title="Supprimer">
+                    <button @click="openDeleteModal(client)" class="btn-icon btn-danger" title="Supprimer">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -77,15 +76,19 @@
               <div class="modal-header">
                 <h2 class="modal-title">{{ editingClient ? 'Modifier' : 'Ajouter' }} un client</h2>
                 <button @click="closeForm" class="btn-close">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
+                  <!-- ...svg... -->
                 </button>
               </div>
               <form @submit.prevent="submitForm" class="modal-form">
                 <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
-                <div class="form-row">
+                <div class="form-group">
+                  <label>Type de client *</label>
+                  <select v-model="form.type" class="form-input" required>
+                    <option value="particulier">Particulier</option>
+                    <option value="entreprise">Entreprise</option>
+                  </select>
+                </div>
+                <div v-if="form.type === 'particulier'" class="form-row">
                   <div class="form-group">
                     <label>Nom *</label>
                     <input v-model="form.nom" placeholder="Nom" required class="form-input" />
@@ -95,7 +98,10 @@
                     <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
                   </div>
                 </div>
-
+                <div v-else class="form-group">
+                  <label>Nom de l'entreprise *</label>
+                  <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
+                </div>
                 <div class="form-row">
                   <div class="form-group">
                     <label>Email</label>
@@ -127,6 +133,28 @@
         </div>
       </div>
     </div>
+    <!-- Modale de suppression -->
+    <div v-if="showDeleteModal" class="modal" @click.self="closeDeleteModal">
+      <div class="modal-content">
+        <div class="modal-header confirmation">
+          <span class="confirmation-icon">⚠️</span>
+          <h2 class="modal-title" style="flex:1;">Confirmer la suppression</h2>
+          <button @click="closeDeleteModal" class="btn-close">×</button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem 2rem;">
+          <p>Êtes-vous sûr de vouloir supprimer ce client&nbsp;?
+            <span v-if="clientToDelete?.type === 'entreprise'">Entreprise : <b>{{ clientToDelete.nom_entreprise }}</b></span>
+            <span v-else>Client : <b>{{ clientToDelete.nom }} {{ clientToDelete.prenom }}</b></span>
+          </p>
+          <p style="color:#dc2626;font-weight:600;">Cette action est irréversible.</p>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeDeleteModal" class="btn-cancel">Annuler</button>
+          <button @click="confirmDeleteClient" class="btn-danger">Supprimer</button>
+        </div>
+      </div>
+    </div>
+  
   </div>
 </template>
 
@@ -142,8 +170,10 @@ const showAddForm = ref(false)
 const formError = ref('')
 const editingClient = ref(null)
 const form = ref({
+  type: 'particulier',
   nom: '',
   prenom: '',
+  nom_entreprise: '',
   email: '',
   telephone: '',
   adresse: '',
@@ -200,8 +230,10 @@ const submitForm = async () => {
 const editClient = (client) => {
   editingClient.value = client
   form.value = {
+    type: client.type || 'particulier',
     nom: client.nom || '',
     prenom: client.prenom || '',
+    nom_entreprise: client.nom_entreprise || '',
     email: client.email || '',
     telephone: client.telephone || '',
     adresse: client.adresse || '',
@@ -210,22 +242,71 @@ const editClient = (client) => {
 }
 
 const deleteClient = async (id) => {
-  if (confirm('Supprimer ce client ?')) {
-    // Utilise la méthode DELETE et passe l'id dans l'URL
-    const response = await apiClient.delete(`/clients.php?id=${id}`)
-    console.log('Réponse suppression', response.data)
-    fetchClients()
+  showDeleteModal.value = false
+  clientToDelete.value = null
+  const response = await apiClient.delete(`/clients.php?id=${id}`)
+  console.log('Réponse suppression', response.data)
+  fetchClients()
+}
+
+const showDeleteModal = ref(false)
+const clientToDelete = ref(null)
+const openDeleteModal = (client) => {
+  clientToDelete.value = client
+  showDeleteModal.value = true
+}
+const closeDeleteModal = () => {
+  showDeleteModal.value = false
+  clientToDelete.value = null
+}
+const confirmDeleteClient = async () => {
+  if (clientToDelete.value) {
+    await deleteClient(clientToDelete.value.id)
+    closeDeleteModal()
   }
 }
 
 const closeForm = () => {
   showAddForm.value = false
   editingClient.value = null
-  form.value = { nom: '', prenom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
+  form.value = { type: 'particulier', nom: '', prenom: '', nom_entreprise: '', email: '', telephone: '', adresse: '', statut: 'actif' }
 }
 </script>
 
 <style scoped>
+  /* --- Harmonisation modale suppression avec produits --- */
+  .modal-header.confirmation {
+    background: #fffbeb;
+    border-bottom: 1px solid #f59e0b;
+  }
+  .confirmation-icon {
+    color: #f59e0b;
+    font-size: 2rem;
+    margin-right: 1rem;
+  }
+  .btn-danger {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  }
+  .btn-cancel {
+    padding: 0.75rem 1.5rem;
+    border: 1.5px solid #6b7280;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+  }
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
@@ -245,6 +326,7 @@ const closeForm = () => {
   margin-left: 250px;
   max-width: 100vw;
   background: #fafbfc;
+  padding-top: 90px; /* pour ne pas cacher le contenu sous la topbar fixed */
 }
 
 .dashboard-wrapper {

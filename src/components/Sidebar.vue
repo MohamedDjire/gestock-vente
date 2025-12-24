@@ -43,7 +43,7 @@ const menuItems = [
   { name: 'Comptabilité', route: '/compta', icon: '💰' },
   { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
   { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
-  { name: 'Journal d’activités', route: '/logs', icon: '📝' },
+  { name: 'Journal', route: '/journal', icon: '📝' },
   { name: 'Paramètres', route: '/settings', icon: '⚙️' }
 ]
 
