@@ -4,15 +4,15 @@
  * Endpoint: /api-stock/api_stock.php
  */
 
-// Activer la gestion des erreurs et définir les headers
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+// Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
+@header('Content-Type: application/json');
+@header('Access-Control-Allow-Origin: *');
+@header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+@header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 // Répondre immédiatement aux requêtes OPTIONS (préflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+    @http_response_code(200);
     exit;
 }
 
@@ -94,7 +94,7 @@ try {
     $enterpriseId = $currentUser['enterprise_id'];
     $userId = $currentUser['user_id'];
 } catch (Exception $e) {
-    http_response_code(401);
+    @http_response_code(401);
     echo json_encode([
         'success' => false,
         'message' => 'Non autorisé',
@@ -276,25 +276,49 @@ function createSortie($bdd, $data, $enterpriseId, $userId) {
         throw new Exception("Stock insuffisant. Stock disponible: " . $product['quantite_stock']);
     }
     
-    $stmt = $bdd->prepare("
-        INSERT INTO stock_sortie (
-            id_produit, quantite, type_sortie, motif, 
-            id_user, id_entreprise, prix_unitaire
-        ) VALUES (
-            :id_produit, :quantite, :type_sortie, :motif,
-            :id_user, :id_entreprise, :prix_unitaire
-        )
-    ");
+    // Construire la requête selon si c'est un transfert avec entrepot_destination
+    $hasEntrepot = isset($data['entrepot_destination']) && !empty($data['entrepot_destination']);
     
-    $stmt->execute([
-        'id_produit' => $data['id_produit'],
-        'quantite' => $data['quantite'],
-        'type_sortie' => $data['type_sortie'],
-        'motif' => $data['motif'] ?? null,
-        'id_user' => $userId,
-        'id_entreprise' => $enterpriseId,
-        'prix_unitaire' => $data['prix_unitaire'] ?? null
-    ]);
+    if ($hasEntrepot) {
+        $stmt = $bdd->prepare("
+            INSERT INTO stock_sortie (
+                id_produit, quantite, type_sortie, motif,
+                id_user, id_entreprise, prix_unitaire, entrepot_destination
+            ) VALUES (
+                :id_produit, :quantite, :type_sortie, :motif,
+                :id_user, :id_entreprise, :prix_unitaire, :entrepot_destination
+            )
+        ");
+        $stmt->execute([
+            'id_produit' => $data['id_produit'],
+            'quantite' => $data['quantite'],
+            'type_sortie' => $data['type_sortie'],
+            'motif' => $data['motif'] ?? null,
+            'id_user' => $userId,
+            'id_entreprise' => $enterpriseId,
+            'prix_unitaire' => $data['prix_unitaire'] ?? null,
+            'entrepot_destination' => $data['entrepot_destination']
+        ]);
+    } else {
+        $stmt = $bdd->prepare("
+            INSERT INTO stock_sortie (
+                id_produit, quantite, type_sortie, motif,
+                id_user, id_entreprise, prix_unitaire
+            ) VALUES (
+                :id_produit, :quantite, :type_sortie, :motif,
+                :id_user, :id_entreprise, :prix_unitaire
+            )
+        ");
+        $stmt->execute([
+            'id_produit' => $data['id_produit'],
+            'quantite' => $data['quantite'],
+            'type_sortie' => $data['type_sortie'],
+            'motif' => $data['motif'] ?? null,
+            'id_user' => $userId,
+            'id_entreprise' => $enterpriseId,
+            'prix_unitaire' => $data['prix_unitaire'] ?? null
+        ]);
+    }
     
     $sortieId = $bdd->lastInsertId();
     

@@ -86,6 +86,12 @@ const routes = [
     name: 'Clients',
     component: Clients,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/fournisseurs',
+    name: 'Fournisseurs',
+    component: ComingSoon,
+    meta: { requiresAuth: true }
   }
 ]
 

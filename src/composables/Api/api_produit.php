@@ -125,6 +125,7 @@ function getAllProducts($bdd, $enterpriseId) {
             p.date_modification,
             p.actif,
             p.id_entreprise,
+            COALESCE(p.entrepot, 'Magasin') AS entrepot,
             (p.prix_vente - p.prix_achat) AS marge_beneficiaire,
             ((p.prix_vente - p.prix_achat) * p.quantite_stock) AS valeur_stock,
             CASE 
@@ -221,10 +222,10 @@ function createProduct($bdd, $data, $enterpriseId) {
     $stmt = $bdd->prepare("
         INSERT INTO stock_produit (
             code_produit, nom, id_categorie, prix_achat, prix_vente,
-            quantite_stock, seuil_minimum, date_expiration, actif, id_entreprise
+            quantite_stock, seuil_minimum, date_expiration, entrepot, actif, id_entreprise
         ) VALUES (
             :code_produit, :nom, :id_categorie, :prix_achat, :prix_vente,
-            :quantite_stock, :seuil_minimum, :date_expiration, :actif, :id_entreprise
+            :quantite_stock, :seuil_minimum, :date_expiration, :entrepot, :actif, :id_entreprise
         )
     ");
     
@@ -237,6 +238,7 @@ function createProduct($bdd, $data, $enterpriseId) {
         'quantite_stock' => $data['quantite_stock'] ?? 0,
         'seuil_minimum' => $data['seuil_minimum'] ?? 0,
         'date_expiration' => !empty($data['date_expiration']) ? $data['date_expiration'] : null,
+        'entrepot' => $data['entrepot'] ?? 'Magasin',
         'actif' => isset($data['actif']) ? (int)$data['actif'] : 1,
         'id_entreprise' => $enterpriseId
     ]);

@@ -2,6 +2,14 @@
   <header class="topbar">
     <div style="flex:1"></div>
     <div class="topbar-actions">
+      <div class="currency-select-topbar">
+        <label>Devise:</label>
+        <select v-model="selectedCurrency" class="currency-select-input">
+          <option value="F CFA">F CFA</option>
+          <option value="EUR">EUR</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
       <span class="notif-icon">🔔</span>
       <div class="profile">
         <img :src="user?.avatar || 'https://randomuser.me/api/portraits/women/44.jpg'" alt="profile" />
@@ -13,11 +21,26 @@
 
 <script setup>
 import { useStorage } from '../composables/storage/useStorage'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, provide, watch } from 'vue'
 const { getUser } = useStorage()
 const user = ref(null)
+const selectedCurrency = ref('F CFA')
+
+// Fournir la devise aux composants enfants
+provide('selectedCurrency', selectedCurrency)
+
 onMounted(() => {
   user.value = getUser()
+  // Récupérer la devise depuis localStorage si disponible
+  const savedCurrency = localStorage.getItem('selectedCurrency')
+  if (savedCurrency) {
+    selectedCurrency.value = savedCurrency
+  }
+})
+
+// Sauvegarder la devise dans localStorage quand elle change
+watch(selectedCurrency, (newValue) => {
+  localStorage.setItem('selectedCurrency', newValue)
 })
 </script>
 
@@ -44,6 +67,38 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 1.7rem;
+}
+
+.currency-select-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f5f6fa;
+  border-radius: 12px;
+  padding: 0.4rem 0.8rem;
+}
+
+.currency-select-topbar label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a5f4a;
+}
+
+.currency-select-input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: white;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.currency-select-input:focus {
+  outline: none;
+  border-color: #1a5f4a;
+  box-shadow: 0 0 0 3px rgba(26, 95, 74, 0.1);
 }
 .notif-icon {
   font-size: 1.5rem;
