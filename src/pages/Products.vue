@@ -86,7 +86,12 @@
           <div class="panel card">
             <div class="panel-header">
               <div class="panel-title">Mouvements récents</div>
-              <div class="panel-count">{{ recentMovements.length }}</div>
+              <div class="panel-actions">
+                <div class="panel-count">{{ allMovements.length }}</div>
+                <button @click="openAllMovementsModal" class="btn-more" title="Voir tous les mouvements">
+                  <span>+</span> Plus
+                </button>
+              </div>
             </div>
             <div v-if="recentMovements.length === 0" class="panel-empty">Enregistrez des entrées/sorties pour voir l'historique.</div>
             <ul v-else class="movement-list">
@@ -183,16 +188,17 @@
                   <th>Stock Actuel</th>
                   <th>Seuil Min.</th>
                   <th>Statut Stock</th>
+                  <th>Entrepôt</th>
                   <th>Valeur Stock</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="loading">
-                  <td colspan="10" class="loading-cell">Chargement...</td>
+                  <td colspan="11" class="loading-cell">Chargement...</td>
                 </tr>
                 <tr v-else-if="filteredProducts.length === 0">
-                  <td colspan="10" class="empty-cell">Aucun produit trouvé</td>
+                  <td colspan="11" class="empty-cell">Aucun produit trouvé</td>
                 </tr>
                 <tr v-else v-for="product in filteredProducts" :key="product.id_produit">
                   <td><strong>{{ product.code_produit }}</strong></td>
@@ -229,6 +235,9 @@
                       {{ getStatusLabel(product.statut_stock) }}
                     </span>
                   </td>
+                  <td>
+                    <span class="entrepot-badge">{{ product.entrepot || 'Magasin' }}</span>
+                  </td>
                   <td class="valeur-stock-cell">
                     {{ formatCurrency((product.quantite_stock || 0) * (product.prix_achat || 0)) }}
                   </td>
@@ -263,17 +272,6 @@
               min="1"
               required
               placeholder="0"
-            />
-          </div>
-          <div class="form-group">
-            <label>Prix Unitaire *</label>
-            <input 
-              v-model.number="entreeData.prix_unitaire" 
-              type="number" 
-              step="0.01"
-              min="0"
-              required
-              placeholder="0.00"
             />
           </div>
           <div class="form-group">
@@ -324,7 +322,7 @@
           </div>
           <div class="form-group">
             <label>Type de Sortie *</label>
-            <select v-model="sortieData.type_sortie" required>
+            <select v-model="sortieData.type_sortie" required @change="handleSortieTypeChange">
               <option value="vente">Vente</option>
               <option value="perte">Perte</option>
               <option value="transfert">Transfert</option>
@@ -332,14 +330,13 @@
               <option value="autre">Autre</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Prix Unitaire (optionnel)</label>
+          <div v-if="sortieData.type_sortie === 'transfert'" class="form-group">
+            <label>Entrepôt de destination *</label>
             <input 
-              v-model.number="sortieData.prix_unitaire" 
-              type="number" 
-              step="0.01"
-              min="0"
-              placeholder="0.00"
+              v-model="sortieData.entrepot_destination" 
+              type="text" 
+              required
+              placeholder="Nom de l'entrepôt de destination"
             />
           </div>
           <div class="form-group">
@@ -467,16 +464,15 @@
         <form @submit.prevent="saveProduct" class="product-form">
           <div class="form-row">
             <div class="form-group">
-              <label>Code Produit *</label>
+              <label>Code Produit</label>
               <input 
                 v-model="formData.code_produit" 
                 type="text" 
-                required 
-                placeholder="PROD-001"
               />
+              <small class="form-hint">Si vide, un code sera généré automatiquement</small>
             </div>
             <div class="form-group">
-              <label>Nom *</label>
+              <label>Nom de produit (Libellé) *</label>
               <input 
                 v-model="formData.nom" 
                 type="text" 
@@ -496,6 +492,7 @@
                 required 
                 min="0"
                 placeholder="0.00"
+                :class="getPriceValidationClass()"
               />
             </div>
             <div class="form-group">
@@ -507,7 +504,13 @@
                 required 
                 min="0"
                 placeholder="0.00"
+                :class="getPriceValidationClass()"
               />
+              <small v-if="formData.prix_achat && formData.prix_vente" :class="['price-validation-hint', getPriceValidationClass()]">
+                <span v-if="formData.prix_vente < formData.prix_achat">⚠️ Le prix de vente doit être supérieur ou égal au prix d'achat</span>
+                <span v-else-if="formData.prix_vente === formData.prix_achat">⚠️ Pas de marge bénéficiaire</span>
+                <span v-else>✅ Marge bénéficiaire: {{ formatCurrency(formData.prix_vente - formData.prix_achat) }}</span>
+              </small>
             </div>
           </div>
 
@@ -578,7 +581,7 @@
             </div>
           </div>
 
-          <div v-if="formData.prix_achat && formData.prix_vente" class="marge-preview">
+          <div v-if="formData.prix_achat && formData.prix_vente" class="marge-preview" :class="getPriceValidationClass()">
             <strong>Marge bénéficiaire: </strong>
             <span :class="getMargeClass(formData.prix_vente - formData.prix_achat)">
               {{ formatCurrency(formData.prix_vente - formData.prix_achat) }}
@@ -595,13 +598,42 @@
       </div>
     </div>
 
-    <div class="currency-select">
-      <label>Devise</label>
-      <select v-model="selectedCurrency">
-        <option value="F CFA">F CFA</option>
-        <option value="EUR">EUR</option>
-        <option value="USD">USD</option>
-      </select>
+  </div>
+
+  <!-- Modal tous les mouvements -->
+  <div v-if="showAllMovementsModal" class="modal-overlay" @click="closeAllMovementsModal">
+    <div class="modal-content movements-modal" @click.stop>
+      <div class="modal-header">
+        <h3>Tous les mouvements de stock</h3>
+        <button @click="closeAllMovementsModal" class="modal-close">×</button>
+      </div>
+      <div class="movements-table-container">
+        <table class="movements-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Produit</th>
+              <th>Quantité</th>
+              <th>Détails</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="allMovements.length === 0">
+              <td colspan="5" class="empty-cell">Aucun mouvement enregistré</td>
+            </tr>
+            <tr v-else v-for="m in allMovements" :key="m.id">
+              <td>{{ formatDateTime(m.date) }}</td>
+              <td>
+                <span class="movement-type-badge" :class="m.type">{{ m.typeLabel }}</span>
+              </td>
+              <td><strong>{{ m.nom }}</strong></td>
+              <td>{{ m.quantite }}</td>
+              <td class="text-muted">{{ m.details }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -645,7 +677,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { apiService } from '../composables/Api/apiService.js'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
@@ -656,12 +688,14 @@ const loading = ref(false)
 const saving = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref(null)
-const selectedCurrency = ref('F CFA')
+// La devise est maintenant gérée dans Topbar.vue via provide/inject
+const selectedCurrency = inject('selectedCurrency', ref('F CFA'))
 const showModal = ref(false)
 const showStockModal = ref(false)
 const showEntreeModal = ref(false)
 const showSortieModal = ref(false)
 const showHistoryModal = ref(false)
+const showAllMovementsModal = ref(false)
 const editingProduct = ref(null)
 const stockProduct = ref(null)
 const historyProduct = ref(null)
@@ -711,6 +745,7 @@ const formData = ref({
   seuil_minimum: 0,
   date_expiration: '',
   unite: 'unité',
+  entrepot: 'Magasin',
   actif: 1
 })
 
@@ -751,12 +786,11 @@ const lowStockProducts = computed(() => {
     .slice(0, 5)
 })
 
-// Mouvements récents (placeholder basé sur date_modification si dispo)
-const recentMovements = computed(() => {
+// Tous les mouvements
+const allMovements = computed(() => {
   return products.value
     .filter(p => p.date_modification || p.date_creation)
     .sort((a, b) => new Date(b.date_modification || b.date_creation) - new Date(a.date_modification || a.date_creation))
-    .slice(0, 5)
     .map((p, idx) => ({
       id: p.id_produit + '-' + idx,
       type: p.statut_stock === 'rupture' ? 'sortie' : 'entree',
@@ -766,6 +800,11 @@ const recentMovements = computed(() => {
       quantite: p.quantite_stock,
       details: p.code_produit ? `Code: ${p.code_produit}` : ''
     }))
+})
+
+// Mouvements récents (limité à 3)
+const recentMovements = computed(() => {
+  return allMovements.value.slice(0, 3)
 })
 
 // Produits filtrés
@@ -896,6 +935,8 @@ const openEditModal = (product) => {
     quantite_stock: parseInt(product.quantite_stock),
     seuil_minimum: parseInt(product.seuil_minimum),
     date_expiration: product.date_expiration || '',
+    unite: product.unite || 'unité',
+    entrepot: product.entrepot || 'Magasin',
     actif: product.actif ? 1 : 0
   }
   showModal.value = true
@@ -907,13 +948,43 @@ const closeModal = () => {
   editingProduct.value = null
 }
 
+// Générer un code produit automatiquement
+const generateProductCode = (nom) => {
+  if (!nom) return 'PROD-' + Date.now()
+  // Prendre les 3 premières lettres du nom en majuscules
+  const prefix = nom.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '') || 'PROD'
+  // Ajouter un timestamp pour l'unicité
+  const timestamp = Date.now().toString().slice(-6)
+  return `${prefix}-${timestamp}`
+}
+
+// Validation des prix
+const getPriceValidationClass = () => {
+  if (!formData.value.prix_achat || !formData.value.prix_vente) return ''
+  if (formData.value.prix_vente < formData.value.prix_achat) return 'price-invalid'
+  if (formData.value.prix_vente === formData.value.prix_achat) return 'price-warning'
+  return 'price-valid'
+}
+
 // Sauvegarder produit
 const saveProduct = async () => {
+  // Validation : prix de vente doit être >= prix d'achat
+  if (formData.value.prix_vente < formData.value.prix_achat) {
+    showNotification('error', 'Erreur de validation', 'Le prix de vente doit être supérieur ou égal au prix d\'achat')
+    return
+  }
+
+  // Générer le code produit si vide
+  const dataToSave = { ...formData.value }
+  if (!dataToSave.code_produit || dataToSave.code_produit.trim() === '') {
+    dataToSave.code_produit = generateProductCode(dataToSave.nom)
+  }
+
   saving.value = true
   try {
     if (editingProduct.value) {
       // Mise à jour
-      const response = await apiService.put(`/api_produit.php?id=${editingProduct.value.id_produit}`, formData.value)
+      const response = await apiService.put(`/api_produit.php?id=${editingProduct.value.id_produit}`, dataToSave)
       if (response.success) {
         await loadProducts()
         closeModal()
@@ -921,7 +992,7 @@ const saveProduct = async () => {
       }
     } else {
       // Création
-      const response = await apiService.post('/api_produit.php', formData.value)
+      const response = await apiService.post('/api_produit.php', dataToSave)
       if (response.success) {
         await loadProducts()
         closeModal()
@@ -1132,7 +1203,7 @@ const openEntreeModal = (product) => {
   stockProduct.value = product
   entreeData.value = {
     quantite: 0,
-    prix_unitaire: product.prix_achat || 0,
+    prix_unitaire: product.prix_achat || 0, // Gardé pour l'API mais non affiché
     numero_bon: '',
     notes: ''
   }
@@ -1146,15 +1217,19 @@ const closeEntreeModal = () => {
   entreeData.value = { quantite: 0, prix_unitaire: 0, numero_bon: '', notes: '' }
 }
 
-// Sauvegarder entrée
+// Sauvegarder entrée (utilise le prix d'achat du produit)
 const saveEntree = async () => {
   if (!stockProduct.value) return
   
   saving.value = true
   try {
+    // Utiliser le prix d'achat du produit actuel
     const response = await apiService.post(`/api_stock.php?type=entree`, {
       id_produit: stockProduct.value.id_produit,
-      ...entreeData.value
+      quantite: entreeData.value.quantite,
+      prix_unitaire: stockProduct.value.prix_achat || 0,
+      numero_bon: entreeData.value.numero_bon,
+      notes: entreeData.value.notes
     })
     
     if (response.success) {
@@ -1176,7 +1251,7 @@ const openSortieModal = (product) => {
   sortieData.value = {
     quantite: 0,
     type_sortie: 'vente',
-    prix_unitaire: product.prix_vente || null,
+    prix_unitaire: product.prix_vente || null, // Gardé pour l'API mais non affiché
     motif: ''
   }
   showSortieModal.value = true
@@ -1186,19 +1261,36 @@ const openSortieModal = (product) => {
 const closeSortieModal = () => {
   showSortieModal.value = false
   stockProduct.value = null
-  sortieData.value = { quantite: 0, type_sortie: 'vente', prix_unitaire: null, motif: '' }
+  sortieData.value = { quantite: 0, type_sortie: 'vente', prix_unitaire: null, entrepot_destination: '', motif: '' }
 }
 
-// Sauvegarder sortie
+// Sauvegarder sortie (utilise le prix de vente du produit)
 const saveSortie = async () => {
   if (!stockProduct.value) return
   
+  // Validation : entrepot_destination requis pour les transferts
+  if (sortieData.value.type_sortie === 'transfert' && !sortieData.value.entrepot_destination?.trim()) {
+    showNotification('error', 'Erreur de validation', 'L\'entrepôt de destination est requis pour un transfert')
+    return
+  }
+  
   saving.value = true
   try {
-    const response = await apiService.post(`/api_stock.php?type=sortie`, {
+    // Utiliser le prix de vente du produit actuel
+    const dataToSend = {
       id_produit: stockProduct.value.id_produit,
-      ...sortieData.value
-    })
+      quantite: sortieData.value.quantite,
+      type_sortie: sortieData.value.type_sortie,
+      prix_unitaire: stockProduct.value.prix_vente || null,
+      motif: sortieData.value.motif
+    }
+    
+    // Ajouter entrepot_destination si c'est un transfert
+    if (sortieData.value.type_sortie === 'transfert' && sortieData.value.entrepot_destination) {
+      dataToSend.entrepot_destination = sortieData.value.entrepot_destination
+    }
+    
+    const response = await apiService.post(`/api_stock.php?type=sortie`, dataToSend)
     
     if (response.success) {
       await loadProducts()
@@ -1237,6 +1329,16 @@ const closeHistoryModal = () => {
   showHistoryModal.value = false
   historyProduct.value = null
   productHistory.value = []
+}
+
+// Ouvrir modal tous les mouvements
+const openAllMovementsModal = () => {
+  showAllMovementsModal.value = true
+}
+
+// Fermer modal tous les mouvements
+const closeAllMovementsModal = () => {
+  showAllMovementsModal.value = false
 }
 
 // Utilitaires supplémentaires
@@ -1304,10 +1406,11 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: 100vh;
-  overflow: auto;
+  min-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   margin-left: 280px;
-  max-width: 100vw;
+  max-width: calc(100vw - 280px);
   background: #f6f7fa;
 }
 
@@ -1320,13 +1423,12 @@ onMounted(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow-x: auto;
   transition: box-shadow 0.2s;
 }
 
 .dashboard-content {
   flex: 1;
-  padding: 2.5rem 2.5rem 0 2.5rem;
+  padding: 2.5rem 2.5rem 2.5rem 2.5rem;
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -1335,13 +1437,15 @@ onMounted(() => {
   width: 100%;
   box-sizing: border-box;
   background: #f6f7fa;
+  overflow: visible;
+  position: relative;
 }
 
 .dashboard-title {
-  font-size: 2rem;
-  font-weight: 800;
+  font-size: 1.5rem;
+  font-weight: 700;
   color: #1a5f4a;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   letter-spacing: 0.01em;
 }
 
@@ -1349,7 +1453,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .btn-primary {
@@ -1373,7 +1477,7 @@ onMounted(() => {
 .products-filters {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   align-items: center;
   justify-content: flex-start;
 }
@@ -1429,13 +1533,23 @@ onMounted(() => {
 .stats-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 1rem;
   justify-content: flex-start;
+  margin-bottom: 1rem;
 }
 
 .stats-row :deep(.stat-card) {
-  flex: 1 1 220px;
-  min-width: 220px;
+  flex: 1 1 180px;
+  min-width: 180px;
+  padding: 0.9rem 1rem 0.7rem 1rem;
+}
+
+.stats-row :deep(.stat-title) {
+  font-size: 0.9rem;
+}
+
+.stats-row :deep(.stat-value) {
+  font-size: 1.5rem;
 }
 
 /* Blocs synthèse comme la maquette */
@@ -1522,17 +1636,18 @@ onMounted(() => {
 .inventory-panels {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .panel {
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 4px 18px rgba(26, 95, 74, 0.08);
-  padding: 1.25rem 1.4rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(26, 95, 74, 0.06);
+  padding: 1rem 1.2rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .panel-header {
@@ -1542,16 +1657,44 @@ onMounted(() => {
 }
 
 .panel-title {
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 0.95rem;
   color: #1a1a1a;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .panel-count {
   background: #fef3c7;
   color: #92400e;
   font-weight: 700;
-  padding: 0.35rem 0.75rem;
-  border-radius: 10px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.btn-more {
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-more:hover {
+  background: #145040;
+  transform: translateY(-1px);
 }
 
 .panel-empty {
@@ -1641,34 +1784,56 @@ onMounted(() => {
 }
 
 .products-table-container {
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 0;
-  overflow: visible;
-  margin-top: 1rem;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-top: 0;
+  width: 100%;
 }
 
 .products-table {
   width: 100%;
   border-collapse: collapse;
+  background: #ffffff;
+  display: table;
+  table-layout: auto;
 }
 
 .products-table thead {
-  background: #1a5f4a;
-  color: white;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .products-table th {
-  padding: 1rem;
+  padding: 0.875rem 1rem;
   text-align: left;
+  font-size: 0.75rem;
   font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .products-table td {
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: white;
+  font-size: 0.875rem;
+  color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.products-table tbody tr {
+  transition: background 0.2s;
+}
+
+.products-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.products-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .product-name {
@@ -1677,6 +1842,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  vertical-align: middle;
+  line-height: 1.5;
 }
 
 .product-icon {
@@ -1769,6 +1936,15 @@ onMounted(() => {
   font-size: 0.875rem;
   background: #e5e7eb;
   color: #374151;
+}
+
+.entrepot-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: #dbeafe;
+  color: #1e40af;
 }
 
 .valeur-stock-cell {
@@ -1892,6 +2068,47 @@ onMounted(() => {
   border: 1.5px solid #10b981;
   border-radius: 8px;
   font-size: 1rem;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+/* Validation des prix */
+.form-group input.price-invalid {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.form-group input.price-warning {
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+}
+
+.form-group input.price-valid {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.price-validation-hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.price-validation-hint.price-invalid {
+  color: #991b1b;
+  background-color: #fee2e2;
+}
+
+.price-validation-hint.price-warning {
+  color: #92400e;
+  background-color: #fef3c7;
+}
+
+.price-validation-hint.price-valid {
+  color: #065f46;
+  background-color: #d1fae5;
 }
 
 .marge-preview {
@@ -2057,7 +2274,9 @@ onMounted(() => {
   border: 2px solid #ffc107;
   border-radius: 16px;
   padding: 1.5rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 1;
 }
 
 .alertes-header {
@@ -2321,6 +2540,83 @@ onMounted(() => {
   background: #dc2626;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Modal tous les mouvements */
+.movements-modal {
+  max-width: 900px;
+  max-height: 85vh;
+}
+
+.movements-table-container {
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.movements-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.movements-table thead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.movements-table th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.movements-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.movements-table tbody tr {
+  transition: background 0.2s;
+}
+
+.movements-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.movements-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.movement-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.movement-type-badge.entree {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.movement-type-badge.sortie {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.text-muted {
+  color: #6b7280;
 }
 
 .history-date {
