@@ -8,6 +8,7 @@ import Products from '../pages/Products.vue'
 import ComingSoon from '../pages/ComingSoon.vue'
 import Clients from '../pages/Clients.vue'
 import Entrepot from '../pages/Entrepot.vue'
+import Journal from '../pages/Journal.vue'
 
 const routes = [
   {
@@ -73,6 +74,12 @@ const routes = [
     path: '/logs',
     name: 'Logs',
     component: ComingSoon,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/journal',
+    name: 'Journal',
+    component: Journal,
     meta: { requiresAuth: true }
   },
   {

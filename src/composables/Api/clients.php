@@ -1,3 +1,5 @@
+    // DEBUG LOG pour comprendre le POST reçu
+    file_put_contents(__DIR__.'/debug_clients.log', date('c')." TYPE: $type\nDATA: ".json_encode($data)."\n", FILE_APPEND);
 <?php
 // Fallback pour serveurs qui ne supportent pas PUT/DELETE
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['_method'])) {
@@ -38,17 +40,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                                JOIN stock_entreprise e ON c.id_entreprise = e.id_entreprise
                                WHERE c.id = ?');
         $stmt->execute([$_GET['id']]);
-        echo json_encode($stmt->fetch());
+        $client = $stmt->fetch();
+        if ($client && $client['type'] === 'entreprise') {
+            $client['nom'] = $client['nom_entreprise'];
+            $client['prenom'] = $client['nom_entreprise'];
+        }
+        echo json_encode($client);
     } else {
         $stmt = $pdo->query('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise 
                              FROM stock_clients c
                              JOIN stock_utilisateur u ON c.id_utilisateur = u.id_utilisateur
                              JOIN stock_entreprise e ON c.id_entreprise = e.id_entreprise
                              ORDER BY c.date_creation DESC');
-        echo json_encode($stmt->fetchAll());
+        $clients = $stmt->fetchAll();
+        foreach ($clients as &$client) {
+            if ($client['type'] === 'entreprise') {
+                $client['nom'] = $client['nom_entreprise'];
+                $client['prenom'] = $client['nom_entreprise'];
+            }
+        }
+        echo json_encode($clients);
     }
     exit;
 }
+
 
 // POST : ajout
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -57,27 +72,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$data) {
         parse_str(file_get_contents('php://input'), $data);
     }
-    // Vérification des champs obligatoires
-    $required = ['nom','prenom','id_entreprise','id_utilisateur'];
-    foreach ($required as $field) {
-        if (!isset($data[$field]) || empty($data[$field])) {
-            echo json_encode(['error' => "Champ manquant ou vide : $field", 'data' => $data]);
+    // Détection robuste du type de client
+    $type = isset($data['type']) ? strtolower(trim($data['type'])) : '';
+    // Si nom_entreprise est renseigné et nom/prenom sont vides, on force le type à entreprise
+    if ($type !== 'particulier' && !empty($data['nom_entreprise']) && empty($data['nom']) && empty($data['prenom'])) {
+        $type = 'entreprise';
+    }
+    // Pour une entreprise, on force nom et prenom à nom_entreprise (toujours, même si le front envoie nom/prenom présents ou vides)
+    if ($type === 'entreprise') {
+        $data['nom'] = isset($data['nom_entreprise']) ? $data['nom_entreprise'] : '';
+        $data['prenom'] = isset($data['nom_entreprise']) ? $data['nom_entreprise'] : '';
+    }
+
+    if ($type === 'entreprise') {
+        // Pour une entreprise, nom_entreprise et id_utilisateur obligatoires
+        if (empty($data['nom_entreprise']) || empty($data['id_utilisateur'])) {
+            echo json_encode(['error' => "Champ manquant : nom_entreprise ou id_utilisateur", 'data' => $data]);
             exit;
         }
+        // Vérifier si l'entreprise existe, sinon la créer
+        $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');
+        $stmtE->execute([$data['nom_entreprise']]);
+        $rowE = $stmtE->fetch();
+        if ($rowE && isset($rowE['id_entreprise'])) {
+            $id_entreprise = $rowE['id_entreprise'];
+        } else {
+            $stmtInsertE = $pdo->prepare('INSERT INTO stock_entreprise (nom_entreprise) VALUES (?)');
+            $stmtInsertE->execute([$data['nom_entreprise']]);
+            $id_entreprise = $pdo->lastInsertId();
+        }
+        $nomEntreprise = trim($data['nom_entreprise']);
+        $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([
+            $nomEntreprise, // nom = nom de l'entreprise
+            $nomEntreprise, // prenom = nom de l'entreprise
+            $id_entreprise,
+            $data['id_utilisateur'],
+            isset($data['email']) ? $data['email'] : null,
+            isset($data['telephone']) ? $data['telephone'] : null,
+            isset($data['adresse']) ? $data['adresse'] : null,
+            isset($data['statut']) ? $data['statut'] : 'actif',
+            'entreprise'
+        ]);
+        echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
+        exit;
+    } else if ($type === 'particulier') {
+        // Pour un particulier, nom et prénom obligatoires
+        $required = ['nom','prenom','id_utilisateur'];
+        foreach ($required as $field) {
+            if (!isset($data[$field]) || empty($data[$field])) {
+                echo json_encode(['error' => "Champ manquant ou vide : $field", 'data' => $data]);
+                exit;
+            }
+        }
+        // Si une entreprise est sélectionnée, on l'associe
+        $id_entreprise = isset($data['id_entreprise']) ? $data['id_entreprise'] : null;
+        if (!empty($data['nom_entreprise'])) {
+            $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');
+            $stmtE->execute([$data['nom_entreprise']]);
+            $rowE = $stmtE->fetch();
+            if ($rowE && isset($rowE['id_entreprise'])) {
+                $id_entreprise = $rowE['id_entreprise'];
+            } else {
+                $stmtInsertE = $pdo->prepare('INSERT INTO stock_entreprise (nom_entreprise) VALUES (?)');
+                $stmtInsertE->execute([$data['nom_entreprise']]);
+                $id_entreprise = $pdo->lastInsertId();
+            }
+        }
+        $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([
+            $data['nom'],
+            $data['prenom'],
+            $id_entreprise,
+            $data['id_utilisateur'],
+            isset($data['email']) ? $data['email'] : null,
+            isset($data['telephone']) ? $data['telephone'] : null,
+            isset($data['adresse']) ? $data['adresse'] : null,
+            isset($data['statut']) ? $data['statut'] : 'actif',
+            'particulier'
+        ]);
+        echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
+        exit;
+    } else {
+        echo json_encode(['error' => "Type de client inconnu ou non géré", 'data' => $data]);
+        exit;
     }
-    $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    $stmt->execute([
-        $data['nom'],
-        $data['prenom'],
-        $data['id_entreprise'],
-        $data['id_utilisateur'],
-        isset($data['email']) ? $data['email'] : null,
-        isset($data['telephone']) ? $data['telephone'] : null,
-        isset($data['adresse']) ? $data['adresse'] : null,
-        isset($data['statut']) ? $data['statut'] : 'actif'
-    ]);
-    echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
-    exit;
 }
 
 // PUT : modification
@@ -90,43 +169,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         parse_str($raw, $data);
         error_log('PUT PARSE_STR: ' . print_r($data, true));
     }
-    if (!$data || !isset($data['nom'])) {
+    if (!$data || !isset($data['type'])) {
         echo json_encode(['error' => 'Aucune donnée reçue ou format incorrect', 'raw' => $raw, 'data' => $data]);
         exit;
     }
-    // Si on reçoit le nom de l'entreprise, on le convertit en id_entreprise
-    if (!empty($data['entreprise']) && empty($data['id_entreprise'])) {
-        $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');
-        $stmtE->execute([$data['entreprise']]);
-        $rowE = $stmtE->fetch();
-        if ($rowE && isset($rowE['id_entreprise'])) {
-            $data['id_entreprise'] = $rowE['id_entreprise'];
-        } else {
-            // Si l'entreprise n'existe pas, on la crée
-            $stmtInsertE = $pdo->prepare('INSERT INTO stock_entreprise (nom_entreprise) VALUES (?)');
-            $stmtInsertE->execute([$data['entreprise']]);
-            $data['id_entreprise'] = $pdo->lastInsertId();
-        }
-    }
-    // Vérification des champs obligatoires
-    $required = ['nom','prenom','id_entreprise','id_utilisateur','id'];
-    foreach ($required as $field) {
-        if (!isset($data[$field])) {
-            echo json_encode(['error' => "Champ manquant : $field", 'data' => $data]);
+    $type = $data['type'];
+    if ($type === 'entreprise') {
+        if (empty($data['nom_entreprise']) || empty($data['id_utilisateur']) || empty($data['id'])) {
+            echo json_encode(['error' => 'Champs manquants pour entreprise', 'data' => $data]);
             exit;
         }
-    }
-    try {
-        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=? WHERE id=?');
+        // Vérifier/créer l'entreprise
+        $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');
+        $stmtE->execute([$data['nom_entreprise']]);
+        $rowE = $stmtE->fetch();
+        if ($rowE && isset($rowE['id_entreprise'])) {
+            $id_entreprise = $rowE['id_entreprise'];
+        } else {
+            $stmtInsertE = $pdo->prepare('INSERT INTO stock_entreprise (nom_entreprise) VALUES (?)');
+            $stmtInsertE->execute([$data['nom_entreprise']]);
+            $id_entreprise = $pdo->lastInsertId();
+        }
+        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=? WHERE id=?');
         $stmt->execute([
-            $data['nom'],
-            $data['prenom'],
-            $data['id_entreprise'],
+            $data['nom_entreprise'], // nom = nom de l'entreprise
+            $data['nom_entreprise'], // prenom = nom de l'entreprise
+            $id_entreprise,
             $data['id_utilisateur'],
             isset($data['email']) ? $data['email'] : null,
             isset($data['telephone']) ? $data['telephone'] : null,
             isset($data['adresse']) ? $data['adresse'] : null,
             isset($data['statut']) ? $data['statut'] : 'actif',
+            'entreprise',
             $data['id']
         ]);
         echo json_encode([
@@ -134,10 +208,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             'rowCount' => $stmt->rowCount(),
             'data' => $data
         ]);
-    } catch (Exception $e) {
-        echo json_encode(['error' => 'Erreur SQL', 'message' => $e->getMessage(), 'data' => $data]);
+        exit;
+    } else {
+        // particulier
+        $required = ['nom','prenom','id_utilisateur','id'];
+        foreach ($required as $field) {
+            if (!isset($data[$field]) || empty($data[$field])) {
+                echo json_encode(['error' => "Champ manquant : $field", 'data' => $data]);
+                exit;
+            }
+        }
+        // Gestion entreprise associée si renseignée
+        $id_entreprise = isset($data['id_entreprise']) ? $data['id_entreprise'] : null;
+        if (!empty($data['nom_entreprise'])) {
+            $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');
+            $stmtE->execute([$data['nom_entreprise']]);
+            $rowE = $stmtE->fetch();
+            if ($rowE && isset($rowE['id_entreprise'])) {
+                $id_entreprise = $rowE['id_entreprise'];
+            } else {
+                $stmtInsertE = $pdo->prepare('INSERT INTO stock_entreprise (nom_entreprise) VALUES (?)');
+                $stmtInsertE->execute([$data['nom_entreprise']]);
+                $id_entreprise = $pdo->lastInsertId();
+            }
+        }
+        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=? WHERE id=?');
+        $stmt->execute([
+            $data['nom'],
+            $data['prenom'],
+            $id_entreprise,
+            $data['id_utilisateur'],
+            isset($data['email']) ? $data['email'] : null,
+            isset($data['telephone']) ? $data['telephone'] : null,
+            isset($data['adresse']) ? $data['adresse'] : null,
+            isset($data['statut']) ? $data['statut'] : 'actif',
+            'particulier',
+            $data['id']
+        ]);
+        echo json_encode([
+            'success' => true,
+            'rowCount' => $stmt->rowCount(),
+            'data' => $data
+        ]);
+        exit;
     }
-    exit;
 }
 
 
