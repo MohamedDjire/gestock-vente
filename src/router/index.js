@@ -10,6 +10,7 @@ import Clients from '../pages/Clients.vue'
 import Entrepot from '../pages/Entrepot.vue'
 import PointVente from '../pages/PointVente.vue'
 import Journal from '../pages/Journal.vue'
+import Fournisseurs from '../pages/Fournisseurs.vue'
 
 const routes = [
   {
@@ -104,7 +105,7 @@ const routes = [
   {
     path: '/fournisseurs',
     name: 'Fournisseurs',
-    component: ComingSoon,
+    component: Fournisseurs,
     meta: { requiresAuth: true }
   }
 ]

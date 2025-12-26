@@ -1,9 +1,9 @@
 <template>
   <div class="main-layout">
-    <Sidebar />
+    <Sidebar v-if="isAuthenticated" />
     <div class="main-content">
       <div class="dashboard-wrapper">
-        <div class="topbar-sticky">
+        <div v-if="isAuthenticated" class="topbar-sticky">
           <Topbar />
         </div>
         <div class="page-content">
@@ -17,6 +17,11 @@
 <script setup>
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
+import { useAuthStore } from '../stores/auth.js'
+import { computed } from 'vue'
+
+const authStore = useAuthStore()
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 </script>
 
 <style scoped>

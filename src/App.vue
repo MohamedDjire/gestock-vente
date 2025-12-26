@@ -1,3 +1,8 @@
+<template>
+  <MainLayout>
+    <RouterView />
+  </MainLayout>
+</template>
 
 
 <script setup>
@@ -5,12 +10,6 @@ import { RouterView, useRoute } from 'vue-router'
 import { computed } from 'vue'
 import MainLayout from './components/MainLayout.vue'
 </script>
-
-<template>
-  <MainLayout>
-    <RouterView />
-  </MainLayout>
-</template>
 
 <style>
 * {

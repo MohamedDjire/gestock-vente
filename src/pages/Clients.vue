@@ -17,6 +17,8 @@
                 </svg>
                 Ajouter un client
               </button>
+              <button @click="exportExcel" class="btn-primary" style="background:#2563eb; margin-left:8px;">Exporter Excel</button>
+              <button @click="exportPDF" class="btn-primary" style="background:#dc2626; margin-left:8px;">Exporter PDF</button>
             </div>
           </div>
 
@@ -156,6 +158,9 @@ import { ref, computed, onMounted } from 'vue'
 import apiClient from '../composables/api/apiClient'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const clients = ref([])
 const search = ref('')
@@ -263,6 +268,34 @@ const closeForm = () => {
   showAddForm.value = false
   editingClient.value = null
   form.value = { type: 'particulier', nom: '', prenom: '', nom_entreprise: '', email: '', telephone: '', adresse: '', statut: 'actif' }
+}
+
+function exportExcel() {
+  const data = clients.value.map(c => ({
+    Nom: c.type === 'entreprise' ? c.nom_entreprise : c.nom + ' ' + c.prenom,
+    Email: c.email,
+    Téléphone: c.telephone,
+    Statut: c.statut,
+    AjoutéPar: c.nom_utilisateur
+  }))
+  const ws = XLSX.utils.json_to_sheet(data)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Clients')
+  XLSX.writeFile(wb, 'clients.xlsx')
+}
+
+function exportPDF() {
+  const doc = new jsPDF()
+  doc.text('Liste des clients', 14, 16)
+  const rows = clients.value.map(c => [c.type === 'entreprise' ? c.nom_entreprise : c.nom + ' ' + c.prenom, c.email, c.telephone, c.statut, c.nom_utilisateur])
+  autoTable(doc, {
+    head: [['Nom', 'Email', 'Téléphone', 'Statut', 'Ajouté par']],
+    body: rows,
+    startY: 22,
+    theme: 'grid',
+    styles: { fontSize: 10 }
+  })
+  doc.save('clients.pdf')
 }
 </script>
 

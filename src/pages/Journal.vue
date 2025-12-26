@@ -3,6 +3,13 @@
     <div class="journal-header">
       <h1 class="journal-title">Journal des mouvements</h1>
       <p class="journal-subtitle">Historique de toutes les actions effectuées</p>
+      <div class="journal-search-group">
+        <input v-model="search" type="text" placeholder="Rechercher (utilisateur, action, détails)" class="journal-search-input" />
+        <input v-model="dateFrom" type="date" class="journal-date-input" />
+        <input v-model="dateTo" type="date" class="journal-date-input" />
+        <button @click="exportExcel" class="btn-primary btn-excel" style="margin-left:8px;">Exporter Excel</button>
+        <button @click="exportPDF" class="btn-primary btn-pdf" style="margin-left:8px;">Exporter PDF</button>
+      </div>
     </div>
     <div class="table-container">
       <table class="journal-table">
@@ -26,13 +33,13 @@
               <span>{{ error }}</span>
             </td>
           </tr>
-          <tr v-else-if="journalEntries.length === 0">
+          <tr v-else-if="filteredJournalEntries.length === 0">
             <td colspan="4" class="empty-state">
               <span class="empty-icon">📋</span>
               <span>Aucun mouvement trouvé</span>
             </td>
           </tr>
-          <tr v-else v-for="(entry, index) in journalEntries" :key="index" class="data-row">
+          <tr v-else v-for="(entry, index) in filteredJournalEntries" :key="index" class="data-row">
             <td class="date-cell">{{ entry.date }}</td>
             <td class="user-cell">
               <div class="user-badge">
@@ -52,12 +59,41 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+
+import { ref, computed, onMounted } from 'vue'
 import apiJournal from '../composables/api/apiJournal';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 
 const journalEntries = ref([]);
 const loading = ref(true);
 const error = ref(null);
+const search = ref('');
+const dateFrom = ref('');
+const dateTo = ref('');
+
+const filteredJournalEntries = computed(() => {
+  let entries = journalEntries.value;
+  // Filtre texte
+  if (search.value) {
+    const s = search.value.toLowerCase();
+    entries = entries.filter(entry =>
+      (entry.user && entry.user.toLowerCase().includes(s)) ||
+      (entry.action && entry.action.toLowerCase().includes(s)) ||
+      (entry.details && entry.details.toLowerCase().includes(s))
+    );
+  }
+  // Filtre date
+  if (dateFrom.value) {
+    entries = entries.filter(entry => entry.date && entry.date >= dateFrom.value);
+  }
+  if (dateTo.value) {
+    entries = entries.filter(entry => entry.date && entry.date <= dateTo.value);
+  }
+  return entries;
+});
 
 const fetchJournal = async () => {
   loading.value = true;
@@ -71,14 +107,95 @@ const fetchJournal = async () => {
 };
 
 onMounted(fetchJournal);
+
+function exportExcel() {
+  const data = filteredJournalEntries.value.map(e => ({
+    Date: e.date,
+    Utilisateur: e.user,
+    Action: e.action,
+    Détails: e.details
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Journal');
+  XLSX.writeFile(wb, 'journal_mouvements.xlsx');
+}
+
+function exportPDF() {
+  const doc = new jsPDF();
+  doc.text('Journal des mouvements', 14, 16);
+  const rows = filteredJournalEntries.value.map(e => [e.date, e.user, e.action, e.details]);
+  autoTable(doc, {
+    head: [['Date', 'Utilisateur', 'Action', 'Détails']],
+    body: rows,
+    startY: 22,
+    theme: 'grid',
+    styles: { fontSize: 10 }
+  });
+  doc.save('journal_mouvements.pdf');
+}
 </script>
 
 <style scoped>
+/* Boutons export personnalisés */
+.btn-excel {
+  background: #2563eb !important;
+  color: #fff !important;
+}
+.btn-pdf {
+  background: #dc2626 !important;
+  color: #fff !important;
+}
+.btn-primary {
+  background-color: #1a5f4a;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
 .journal-header {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
   border-bottom: 2px solid #f0f1f3;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.journal-search-group {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 700px;
+}
+.journal-search-input {
+  flex: 3;
+  min-width: 280px;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #f8fafc;
+  transition: border-color 0.2s;
+}
+.journal-date-input {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.5rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #f8fafc;
+  transition: border-color 0.2s;
+}
+.journal-search-input:focus, .journal-date-input:focus {
+  outline: none;
+  border-color: #1a5f4a;
 }
 
 .journal-title {
@@ -277,6 +394,7 @@ onMounted(fetchJournal);
 
 
 .journal-offset {
-  margin-left: 250px;
+  margin-left: 0;
 }
 </style>
+
