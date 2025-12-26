@@ -1,5 +1,4 @@
-    // DEBUG LOG pour comprendre le POST reçu
-    file_put_contents(__DIR__.'/debug_clients.log', date('c')." TYPE: $type\nDATA: ".json_encode($data)."\n", FILE_APPEND);
+
 <?php
 // Fallback pour serveurs qui ne supportent pas PUT/DELETE
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['_method'])) {

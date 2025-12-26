@@ -2,12 +2,18 @@
 
 <script setup>
 import MainLayout from './components/MainLayout.vue'
+import { useAuthStore } from './stores/auth.js'
+import { storeToRefs } from 'pinia'
+
+const authStore = useAuthStore()
+const { isAuthenticated } = storeToRefs(authStore)
 </script>
 
 <template>
-  <MainLayout>
+  <MainLayout v-if="isAuthenticated">
     <RouterView />
   </MainLayout>
+  <RouterView v-else />
 </template>
 
 <style>

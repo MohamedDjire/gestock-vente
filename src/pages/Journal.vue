@@ -1,56 +1,54 @@
 <template>
-  <PageCard>
-    <div class="journal-offset">
-      <div class="journal-header">
-        <h1 class="journal-title">Journal des mouvements</h1>
-        <p class="journal-subtitle">Historique de toutes les actions effectuées</p>
-      </div>
-      <div class="table-container">
-        <table class="journal-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Utilisateur</th>
-              <th>Action</th>
-              <th>Détails</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="4" class="empty-state">
-                <span>Chargement des données...</span>
-              </td>
-            </tr>
-            <tr v-else-if="error">
-              <td colspan="4" class="empty-state error-state">
-                <span class="error-icon">⚠️</span>
-                <span>{{ error }}</span>
-              </td>
-            </tr>
-            <tr v-else-if="journalEntries.length === 0">
-              <td colspan="4" class="empty-state">
-                <span class="empty-icon">📋</span>
-                <span>Aucun mouvement trouvé</span>
-              </td>
-            </tr>
-            <tr v-else v-for="(entry, index) in journalEntries" :key="index" class="data-row">
-              <td class="date-cell">{{ entry.date }}</td>
-              <td class="user-cell">
-                <div class="user-badge">
-                  <span class="user-avatar">{{ entry.user?.charAt(0)?.toUpperCase() }}</span>
-                  {{ entry.user }}
-                </div>
-              </td>
-              <td class="action-cell">
-                <span class="action-badge">{{ entry.action }}</span>
-              </td>
-              <td class="details-cell">{{ entry.details }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+  <div class="journal-offset">
+    <div class="journal-header">
+      <h1 class="journal-title">Journal des mouvements</h1>
+      <p class="journal-subtitle">Historique de toutes les actions effectuées</p>
     </div>
-  </PageCard>
+    <div class="table-container">
+      <table class="journal-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Utilisateur</th>
+            <th>Action</th>
+            <th>Détails</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading">
+            <td colspan="4" class="empty-state">
+              <span>Chargement des données...</span>
+            </td>
+          </tr>
+          <tr v-else-if="error">
+            <td colspan="4" class="empty-state error-state">
+              <span class="error-icon">⚠️</span>
+              <span>{{ error }}</span>
+            </td>
+          </tr>
+          <tr v-else-if="journalEntries.length === 0">
+            <td colspan="4" class="empty-state">
+              <span class="empty-icon">📋</span>
+              <span>Aucun mouvement trouvé</span>
+            </td>
+          </tr>
+          <tr v-else v-for="(entry, index) in journalEntries" :key="index" class="data-row">
+            <td class="date-cell">{{ entry.date }}</td>
+            <td class="user-cell">
+              <div class="user-badge">
+                <span class="user-avatar">{{ entry.user?.charAt(0)?.toUpperCase() }}</span>
+                {{ entry.user }}
+              </div>
+            </td>
+            <td class="action-cell">
+              <span class="action-badge">{{ entry.action }}</span>
+            </td>
+            <td class="details-cell">{{ entry.details }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </template>
 
 <script setup>

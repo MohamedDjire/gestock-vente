@@ -37,26 +37,29 @@ import Topbar from './Topbar.vue'
   z-index: 0;
 }
 
+
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   height: 100vh;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 1;
 }
 
 .page-content {
   padding: 0 2rem 2rem 2rem;
+  padding-top: 0;
   width: 100%;
   height: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow-x: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 @media (max-width: 768px) {
