@@ -370,8 +370,9 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
+import { useCurrency } from '../composables/useCurrency.js'
 
-const selectedCurrency = inject('selectedCurrency', ref('F CFA'))
+const { formatPrice: formatCurrency } = useCurrency()
 
 const pointsVente = ref([])
 const entrepots = ref([])
@@ -443,15 +444,8 @@ const filteredPointsVente = computed(() => {
   return filtered
 })
 
-const formatCurrency = (amount) => {
-  const num = parseFloat(amount) || 0
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: selectedCurrency.value === 'F CFA' ? 'XOF' : selectedCurrency.value,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(num).replace('XOF', 'F CFA')
-}
+// formatCurrency est maintenant fourni par useCurrency() via formatPrice
+// Les valeurs sont supposées être en XOF (F CFA) par défaut dans la base de données
 
 const formatDate = (dateString) => {
   if (!dateString) return '—'
