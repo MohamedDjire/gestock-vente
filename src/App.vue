@@ -1,19 +1,15 @@
 
 
 <script setup>
+import { RouterView, useRoute } from 'vue-router'
+import { computed } from 'vue'
 import MainLayout from './components/MainLayout.vue'
-import { useAuthStore } from './stores/auth.js'
-import { storeToRefs } from 'pinia'
-
-const authStore = useAuthStore()
-const { isAuthenticated } = storeToRefs(authStore)
 </script>
 
 <template>
-  <MainLayout v-if="isAuthenticated">
+  <MainLayout>
     <RouterView />
   </MainLayout>
-  <RouterView v-else />
 </template>
 
 <style>
@@ -23,15 +19,19 @@ const { isAuthenticated } = storeToRefs(authStore)
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
-  min-height: 100vh;
-  width: 100%;
+  width: 100vw;
+  overflow-x: hidden;
 }
 </style>

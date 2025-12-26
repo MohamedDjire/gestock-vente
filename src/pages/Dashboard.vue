@@ -1,13 +1,8 @@
 <template>
-  <div class="dashboard-layout">
-    <Sidebar />
-    <div class="main-content">
-      <div class="dashboard-wrapper">
-        <Topbar />
-        <div class="dashboard-content">
-          <h2 class="dashboard-title">Overview</h2>
+  <div class="dashboard-page">
+    <h2 class="dashboard-title">Overview</h2>
 
-          <div class="stats-row">
+    <div class="stats-row">
             <StatCard 
               title="Vente total" 
               :value="'25.1k'" 
@@ -46,67 +41,27 @@
                 <div class="team-queue">Cleared Queue <span class="team-queue-value">1.4k</span> <span class="team-queue-variation">+15%</span></div>
               </div>
             </div>
-          </div>
-          <div class="table-row">
-            <SalesTable />
-          </div>
-        </div>
-      </div>
+    </div>
+    <div class="table-row">
+      <SalesTable />
     </div>
   </div>
 </template>
 
 <script setup>
-import Sidebar from '../components/Sidebar.vue'
-import Topbar from '../components/Topbar.vue'
 import StatCard from '../components/StatCard.vue'
 import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 </script>
 
 <style scoped>
-.dashboard-layout {
+.dashboard-page {
   display: flex;
-  min-height: 100vh;
-  width: 100vw;
-  background: #f6f7fa;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-}
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100vh;
-  overflow: auto;
-  margin-left: 250px;
-  max-width: 100vw;
-  background: #f6f7fa;
-}
-.dashboard-wrapper {
-  background: #fff;
-  border-radius: 0 32px 32px 0;
-  box-shadow: 0 8px 32px 0 rgba(26,95,74,0.10);
-  min-height: 100vh;
-  width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-x: auto;
-  transition: box-shadow 0.2s;
-}
-.dashboard-content {
-  flex: 1;
-  padding: 2.5rem 2.5rem 0 2.5rem;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2.2rem;
-  width: 100%;
-  box-sizing: border-box;
-  background: #f6f7fa;
+  padding-bottom: 2.5rem;
 }
 .dashboard-title {
   font-size: 2rem;

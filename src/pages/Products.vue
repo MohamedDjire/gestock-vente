@@ -1,19 +1,19 @@
 <template>
-  <div class="dashboard-layout">
-    <Sidebar />
-    <div class="main-content">
-      <div class="dashboard-wrapper">
-        <Topbar />
-        <div class="dashboard-content">
-          <div class="products-header">
-            <h2 class="dashboard-title">Produits & Stocks</h2>
-            <button @click="openCreateModal" class="btn-primary">
-              <span>+</span> Nouveau Produit
-            </button>
-          </div>
+  <div class="products-page">
+    <div class="products-header">
+      <h2 class="dashboard-title">Produits & Stocks</h2>
+      <div style="display: flex; gap: 1rem;">
+        <button @click="goToEntrepot" class="btn-secondary" style="background: #3b82f6; color: white;">
+          <span>🏭</span> Gérer les Entrepôts
+        </button>
+        <button @click="openCreateModal" class="btn-primary">
+          <span>+</span> Nouveau Produit
+        </button>
+      </div>
+    </div>
 
-        <!-- Vue synthétique comme la maquette -->
-          <div class="inventory-overview">
+    <!-- Vue synthétique comme la maquette -->
+    <div class="inventory-overview">
             <!-- Statistiques Produits & Stocks (en haut avec icônes) -->
             <div class="stats-row">
               <StatCard 
@@ -43,140 +43,140 @@
                 icon="⚠️" />
             </div>
 
-          <div class="inventory-summary card">
-            <div class="summary-row">
-              <div class="summary-label">Quantité disponible</div>
-              <div class="summary-value">{{ stats.stockTotal }}</div>
-            </div>
-            <div class="summary-row">
-              <div class="summary-label">Quantité à recevoir</div>
-              <div class="summary-value muted">—</div>
-            </div>
-            <div class="summary-footer">Ajustez via Entrée/Sortie ou commandes fournisseurs.</div>
+      <div class="inventory-summary card">
+        <div class="summary-row">
+          <div class="summary-label">Quantité disponible</div>
+          <div class="summary-value">{{ stats.stockTotal }}</div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">Quantité à recevoir</div>
+          <div class="summary-value muted">—</div>
+        </div>
+        <div class="summary-footer">Ajustez via Entrée/Sortie ou commandes fournisseurs.</div>
+      </div>
+    </div>
+
+    <div class="inventory-panels">
+      <div class="panel card">
+        <div class="panel-header">
+          <div class="panel-title">Articles stock faible / rupture</div>
+          <div class="panel-count">{{ lowStockProducts.length }}</div>
+        </div>
+        <div v-if="lowStockProducts.length === 0" class="panel-empty">Aucune alerte en cours</div>
+        <table v-else class="panel-table">
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th>Stock</th>
+              <th>Seuil</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in lowStockProducts" :key="p.id_produit">
+              <td>{{ p.nom }}</td>
+              <td>{{ p.quantite_stock }}</td>
+              <td>{{ p.seuil_minimum }}</td>
+              <td><span :class="['status-badge', p.statut_stock]">{{ getStatusLabel(p.statut_stock) }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel card">
+        <div class="panel-header">
+          <div class="panel-title">Mouvements récents</div>
+          <div class="panel-actions">
+            <div class="panel-count">{{ allMovements.length }}</div>
+            <button @click="openAllMovementsModal" class="btn-more" title="Voir tous les mouvements">
+              <span>+</span> Plus
+            </button>
           </div>
         </div>
-
-        <div class="inventory-panels">
-          <div class="panel card">
-            <div class="panel-header">
-              <div class="panel-title">Articles stock faible / rupture</div>
-              <div class="panel-count">{{ lowStockProducts.length }}</div>
+        <div v-if="recentMovements.length === 0" class="panel-empty">Enregistrez des entrées/sorties pour voir l'historique.</div>
+        <ul v-else class="movement-list">
+          <li v-for="m in recentMovements" :key="m.id">
+            <div class="movement-top">
+              <span class="movement-type" :class="m.type">{{ m.typeLabel }}</span>
+              <span class="movement-date">{{ formatShortDate(m.date) }}</span>
             </div>
-            <div v-if="lowStockProducts.length === 0" class="panel-empty">Aucune alerte en cours</div>
-            <table v-else class="panel-table">
-              <thead>
-                <tr>
-                  <th>Produit</th>
-                  <th>Stock</th>
-                  <th>Seuil</th>
-                  <th>Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="p in lowStockProducts" :key="p.id_produit">
-                  <td>{{ p.nom }}</td>
-                  <td>{{ p.quantite_stock }}</td>
-                  <td>{{ p.seuil_minimum }}</td>
-                  <td><span :class="['status-badge', p.statut_stock]">{{ getStatusLabel(p.statut_stock) }}</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="movement-main">
+              <strong>{{ m.nom }}</strong>
+              <span class="movement-qty">Qté: {{ m.quantite }}</span>
+            </div>
+            <div class="movement-sub">{{ m.details }}</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Panneau d'Alertes -->
+    <div v-if="alertesNonVues.length > 0" class="alertes-panel">
+      <div class="alertes-header">
+        <h3>⚠️ Alertes de Stock ({{ alertesNonVues.length }})</h3>
+        <button @click="markAllAlertesAsVue" class="btn-mark-all">Tout marquer comme vu</button>
+      </div>
+      <div class="alertes-list">
+        <div 
+          v-for="alerte in alertesNonVues.slice(0, 5)" 
+          :key="alerte.id_alerte"
+          :class="['alerte-item', alerte.type_alerte]"
+        >
+          <span class="alerte-icon">{{ getAlerteIcon(alerte.type_alerte) }}</span>
+          <div class="alerte-content">
+            <strong>{{ alerte.produit_nom }}</strong>
+            <p>{{ alerte.message }}</p>
+            <small>{{ formatDate(alerte.date_alerte) }}</small>
           </div>
-
-          <div class="panel card">
-            <div class="panel-header">
-              <div class="panel-title">Mouvements récents</div>
-              <div class="panel-actions">
-                <div class="panel-count">{{ allMovements.length }}</div>
-                <button @click="openAllMovementsModal" class="btn-more" title="Voir tous les mouvements">
-                  <span>+</span> Plus
-                </button>
-              </div>
-            </div>
-            <div v-if="recentMovements.length === 0" class="panel-empty">Enregistrez des entrées/sorties pour voir l'historique.</div>
-            <ul v-else class="movement-list">
-              <li v-for="m in recentMovements" :key="m.id">
-                <div class="movement-top">
-                  <span class="movement-type" :class="m.type">{{ m.typeLabel }}</span>
-                  <span class="movement-date">{{ formatShortDate(m.date) }}</span>
-                </div>
-                <div class="movement-main">
-                  <strong>{{ m.nom }}</strong>
-                  <span class="movement-qty">Qté: {{ m.quantite }}</span>
-                </div>
-                <div class="movement-sub">{{ m.details }}</div>
-              </li>
-            </ul>
+          <div class="alerte-actions">
+            <button @click="viewProduct(alerte.id_produit)" class="btn-view">Voir</button>
+            <button @click="markAlerteAsVue(alerte.id_alerte)" class="btn-mark-vue">✓</button>
           </div>
         </div>
+      </div>
+    </div>
 
-          <!-- Panneau d'Alertes -->
-          <div v-if="alertesNonVues.length > 0" class="alertes-panel">
-            <div class="alertes-header">
-              <h3>⚠️ Alertes de Stock ({{ alertesNonVues.length }})</h3>
-              <button @click="markAllAlertesAsVue" class="btn-mark-all">Tout marquer comme vu</button>
-            </div>
-            <div class="alertes-list">
-              <div 
-                v-for="alerte in alertesNonVues.slice(0, 5)" 
-                :key="alerte.id_alerte"
-                :class="['alerte-item', alerte.type_alerte]"
-              >
-                <span class="alerte-icon">{{ getAlerteIcon(alerte.type_alerte) }}</span>
-                <div class="alerte-content">
-                  <strong>{{ alerte.produit_nom }}</strong>
-                  <p>{{ alerte.message }}</p>
-                  <small>{{ formatDate(alerte.date_alerte) }}</small>
-                </div>
-                <div class="alerte-actions">
-                  <button @click="viewProduct(alerte.id_produit)" class="btn-view">Voir</button>
-                  <button @click="markAlerteAsVue(alerte.id_alerte)" class="btn-mark-vue">✓</button>
-                </div>
-              </div>
-            </div>
-          </div>
+    <!-- Barre de recherche et filtres -->
+    <div class="products-filters">
+      <div class="search-box">
+        <input 
+          v-model="searchQuery" 
+          @input="handleSearch"
+          type="text" 
+          placeholder="Rechercher un produit (nom ou code)..." 
+          class="search-input"
+        />
+      </div>
+      <div class="filter-buttons">
+        <button 
+          @click="filterStatus = null" 
+          :class="['filter-btn', { active: filterStatus === null }]"
+        >
+          Tous
+        </button>
+        <button 
+          @click="filterStatus = 'normal'" 
+          :class="['filter-btn', { active: filterStatus === 'normal' }]"
+        >
+          En Stock
+        </button>
+        <button 
+          @click="filterStatus = 'alerte'" 
+          :class="['filter-btn', { active: filterStatus === 'alerte' }]"
+        >
+          Alerte
+        </button>
+        <button 
+          @click="filterStatus = 'rupture'" 
+          :class="['filter-btn', { active: filterStatus === 'rupture' }]"
+        >
+          Rupture
+        </button>
+      </div>
+    </div>
 
-          <!-- Barre de recherche et filtres -->
-          <div class="products-filters">
-            <div class="search-box">
-              <input 
-                v-model="searchQuery" 
-                @input="handleSearch"
-                type="text" 
-                placeholder="Rechercher un produit (nom ou code)..." 
-                class="search-input"
-              />
-            </div>
-            <div class="filter-buttons">
-              <button 
-                @click="filterStatus = null" 
-                :class="['filter-btn', { active: filterStatus === null }]"
-              >
-                Tous
-              </button>
-              <button 
-                @click="filterStatus = 'normal'" 
-                :class="['filter-btn', { active: filterStatus === 'normal' }]"
-              >
-                En Stock
-              </button>
-              <button 
-                @click="filterStatus = 'alerte'" 
-                :class="['filter-btn', { active: filterStatus === 'alerte' }]"
-              >
-                Alerte
-              </button>
-              <button 
-                @click="filterStatus = 'rupture'" 
-                :class="['filter-btn', { active: filterStatus === 'rupture' }]"
-              >
-                Rupture
-              </button>
-            </div>
-          </div>
-
-          <!-- Tableau des produits -->
-          <div class="products-table-container">
+    <!-- Tableau des produits -->
+    <div class="products-table-container">
             <table class="products-table">
               <thead>
                 <tr>
@@ -202,9 +202,11 @@
                 </tr>
                 <tr v-else v-for="product in filteredProducts" :key="product.id_produit">
                   <td><strong>{{ product.code_produit }}</strong></td>
-                  <td class="product-name">
-                    <span class="product-icon" :title="product.nom">{{ getProductIcon(product) }}</span>
-                    {{ product.nom }}
+                  <td style="vertical-align: middle;">
+                    <span class="product-name">
+                      <span class="product-icon" :title="product.nom">{{ getProductIcon(product) }}</span>
+                      {{ product.nom }}
+                    </span>
                   </td>
                   <td>{{ formatCurrency(product.prix_achat) }}</td>
                   <td>{{ formatCurrency(product.prix_vente) }}</td>
@@ -252,12 +254,10 @@
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
-    </div>
+  </div>
 
-    <!-- Modal Entrée de Stock -->
-    <div v-if="showEntreeModal" class="modal-overlay" @click="closeEntreeModal">
+  <!-- Modal Entrée de Stock -->
+  <div v-if="showEntreeModal" class="modal-overlay" @click="closeEntreeModal">
       <div class="modal-content stock-modal" @click.stop>
         <div class="modal-header">
           <h3>Entrée de Stock - {{ stockProduct?.nom }}</h3>
@@ -300,9 +300,9 @@
       </div>
     </div>
 
-    <!-- Modal Sortie de Stock -->
-    <div v-if="showSortieModal" class="modal-overlay" @click="closeSortieModal">
-      <div class="modal-content stock-modal" @click.stop>
+  <!-- Modal Sortie de Stock -->
+  <div v-if="showSortieModal" class="modal-overlay" @click="closeSortieModal">
+    <div class="modal-content stock-modal" @click.stop>
         <div class="modal-header">
           <h3>Sortie de Stock - {{ stockProduct?.nom }}</h3>
           <button @click="closeSortieModal" class="modal-close">×</button>
@@ -355,10 +355,10 @@
           </div>
         </form>
       </div>
-    </div>
+  </div>
 
-    <!-- Modal Historique -->
-    <div v-if="showHistoryModal" class="modal-overlay" @click="closeHistoryModal">
+  <!-- Modal Historique -->
+  <div v-if="showHistoryModal" class="modal-overlay" @click="closeHistoryModal">
       <div class="modal-content history-modal" @click.stop>
         <div class="modal-header">
           <h3>Historique des Mouvements - {{ historyProduct?.nom }}</h3>
@@ -401,9 +401,9 @@
           </div>
         </div>
       </div>
-    </div>
+  </div>
 
-    <!-- Modal d'ajustement de stock -->
+  <!-- Modal d'ajustement de stock -->
     <div v-if="showStockModal" class="modal-overlay" @click="closeStockModal">
       <div class="modal-content stock-modal" @click.stop>
         <div class="modal-header">
@@ -452,17 +452,17 @@
           </div>
         </div>
       </div>
-    </div>
+  </div>
 
-    <!-- Modal de création/édition -->
-    <div v-if="showModal" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ editingProduct ? 'Modifier le Produit' : 'Nouveau Produit' }}</h3>
-          <button @click="closeModal" class="modal-close">×</button>
-        </div>
-        <form @submit.prevent="saveProduct" class="product-form">
-          <div class="form-row">
+  <!-- Modal de création/édition -->
+  <div v-if="showModal" class="modal-overlay" @click="closeModal">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h3>{{ editingProduct ? 'Modifier le Produit' : 'Nouveau Produit' }}</h3>
+        <button @click="closeModal" class="modal-close">×</button>
+      </div>
+      <form @submit.prevent="saveProduct" class="product-form">
+        <div class="form-row">
             <div class="form-group">
               <label>Code Produit</label>
               <input 
@@ -593,11 +593,9 @@
             <button type="submit" class="btn-save" :disabled="saving">
               {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
             </button>
-          </div>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
-
   </div>
 
   <!-- Modal tous les mouvements -->
@@ -678,11 +676,11 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
-import Sidebar from '../components/Sidebar.vue'
-import Topbar from '../components/Topbar.vue'
 import StatCard from '../components/StatCard.vue'
 
+const router = useRouter()
 const products = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -1385,60 +1383,22 @@ const getSortieTypeLabel = (type) => {
   return labels[type] || type
 }
 
+const goToEntrepot = () => {
+  router.push('/entrepot')
+}
+
 onMounted(() => {
   loadProducts()
 })
 </script>
 
 <style scoped>
-/* Layout principal - identique à Dashboard */
-.dashboard-layout {
-  display: flex;
-  min-height: 100vh;
-  width: 100vw;
-  background: #f6f7fa;
-  overflow-x: auto;
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-}
-
-.main-content {
-  flex: 1;
+/* Page Products - Layout géré par MainLayout */
+.products-page {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  min-height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  margin-left: 280px;
-  max-width: calc(100vw - 280px);
-  background: #f6f7fa;
-}
-
-.dashboard-wrapper {
-  background: #fff;
-  border-radius: 0 32px 32px 0;
-  box-shadow: 0 8px 32px 0 rgba(26, 95, 74, 0.10);
-  min-height: 100vh;
+  gap: 1.5rem;
   width: 100%;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow 0.2s;
-}
-
-.dashboard-content {
-  flex: 1;
-  padding: 2.5rem 2.5rem 2.5rem 2.5rem;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2.2rem;
-  width: 100%;
-  box-sizing: border-box;
-  background: #f6f7fa;
-  overflow: visible;
-  position: relative;
 }
 
 .dashboard-title {
@@ -1472,6 +1432,24 @@ onMounted(() => {
 
 .btn-primary:hover {
   background: #134e3a;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
 }
 
 .products-filters {
@@ -1638,6 +1616,7 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1rem;
   margin-bottom: 1rem;
+  align-items: start;
 }
 
 .panel {
@@ -1648,6 +1627,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  min-height: auto;
 }
 
 .panel-header {
@@ -1727,6 +1707,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  overflow: visible;
+  max-height: none;
 }
 
 .movement-list li {
@@ -1787,7 +1769,6 @@ onMounted(() => {
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-top: 0;
   width: 100%;
@@ -1822,6 +1803,7 @@ onMounted(() => {
   color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
+  line-height: 1.5;
 }
 
 .products-table tbody tr {
@@ -1839,7 +1821,7 @@ onMounted(() => {
 .product-name {
   font-weight: 600;
   color: #1a1a1a;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   vertical-align: middle;
@@ -1848,6 +1830,9 @@ onMounted(() => {
 
 .product-icon {
   font-size: 1.2rem;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
 }
 
 /* Masquer la variation % des StatCard si présente */

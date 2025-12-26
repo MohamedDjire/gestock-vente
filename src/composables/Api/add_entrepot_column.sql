@@ -10,3 +10,4 @@ AFTER `actif`;
 
 -- Mettre à jour les produits existants pour qu'ils aient "Magasin" par défaut
 UPDATE `stock_produit` SET `entrepot` = 'Magasin' WHERE `entrepot` IS NULL OR `entrepot` = '';
+

@@ -611,3 +611,4 @@ const handleSignUp = async () => {
   }
 }
 </style>
+

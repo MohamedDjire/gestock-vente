@@ -458,3 +458,4 @@ try {
         'line' => $e->getLine()
     ], JSON_UNESCAPED_UNICODE);
 }
+

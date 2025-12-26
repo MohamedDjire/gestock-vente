@@ -49,18 +49,26 @@ watch(selectedCurrency, (newValue) => {
 .topbar {
   display: flex;
   align-items: center;
-  padding: 1.5rem 2.2rem 1.5rem 2.2rem;
+  padding: 1rem 2.2rem;
   background: #fff;
   box-shadow: 0 2px 12px #0001;
   border-radius: 0 32px 0 0;
   min-height: 70px;
   position: fixed;
   top: 0;
-  left: 0;
+  left: 280px;
   right: 0;
   z-index: 1002;
-  width: 100vw;
-  max-width: 100vw;
+  width: calc(100vw - 280px);
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  .topbar {
+    left: 0;
+    width: 100vw;
+    border-radius: 0;
+  }
 }
 
 .topbar-actions {
@@ -123,12 +131,5 @@ watch(selectedCurrency, (newValue) => {
   font-weight: 600;
   color: #1a5f4a;
   font-size: 1.08rem;
-}
-</style>
-<style>
-/* Ajoute un padding-top global pour compenser la topbar fixed */
-.main-content, .sidebar, .router-view, main, .page-content {
-  padding-top: 100px !important;
-  box-sizing: border-box;
 }
 </style>

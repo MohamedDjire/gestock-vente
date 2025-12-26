@@ -77,3 +77,4 @@ Vous devriez voir une réponse JSON (même si c'est une erreur, cela confirme qu
 Ces endpoints sont appelés depuis :
 - `src/views/Login.vue` → utilise `useAuth().login()`
 - `src/views/SignUp.vue` → utilise `useAuth().signUp()`
+
