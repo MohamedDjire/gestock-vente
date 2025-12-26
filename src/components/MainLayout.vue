@@ -55,8 +55,7 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 }
 
 .page-content {
-  padding: 0 2rem 2rem 2rem;
-  padding-top: 90px;
+  padding: calc(1.5rem + 70px) 2rem 2rem 2rem;
   width: 100%;
   display: flex;
   flex-direction: column;

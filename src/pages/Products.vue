@@ -679,15 +679,15 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
+import { useCurrency } from '../composables/useCurrency.js'
 
 const router = useRouter()
+const { formatPrice: formatCurrency } = useCurrency()
 const products = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref(null)
-// La devise est maintenant gérée dans Topbar.vue via provide/inject
-const selectedCurrency = inject('selectedCurrency', ref('F CFA'))
 const showModal = ref(false)
 const showStockModal = ref(false)
 const showEntreeModal = ref(false)
@@ -1133,19 +1133,8 @@ const getStockStatusText = (quantite, seuil) => {
   return '✅ Stock normal'
 }
 
-// Utilitaires
-const formatCurrency = (value) => {
-  const currencyMap = {
-    'F CFA': 'XOF',
-    'EUR': 'EUR',
-    'USD': 'USD'
-  }
-  const code = currencyMap[selectedCurrency.value] || 'XOF'
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: code
-  }).format(value || 0)
-}
+// formatCurrency est maintenant fourni par useCurrency() via formatPrice
+// Les valeurs sont supposées être en XOF (F CFA) par défaut dans la base de données
 
 const getMargeClass = (marge) => {
   if (marge > 0) return 'marge-positive'
