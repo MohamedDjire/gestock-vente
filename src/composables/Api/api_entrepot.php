@@ -134,6 +134,104 @@ try {
                     'data' => $entrepots
                 ], JSON_UNESCAPED_UNICODE);
                 
+            } elseif ($action === 'rapport' && isset($_GET['id_entrepot'])) {
+                // Récupérer le rapport hebdomadaire d'un entrepôt
+                $idEntrepot = (int)$_GET['id_entrepot'];
+                
+                // Vérifier que l'entrepôt appartient à l'entreprise
+                $stmt = $bdd->prepare("SELECT nom_entrepot FROM stock_entrepot WHERE id_entrepot = :id AND id_entreprise = :id_entreprise");
+                $stmt->execute(['id' => $idEntrepot, 'id_entreprise' => $enterpriseId]);
+                $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$entrepot) {
+                    @http_response_code(404);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Entrepôt non trouvé'
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                
+                $nomEntrepot = $entrepot['nom_entrepot'];
+                
+                // Calculer la date de début de la semaine (7 derniers jours)
+                $dateDebut = date('Y-m-d H:i:s', strtotime('-7 days'));
+                
+                // Récupérer les entrées de la semaine
+                $stmt = $bdd->prepare("
+                    SELECT 
+                        e.id_entree AS id,
+                        'entree' AS type,
+                        e.date_entree AS date,
+                        e.quantite,
+                        p.nom AS produit_nom,
+                        p.code_produit,
+                        e.notes,
+                        NULL AS type_sortie,
+                        NULL AS motif,
+                        NULL AS entrepot_destination
+                    FROM stock_entree e
+                    INNER JOIN stock_produit p ON e.id_produit = p.id_produit
+                    WHERE p.entrepot = :nom_entrepot 
+                    AND p.id_entreprise = :id_entreprise
+                    AND e.date_entree >= :date_debut
+                    ORDER BY e.date_entree DESC
+                ");
+                $stmt->execute([
+                    'nom_entrepot' => $nomEntrepot,
+                    'id_entreprise' => $enterpriseId,
+                    'date_debut' => $dateDebut
+                ]);
+                $entrees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Récupérer les sorties de la semaine
+                $stmt = $bdd->prepare("
+                    SELECT 
+                        s.id_sortie AS id,
+                        'sortie' AS type,
+                        s.date_sortie AS date,
+                        s.quantite,
+                        p.nom AS produit_nom,
+                        p.code_produit,
+                        NULL AS notes,
+                        s.type_sortie,
+                        s.motif,
+                        s.entrepot_destination
+                    FROM stock_sortie s
+                    INNER JOIN stock_produit p ON s.id_produit = p.id_produit
+                    WHERE p.entrepot = :nom_entrepot 
+                    AND p.id_entreprise = :id_entreprise
+                    AND s.date_sortie >= :date_debut
+                    ORDER BY s.date_sortie DESC
+                ");
+                $stmt->execute([
+                    'nom_entrepot' => $nomEntrepot,
+                    'id_entreprise' => $enterpriseId,
+                    'date_debut' => $dateDebut
+                ]);
+                $sorties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Combiner et trier tous les mouvements
+                $mouvements = array_merge($entrees, $sorties);
+                usort($mouvements, function($a, $b) {
+                    return strtotime($b['date']) - strtotime($a['date']);
+                });
+                
+                // Calculer les totaux
+                $totalEntrees = count($entrees);
+                $totalSorties = count($sorties);
+                $totalMouvements = count($mouvements);
+                
+                echo json_encode([
+                    'success' => true,
+                    'data' => [
+                        'totalEntrees' => $totalEntrees,
+                        'totalSorties' => $totalSorties,
+                        'totalMouvements' => $totalMouvements,
+                        'mouvements' => $mouvements
+                    ]
+                ], JSON_UNESCAPED_UNICODE);
+                
             } elseif ($action === 'produits' && isset($_GET['id_entrepot'])) {
                 // Récupérer les produits d'un entrepôt spécifique
                 $idEntrepot = (int)$_GET['id_entrepot'];

@@ -40,6 +40,7 @@ const menuItems = [
   { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
   { name: 'Produits & Stocks', route: '/products', icon: '📦' },
   { name: 'Entrepôts', route: '/entrepot', icon: '🏭' },
+  { name: 'Points de Vente', route: '/point-vente', icon: '🏪' },
   { name: 'Ventes', route: '/ventes', icon: '🛒' },
   { name: 'Comptabilité', route: '/compta', icon: '💰' },
   { name: 'Clients', route: '/clients', icon: '🧑‍💼' },

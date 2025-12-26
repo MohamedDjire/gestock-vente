@@ -113,6 +113,7 @@
                   </td>
                   <td class="actions-cell">
                     <button @click="viewEntrepot(entrepot)" class="btn-view" title="Voir détails">👁️</button>
+                    <button @click="openRapportModal(entrepot)" class="btn-rapport" title="Rapport hebdomadaire">📊</button>
                     <button @click="openEditModal(entrepot)" class="btn-edit" title="Modifier">✏️</button>
                     <button @click="confirmDelete(entrepot)" class="btn-delete" title="Supprimer">🗑️</button>
                   </td>
@@ -275,6 +276,90 @@
       </div>
     </div>
 
+    <!-- Modal Rapport Hebdomadaire -->
+    <div v-if="showRapportModal" class="modal-overlay" @click.self="closeRapportModal">
+      <div class="modal-content rapport-modal" @click.stop>
+        <div class="modal-header">
+          <h3>📊 Rapport Hebdomadaire - {{ rapportEntrepot?.nom_entrepot }}</h3>
+          <button @click="closeRapportModal" class="modal-close">×</button>
+        </div>
+        <div class="rapport-content">
+          <div v-if="loadingRapport" class="loading-cell">Chargement du rapport...</div>
+          <div v-else>
+            <!-- Période du rapport -->
+            <div class="rapport-period">
+              <strong>Période :</strong> {{ rapportPeriod.debut }} au {{ rapportPeriod.fin }}
+            </div>
+
+            <!-- Statistiques du rapport -->
+            <div class="rapport-stats">
+              <div class="rapport-stat-card">
+                <div class="rapport-stat-icon">➕</div>
+                <div class="rapport-stat-info">
+                  <div class="rapport-stat-label">Entrées</div>
+                  <div class="rapport-stat-value">{{ rapportData.totalEntrees || 0 }}</div>
+                </div>
+              </div>
+              <div class="rapport-stat-card">
+                <div class="rapport-stat-icon">➖</div>
+                <div class="rapport-stat-info">
+                  <div class="rapport-stat-label">Sorties</div>
+                  <div class="rapport-stat-value">{{ rapportData.totalSorties || 0 }}</div>
+                </div>
+              </div>
+              <div class="rapport-stat-card">
+                <div class="rapport-stat-icon">📦</div>
+                <div class="rapport-stat-info">
+                  <div class="rapport-stat-label">Mouvements</div>
+                  <div class="rapport-stat-value">{{ rapportData.totalMouvements || 0 }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Détails des mouvements -->
+            <div class="rapport-section">
+              <h4 class="rapport-section-title">📋 Détails des Mouvements</h4>
+              <div v-if="rapportData.mouvements && rapportData.mouvements.length === 0" class="empty-cell">
+                Aucun mouvement enregistré cette semaine
+              </div>
+              <div v-else class="rapport-mouvements">
+                <div 
+                  v-for="mouvement in rapportData.mouvements" 
+                  :key="mouvement.id"
+                  class="rapport-mouvement-item"
+                  :class="mouvement.type"
+                >
+                  <div class="mouvement-header">
+                    <span class="mouvement-type-badge" :class="mouvement.type">
+                      {{ mouvement.type === 'entree' ? '➕ Entrée' : '➖ Sortie' }}
+                    </span>
+                    <span class="mouvement-date">{{ formatDate(mouvement.date) }}</span>
+                  </div>
+                  <div class="mouvement-details">
+                    <div class="mouvement-product">
+                      <strong>{{ mouvement.produit_nom }}</strong>
+                      <span class="mouvement-code">{{ mouvement.code_produit }}</span>
+                    </div>
+                    <div class="mouvement-info">
+                      <span>Quantité: <strong>{{ mouvement.quantite }}</strong></span>
+                      <span v-if="mouvement.type_sortie">Type: <strong>{{ getSortieTypeLabel(mouvement.type_sortie) }}</strong></span>
+                      <span v-if="mouvement.entrepot_destination">Vers: <strong>{{ mouvement.entrepot_destination }}</strong></span>
+                    </div>
+                    <div v-if="mouvement.motif || mouvement.notes" class="mouvement-notes">
+                      {{ mouvement.motif || mouvement.notes }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeRapportModal" class="btn-secondary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Confirmations -->
     <div v-if="confirmation.show" class="confirmation-overlay" @click.self="closeConfirmation">
       <div class="confirmation-modal">
@@ -311,6 +396,16 @@ const showDetailsModal = ref(false)
 const selectedEntrepot = ref(null)
 const produitsEntrepot = ref([])
 const loadingProduits = ref(false)
+const showRapportModal = ref(false)
+const rapportEntrepot = ref(null)
+const rapportData = ref({
+  totalEntrees: 0,
+  totalSorties: 0,
+  totalMouvements: 0,
+  mouvements: []
+})
+const loadingRapport = ref(false)
+const rapportPeriod = ref({ debut: '', fin: '' })
 
 const formData = ref({
   nom_entrepot: '',
@@ -528,6 +623,78 @@ const confirmAction = () => {
     confirmation.value.action()
   }
   closeConfirmation()
+}
+
+// Calculer la période de la semaine (7 derniers jours)
+const getWeekPeriod = () => {
+  const today = new Date()
+  const lastWeek = new Date(today)
+  lastWeek.setDate(today.getDate() - 7)
+  
+  return {
+    debut: lastWeek.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    fin: today.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+}
+
+const openRapportModal = async (entrepot) => {
+  rapportEntrepot.value = entrepot
+  showRapportModal.value = true
+  loadingRapport.value = true
+  rapportPeriod.value = getWeekPeriod()
+  
+  try {
+    const response = await apiService.get(`/api_entrepot.php?action=rapport&id_entrepot=${entrepot.id_entrepot}`)
+    if (response.success) {
+      rapportData.value = response.data || {
+        totalEntrees: 0,
+        totalSorties: 0,
+        totalMouvements: 0,
+        mouvements: []
+      }
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors du chargement du rapport')
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement du rapport:', error)
+    showNotification('error', 'Erreur', 'Erreur lors du chargement du rapport')
+  } finally {
+    loadingRapport.value = false
+  }
+}
+
+const closeRapportModal = () => {
+  showRapportModal.value = false
+  rapportEntrepot.value = null
+  rapportData.value = {
+    totalEntrees: 0,
+    totalSorties: 0,
+    totalMouvements: 0,
+    mouvements: []
+  }
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('fr-FR', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const getSortieTypeLabel = (type) => {
+  const labels = {
+    'vente': 'Vente',
+    'perte': 'Perte',
+    'transfert': 'Transfert',
+    'retour': 'Retour',
+    'autre': 'Autre'
+  }
+  return labels[type] || type
 }
 
 onMounted(() => {
@@ -778,6 +945,11 @@ onMounted(() => {
   color: #1e40af;
 }
 
+.btn-rapport {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 .btn-edit {
   background: #fef3c7;
   color: #92400e;
@@ -817,6 +989,10 @@ onMounted(() => {
 }
 
 .details-modal {
+  max-width: 900px;
+}
+
+.rapport-modal {
   max-width: 900px;
 }
 
@@ -989,6 +1165,163 @@ onMounted(() => {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
+}
+
+/* Styles pour le modal de rapport */
+.rapport-content {
+  padding: 1.5rem;
+}
+
+.rapport-period {
+  padding: 1rem;
+  background: #f3f4f6;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.rapport-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.rapport-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.rapport-stat-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.rapport-stat-info {
+  flex: 1;
+}
+
+.rapport-stat-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.rapport-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.rapport-section {
+  margin-top: 2rem;
+}
+
+.rapport-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin-bottom: 1rem;
+}
+
+.rapport-mouvements {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rapport-mouvement-item {
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 10px;
+  border-left: 4px solid #10b981;
+}
+
+.rapport-mouvement-item.sortie {
+  border-left-color: #ef4444;
+}
+
+.mouvement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.mouvement-type-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.mouvement-type-badge.entree {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.mouvement-type-badge.sortie {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.mouvement-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.mouvement-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mouvement-product {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mouvement-product strong {
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.mouvement-code {
+  font-size: 0.875rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.mouvement-info {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.mouvement-info strong {
+  color: #1f2937;
+}
+
+.mouvement-notes {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
 }
 </style>
 
