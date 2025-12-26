@@ -3,7 +3,9 @@
     <Sidebar />
     <div class="main-content">
       <div class="dashboard-wrapper">
-        <Topbar />
+        <div class="topbar-sticky">
+          <Topbar />
+        </div>
         <div class="page-content">
           <slot />
         </div>
@@ -49,11 +51,19 @@ import Topbar from './Topbar.vue'
 
 .page-content {
   padding: 0 2rem 2rem 2rem;
+  padding-top: 90px;
   width: 100%;
   display: flex;
   flex-direction: column;
   flex: 1;
   overflow-x: auto;
+}
+
+.topbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
 }
 
 @media (max-width: 1100px) {
