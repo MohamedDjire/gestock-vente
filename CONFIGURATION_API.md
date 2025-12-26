@@ -78,3 +78,4 @@ Ces endpoints sont appelés depuis :
 - `src/views/Login.vue` → utilise `useAuth().login()`
 - `src/views/SignUp.vue` → utilise `useAuth().signUp()`
 
+

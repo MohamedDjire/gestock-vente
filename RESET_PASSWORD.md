@@ -62,3 +62,4 @@ echo $response;
 
 Pour le compte admin, utilisez un mot de passe fort, par exemple : `Admin@2025` ou `ProStock2025!`
 
+

@@ -48,3 +48,4 @@ export function useCurrency() {
     availableCurrencies: currencyStore.availableCurrencies
   }
 }
+
