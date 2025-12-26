@@ -1,8 +1,8 @@
 <template>
   <nav class="sidebar">
     <div class="logo">
-      <span class="logo-icon" style="font-size:2.2rem;">🌥️</span>
-      <span class="logo-text" style="font-size:2.1rem; font-weight:900; color:#ffe082;">PROSTOCK</span>
+      <span class="logo-icon">🌥️</span>
+      <span class="logo-text">PROSTOCK</span>
     </div>
     <ul class="menu">
       <li v-for="item in menuItems" :key="item.name" :class="{ active: item.route === $route.path }">
@@ -133,31 +133,33 @@ function logout() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2.5rem 1rem 1rem 1rem;
-  height: 100vh;
-  min-height: 100vh;
+  padding: 1.2rem 0.8rem 0.8rem 0.8rem;
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
   border-radius: 0 32px 32px 0;
   z-index: 10;
-  overflow-y: auto;
+  flex-shrink: 0;
+  justify-content: space-between;
 }
 .logo {
   display: flex;
   align-items: center;
-  font-size: 2.2rem;
   font-weight: bold;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 .logo-icon {
-  margin-right: 0.7rem;
+  font-size: 1.6rem;
+  margin-right: 0.5rem;
 }
 .logo-text {
   font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  font-size: 1.5rem;
   font-weight: 900;
   letter-spacing: 0.03em;
+  color: #ffe082;
 }
 .menu {
   list-style: none;
@@ -186,31 +188,34 @@ function logout() {
   font-size: 1.3em;
 }
 .upgrade-box {
-  margin-top: auto;
+  margin-top: 0.5rem;
   background: #ffe08222;
-  border-radius: 16px;
-  padding: 1.2em 1em;
+  border-radius: 12px;
+  padding: 0.8em 0.8em;
   text-align: center;
   width: 100%;
+  flex-shrink: 0;
 }
 .upgrade-illustration {
-  font-size: 2.1em;
-  margin-bottom: 0.3em;
+  font-size: 1.6em;
+  margin-bottom: 0.2em;
 }
 .upgrade-text {
-  font-size: 1.1em;
+  font-size: 0.9em;
   font-weight: 700;
-  margin-bottom: 0.5em;
+  margin-bottom: 0.4em;
 }
 .upgrade-btn {
   background: #ffe082;
   color: #1a5f4a;
   border: none;
   border-radius: 8px;
-  padding: 0.5em 1.2em;
+  padding: 0.5em 1em;
+  font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.18s;
+  width: 100%;
 }
 .upgrade-btn:hover {
   background: #fff7c2;

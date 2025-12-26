@@ -1,14 +1,23 @@
 
 
 <script setup>
-import { RouterView } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
+import { computed } from 'vue'
 import MainLayout from './components/MainLayout.vue'
+
+const route = useRoute()
+
+// Appliquer MainLayout uniquement aux routes authentifiées
+const shouldUseLayout = computed(() => {
+  return route.meta.requiresAuth !== false
+})
 </script>
 
 <template>
-  <MainLayout>
+  <MainLayout v-if="shouldUseLayout">
     <RouterView />
   </MainLayout>
+  <RouterView v-else />
 </template>
 
 <style>
@@ -18,15 +27,19 @@ import MainLayout from './components/MainLayout.vue'
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
-  min-height: 100vh;
-  width: 100%;
+  width: 100vw;
+  overflow-x: hidden;
 }
 </style>

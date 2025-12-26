@@ -1,10 +1,5 @@
 <template>
-  <div class="dashboard-layout">
-    <Sidebar />
-    <div class="main-content">
-      <div class="dashboard-wrapper">
-        <Topbar />
-        <div class="clients-page">
+  <div class="clients-page">
           <div class="page-header">
             <h1 class="page-title">Clients</h1>
             <div class="actions">
@@ -25,7 +20,7 @@
             </div>
           </div>
 
-          <div class="table-container">
+    <div class="table-container">
             <table class="clients-table">
               <thead>
                 <tr>
@@ -68,71 +63,69 @@
                 </tr>
               </tbody>
             </table>
-          </div>
+    </div>
 
-          <!-- Formulaire d'ajout/modification -->
-          <div v-if="showAddForm || editingClient" class="modal" @click.self="closeForm">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h2 class="modal-title">{{ editingClient ? 'Modifier' : 'Ajouter' }} un client</h2>
-                <button @click="closeForm" class="btn-close">
-                  <!-- ...svg... -->
-                </button>
-              </div>
-              <form @submit.prevent="submitForm" class="modal-form">
-                <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
-                <div class="form-group">
-                  <label>Type de client *</label>
-                  <select v-model="form.type" class="form-input" required>
-                    <option value="particulier">Particulier</option>
-                    <option value="entreprise">Entreprise</option>
-                  </select>
-                </div>
-                <div v-if="form.type === 'particulier'" class="form-row">
-                  <div class="form-group">
-                    <label>Nom *</label>
-                    <input v-model="form.nom" placeholder="Nom" required class="form-input" />
-                  </div>
-                  <div class="form-group">
-                    <label>Prénom *</label>
-                    <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
-                  </div>
-                </div>
-                <div v-else class="form-group">
-                  <label>Nom de l'entreprise *</label>
-                  <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
-                </div>
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>Email</label>
-                    <input v-model="form.email" type="email" placeholder="email@exemple.com" class="form-input" />
-                  </div>
-                  <div class="form-group">
-                    <label>Téléphone</label>
-                    <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" class="form-input" />
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>Adresse</label>
-                  <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
-                </div>
-                <div class="form-group">
-                  <label>Statut</label>
-                  <select v-model="form.statut" class="form-input">
-                    <option value="actif">Actif</option>
-                    <option value="inactif">Inactif</option>
-                  </select>
-                </div>
-                <div class="modal-footer">
-                  <button type="button" @click="closeForm" class="btn-secondary">Annuler</button>
-                  <button type="submit" class="btn-primary">Valider</button>
-                </div>
-              </form>
+    <!-- Formulaire d'ajout/modification -->
+    <div v-if="showAddForm || editingClient" class="modal" @click.self="closeForm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">{{ editingClient ? 'Modifier' : 'Ajouter' }} un client</h2>
+          <button @click="closeForm" class="btn-close">
+            <!-- ...svg... -->
+          </button>
+        </div>
+        <form @submit.prevent="submitForm" class="modal-form">
+          <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
+          <div class="form-group">
+            <label>Type de client *</label>
+            <select v-model="form.type" class="form-input" required>
+              <option value="particulier">Particulier</option>
+              <option value="entreprise">Entreprise</option>
+            </select>
+          </div>
+          <div v-if="form.type === 'particulier'" class="form-row">
+            <div class="form-group">
+              <label>Nom *</label>
+              <input v-model="form.nom" placeholder="Nom" required class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Prénom *</label>
+              <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
             </div>
           </div>
-        </div>
+          <div v-else class="form-group">
+            <label>Nom de l'entreprise *</label>
+            <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email</label>
+              <input v-model="form.email" type="email" placeholder="email@exemple.com" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Téléphone</label>
+              <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" class="form-input" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Adresse</label>
+            <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Statut</label>
+            <select v-model="form.statut" class="form-input">
+              <option value="actif">Actif</option>
+              <option value="inactif">Inactif</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" @click="closeForm" class="btn-secondary">Annuler</button>
+            <button type="submit" class="btn-primary">Valider</button>
+          </div>
+        </form>
       </div>
     </div>
+
     <!-- Modale de suppression -->
     <div v-if="showDeleteModal" class="modal" @click.self="closeDeleteModal">
       <div class="modal-content">
@@ -307,43 +300,12 @@ const closeForm = () => {
     cursor: pointer;
     font-weight: 600;
   }
-.dashboard-layout {
-  display: flex;
-  min-height: 100vh;
-  width: 100vw;
-  background: #fafbfc;
-  overflow-x: auto;
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-}
-
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100vh;
-  overflow: auto;
-  margin-left: 250px;
-  max-width: 100vw;
-  background: #fafbfc;
-  padding-top: 90px; /* pour ne pas cacher le contenu sous la topbar fixed */
-}
-
-.dashboard-wrapper {
-  background: transparent;
-  min-height: 100vh;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  padding-left: 2.5rem;
-}
-
 .clients-page {
-  flex: 1;
-  padding: 2.5rem 2.5rem 2.5rem 0;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  width: 100%;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
 }
 
 .page-header {

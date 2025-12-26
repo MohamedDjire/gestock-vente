@@ -1,17 +1,9 @@
 <template>
-  <div class="dashboard-layout">
-    <Sidebar />
-    <div class="main-content">
-      <div class="dashboard-wrapper">
-        <Topbar />
-        <div class="dashboard-content">
-          <div class="coming-soon">
-            <div class="coming-soon-icon">🚧</div>
-            <h1>{{ title }}</h1>
-            <p>Cette fonctionnalité sera bientôt disponible.</p>
-          </div>
-        </div>
-      </div>
+  <div class="coming-soon-page">
+    <div class="coming-soon">
+      <div class="coming-soon-icon">🚧</div>
+      <h1>{{ title }}</h1>
+      <p>Cette fonctionnalité sera bientôt disponible.</p>
     </div>
   </div>
 </template>
@@ -19,8 +11,6 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import Sidebar from '../components/Sidebar.vue'
-import Topbar from '../components/Topbar.vue'
 
 const route = useRoute()
 
@@ -37,6 +27,12 @@ const title = computed(() => titles[route.path] || 'Page en construction')
 </script>
 
 <style scoped>
+.coming-soon-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 .coming-soon {
   display: flex;
   flex-direction: column;

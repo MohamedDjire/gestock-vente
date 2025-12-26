@@ -1,10 +1,5 @@
 <template>
-  <div class="dashboard-layout">
-    <Sidebar />
-    <div class="main-content">
-      <div class="dashboard-wrapper">
-        <Topbar />
-        <div class="dashboard-content">
+  <div class="entrepot-page">
           <div class="products-header">
             <h2 class="dashboard-title">Entrepôts</h2>
             <button @click="openCreateModal" class="btn-primary">
@@ -126,9 +121,6 @@
             </table>
           </div>
           </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Modal Création/Modification Entrepôt -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
@@ -547,44 +539,36 @@ onMounted(() => {
 /* Styles similaires à Products.vue */
 .dashboard-layout {
   display: flex;
-  min-height: 100vh;
+  width: 100vw;
   background: #f6f7fa;
 }
 
 .main-content {
   flex: 1;
   margin-left: 280px;
-  min-height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-width: calc(100vw - 280px);
+  width: calc(100vw - 280px);
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-wrapper {
   background: #fff;
   border-radius: 0 32px 32px 0;
   box-shadow: 0 8px 32px 0 rgba(26, 95, 74, 0.10);
-  min-height: 100vh;
   width: 100%;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   transition: box-shadow 0.2s;
-  overflow: visible;
 }
 
 .dashboard-content {
-  flex: 1;
-  padding: 2.5rem;
-  min-width: 0;
-  min-height: 0;
+  padding: 1rem 2.5rem 2.5rem 2.5rem;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 2.2rem;
-  width: 100%;
+  gap: 1.5rem;
   box-sizing: border-box;
   background: #f6f7fa;
-  overflow: visible;
   position: relative;
 }
 
