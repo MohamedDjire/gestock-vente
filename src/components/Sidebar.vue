@@ -46,7 +46,7 @@ const menuItems = [
   { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
   { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
   { name: 'Journal', route: '/journal', icon: '📝' },
-  { name: 'Paramètres', route: '/settings', icon: '⚙️' }
+  { name: 'Paramètres', route: '/parametres', icon: '⚙️' }
 ]
 
 function logout() {

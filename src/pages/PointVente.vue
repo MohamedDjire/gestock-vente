@@ -371,6 +371,7 @@ import { ref, computed, onMounted, inject } from 'vue'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useCurrency } from '../composables/useCurrency.js'
+import { logJournal } from '../composables/useJournal'
 
 const { formatPrice: formatCurrency } = useCurrency()
 
@@ -545,8 +546,10 @@ const savePointVente = async () => {
     let response
     if (isEditMode.value) {
       response = await apiService.put('/api_point_vente.php', formData.value)
+      logJournal({ user: getJournalUser(), action: 'Modifier Point de Vente', details: `Point de vente ${formData.value.nom_point_vente} modifié` })
     } else {
       response = await apiService.post('/api_point_vente.php', formData.value)
+      logJournal({ user: getJournalUser(), action: 'Ajouter Point de Vente', details: `Point de vente ${formData.value.nom_point_vente} ajouté` })
     }
 
     if (response.success) {
@@ -619,6 +622,7 @@ const confirmDelete = (pointVente) => {
     action: async () => {
       try {
         const response = await apiService.delete(`/api_point_vente.php?id_point_vente=${pointVente.id_point_vente}`)
+        logJournal({ user: getJournalUser(), action: 'Supprimer Point de Vente', details: `Point de vente ${pointVente.nom_point_vente} supprimé` })
         if (response.success) {
           showNotification('success', 'Succès', 'Point de vente supprimé')
           await loadPointsVente()
@@ -649,6 +653,19 @@ const confirmAction = () => {
     confirmation.value.action()
   }
   closeConfirmation()
+}
+
+function getJournalUser() {
+  const userStr = localStorage.getItem('prostock_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.nom || user.email || 'inconnu';
+    } catch {
+      return 'inconnu';
+    }
+  }
+  return 'inconnu';
 }
 
 onMounted(() => {

@@ -52,6 +52,22 @@
 import StatCard from '../components/StatCard.vue'
 import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
+import { logJournal } from '../composables/useJournal'
+
+function getJournalUser() {
+  const userStr = localStorage.getItem('prostock_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.nom || user.email || 'inconnu';
+    } catch {
+      return 'inconnu';
+    }
+  }
+  return 'inconnu';
+}
+
+// Utiliser logJournal({ user: getJournalUser(), action: 'Action', details: '...' }) pour chaque action CRUD
 </script>
 
 <style scoped>

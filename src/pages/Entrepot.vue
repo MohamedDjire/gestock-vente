@@ -382,6 +382,7 @@ import Topbar from '../components/Topbar.vue'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useCurrency } from '../composables/useCurrency.js'
+import { logJournal } from '../composables/useJournal'
 
 const router = useRouter()
 const { formatPrice: formatCurrency } = useCurrency()
@@ -544,6 +545,7 @@ const saveEntrepot = async () => {
       showNotification('success', 'Succès', isEditMode.value ? 'Entrepôt mis à jour' : 'Entrepôt créé')
       closeModal()
       await loadEntrepots()
+      logJournal({ user: getJournalUser(), action: isEditMode.value ? 'Modifier l\'entrepôt' : 'Ajouter un entrepôt', details: response.data })
     } else {
       showNotification('error', 'Erreur', response.message || 'Erreur lors de l\'enregistrement')
     }
@@ -590,6 +592,7 @@ const confirmDelete = (entrepot) => {
         if (response.success) {
           showNotification('success', 'Succès', 'Entrepôt supprimé')
           await loadEntrepots()
+          logJournal({ user: getJournalUser(), action: 'Supprimer l\'entrepôt', details: entrepot })
         } else {
           showNotification('error', 'Erreur', response.message || 'Erreur lors de la suppression')
         }
@@ -689,6 +692,19 @@ const getSortieTypeLabel = (type) => {
     'autre': 'Autre'
   }
   return labels[type] || type
+}
+
+function getJournalUser() {
+  const userStr = localStorage.getItem('prostock_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.nom || user.email || 'inconnu';
+    } catch {
+      return 'inconnu';
+    }
+  }
+  return 'inconnu';
 }
 
 onMounted(() => {

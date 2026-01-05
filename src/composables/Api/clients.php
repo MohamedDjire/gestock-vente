@@ -16,7 +16,7 @@ error_reporting(E_ALL);
 // Autoriser CORS pour le développement local (toujours AVANT tout output)
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Content-Type: application/json');
     http_response_code(200);
@@ -88,6 +88,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($data['nom_entreprise']) || empty($data['id_utilisateur'])) {
             echo json_encode(['error' => "Champ manquant : nom_entreprise ou id_utilisateur", 'data' => $data]);
             exit;
+        }
+        // Vérifier unicité de l'email
+        if (!empty($data['email'])) {
+            $stmtCheck = $pdo->prepare('SELECT id FROM stock_clients WHERE email = ? LIMIT 1');
+            $stmtCheck->execute([$data['email']]);
+            if ($stmtCheck->fetch()) {
+                echo json_encode(['error' => "Cet email est déjà utilisé.", 'field' => 'email']);
+                exit;
+            }
         }
         // Vérifier si l'entreprise existe, sinon la créer
         $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');

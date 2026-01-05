@@ -10,4 +10,14 @@ const apiClient = axios.create({
   },
 });
 
+
+// Ajout automatique du token JWT dans l'en-tête Authorization
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('prostock_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default apiClient;

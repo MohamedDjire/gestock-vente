@@ -8,7 +8,7 @@
         </div>
         <button @click="showAddForm = true" class="btn-primary">Ajouter un fournisseur</button>
         <button @click="exportExcel" class="btn-primary" style="background:#2563eb; margin-left:8px;">Exporter Excel</button>
-        <button @click="exportPDF" class="btn-primary" style="background:#dc2626; margin-left:8px;">Exporter PDF</button>
+    <button @click="exportPDF" class="btn-primary" style="background:#dc2626; margin-left:8px;">Exporter PDF</button>
       </div>
     </div>
 
@@ -59,7 +59,7 @@
       </table>
     </div>
 
-    <!-- Formulaire d'ajout/modification -->
+    <!-- Formulaire d'ajout/modification (modale harmonisée) -->
     <div v-if="showAddForm || editingFournisseur" class="modal" @click.self="closeForm">
       <div class="modal-content">
         <div class="modal-header">
@@ -99,13 +99,19 @@
       </div>
     </div>
 
-    <!-- Modale de suppression -->
-    <div v-if="showDeleteModal" class="modal" @click.self="closeDeleteModal">
-      <div class="modal-content">
-        <h2>Confirmer la suppression</h2>
-        <p>Supprimer le fournisseur <b>{{ fournisseurToDelete?.nom }}</b> ?</p>
-        <div class="modal-footer">
-          <button @click="closeDeleteModal">Annuler</button>
+    <!-- Modale de suppression harmonisée -->
+    <div v-if="showDeleteModal" class="confirmation-overlay" @click.self="closeDeleteModal">
+      <div class="confirmation-modal">
+        <div class="confirmation-header">
+          <span class="confirmation-icon">⚠️</span>
+          <h3>Confirmer la suppression</h3>
+        </div>
+        <div class="confirmation-body">
+          <p>Êtes-vous sûr de vouloir supprimer le fournisseur <b>{{ fournisseurToDelete?.nom }}</b> ?</p>
+          <p style="color:#dc2626;font-weight:600;">Cette action est irréversible.</p>
+        </div>
+        <div class="confirmation-actions">
+          <button @click="closeDeleteModal" class="btn-cancel">Annuler</button>
           <button @click="confirmDeleteFournisseur" class="btn-danger">Supprimer</button>
         </div>
       </div>
@@ -113,8 +119,11 @@
   </div>
 </template>
 
+
+
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logJournal } from '../composables/useJournal'
 import apiFournisseur from '../composables/api/apiFournisseur'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
@@ -182,11 +191,19 @@ async function submitForm() {
   }
   formError.value = ''
   try {
+    let actionType = ''
     if (editingFournisseur.value) {
       await apiFournisseur.update(editingFournisseur.value.id, form.value)
+      actionType = 'Modification fournisseur'
     } else {
       await apiFournisseur.create(form.value)
+      actionType = 'Ajout fournisseur'
     }
+    await logJournal({
+      user: getJournalUser(),
+      action: actionType,
+      details: `Email: ${form.value.email}`
+    })
     closeForm()
     await fetchFournisseurs()
   } catch (e) {
@@ -197,6 +214,11 @@ async function confirmDeleteFournisseur() {
   if (!fournisseurToDelete.value) return
   try {
     await apiFournisseur.delete(fournisseurToDelete.value.id)
+    await logJournal({
+      user: getJournalUser(),
+      action: 'Suppression fournisseur',
+      details: `ID: ${fournisseurToDelete.value.id}`
+    })
     closeDeleteModal()
     await fetchFournisseurs()
   } catch (e) {
@@ -231,9 +253,95 @@ function exportPDF() {
   })
   doc.save('fournisseurs.pdf')
 }
+
+function getJournalUser() {
+  const userStr = localStorage.getItem('prostock_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.nom || user.email || 'inconnu';
+    } catch {
+      return 'inconnu';
+    }
+  }
+  return 'inconnu';
+}
 </script>
 
 <style scoped>
+    /* Modale de suppression harmonisée (style Produits/Stock) */
+.confirmation-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.confirmation-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.confirmation-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.confirmation-header h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a5f4a;
+}
+.confirmation-icon {
+  font-size: 2rem;
+}
+.confirmation-body {
+  padding: 1.5rem 0;
+}
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+.btn-cancel {
+  background: #e5e7eb;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-cancel:hover {
+  background: #d1d5db;
+}
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-danger:hover {
+  background: #991b1b;
+}
 .fournisseurs-page {
   padding: 2rem;
   width: 100%;
@@ -326,15 +434,16 @@ function exportPDF() {
   justify-content: center;
   z-index: 1000;
 }
-.modal-content {
-  background: #fff;
-  border-radius: 12px;
-  padding: 2rem;
-  min-width: 320px;
-  max-width: 95vw;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  position: relative;
-}
+      .modal-content {
+        background: #fff;
+        border-radius: 12px;
+        padding: 2rem;
+        min-width: 380px;
+        width: 420px;
+        max-width: 95vw;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        position: relative;
+      }
 .modal-header {
   display: flex;
   align-items: center;

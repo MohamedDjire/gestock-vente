@@ -680,6 +680,7 @@ import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
 import { useCurrency } from '../composables/useCurrency.js'
+import { logJournal } from '../composables/useJournal'
 
 const router = useRouter()
 const { formatPrice: formatCurrency } = useCurrency()
@@ -984,6 +985,11 @@ const saveProduct = async () => {
       // Mise à jour
       const response = await apiService.put(`/api_produit.php?id=${editingProduct.value.id_produit}`, dataToSave)
       if (response.success) {
+        await logJournal({
+          user: getJournalUser(),
+          action: 'Modification produit',
+          details: `ID: ${editingProduct.value.id_produit}`
+        })
         await loadProducts()
         closeModal()
         showNotification('success', 'Succès', 'Produit modifié avec succès')
@@ -992,6 +998,11 @@ const saveProduct = async () => {
       // Création
       const response = await apiService.post('/api_produit.php', dataToSave)
       if (response.success) {
+        await logJournal({
+          user: getJournalUser(),
+          action: 'Ajout produit',
+          details: `ID: ${response.data.id_produit}`
+        })
         await loadProducts()
         closeModal()
         showNotification('success', 'Succès', 'Produit créé avec succès')
@@ -1061,6 +1072,11 @@ const deleteProduct = async (productId) => {
   try {
     const response = await apiService.delete(`/api_produit.php?id=${productId}`)
     if (response.success) {
+      await logJournal({
+        user: getJournalUser(),
+        action: 'Suppression produit',
+        details: `ID: ${productId}`
+      })
       await loadProducts()
       showNotification('success', 'Succès', 'Produit supprimé avec succès')
     }
@@ -1108,6 +1124,11 @@ const saveStockAdjustment = async () => {
     })
     
     if (response.success) {
+      await logJournal({
+        user: getJournalUser(),
+        action: 'Ajustement stock',
+        details: `Produit ID: ${stockProduct.value.id_produit}, Nouveau stock: ${newQuantity}`
+      })
       await loadProducts()
       closeStockModal()
       showNotification('success', 'Succès', 'Stock ajusté avec succès')
@@ -1220,6 +1241,11 @@ const saveEntree = async () => {
     })
     
     if (response.success) {
+      await logJournal({
+        user: getJournalUser(),
+        action: 'Entrée de stock',
+        details: `Produit ID: ${stockProduct.value.id_produit}, Quantité: ${entreeData.value.quantite}`
+      })
       await loadProducts()
       closeEntreeModal()
       showNotification('success', 'Succès', 'Entrée de stock enregistrée avec succès')
@@ -1280,6 +1306,11 @@ const saveSortie = async () => {
     const response = await apiService.post(`/api_stock.php?type=sortie`, dataToSend)
     
     if (response.success) {
+      await logJournal({
+        user: getJournalUser(),
+        action: 'Sortie de stock',
+        details: `Produit ID: ${stockProduct.value.id_produit}, Quantité: ${sortieData.value.quantite}, Type: ${sortieData.value.type_sortie}`
+      })
       await loadProducts()
       closeSortieModal()
       showNotification('success', 'Succès', 'Sortie de stock enregistrée avec succès')
@@ -1374,6 +1405,19 @@ const getSortieTypeLabel = (type) => {
 
 const goToEntrepot = () => {
   router.push('/entrepot')
+}
+
+function getJournalUser() {
+  const userStr = localStorage.getItem('prostock_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.nom || user.email || 'inconnu';
+    } catch {
+      return 'inconnu';
+    }
+  }
+  return 'inconnu';
 }
 
 onMounted(() => {
@@ -2091,6 +2135,8 @@ onMounted(() => {
   border-radius: 8px;
   margin-bottom: 1rem;
 }
+
+
 
 .modal-actions {
   display: flex;

@@ -91,9 +91,9 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/settings',
-    name: 'Settings',
-    component: ComingSoon,
+    path: '/parametres',
+    name: 'Parametres',
+    component: () => import('../pages/Parametres.vue'),
     meta: { requiresAuth: true }
   },
   {

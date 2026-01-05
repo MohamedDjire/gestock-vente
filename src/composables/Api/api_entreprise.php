@@ -1,60 +1,41 @@
 <?php
-// Activer la gestion des erreurs et définir les headers
+// --- CORS headers ---
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-// Gérer les requêtes CORS preflight AVANT toute logique serveur
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// --- Includes & Connexion BDD ---
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/functions/functions_entreprise.php';
+require_once __DIR__ . '/functions/middleware_auth.php';
+//require_once __DIR__ . '/../../../../vendor/autoload.php'; // si JWT ou autres dépendances
 
-
-// Inclure les fichiers nécessaires
-include 'config/database.php';
-include 'functions/functions_entreprise.php';
-include 'functions/middleware_auth.php';
-include 'config.php';
-
-
-// Initialiser la connexion à la base de données
-$database = new Database();
-$bdd = $database->getPdo();
-
-// Récupération des données de la requête
-$rawBody = file_get_contents("php://input");
-$data = json_decode($rawBody, true);
-file_put_contents(__DIR__ . '/debug_post.txt', "RAW BODY:\n" . $rawBody . "\nPARSED:\n" . print_r($data, true));
-
-// Récupérer les paramètres de requête
+// --- Initialisation variables ---
 $action = isset($_GET['action']) ? $_GET['action'] : null;
-$id = isset($_GET['id']) ? $_GET['id'] : null;
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$data = json_decode(file_get_contents('php://input'), true) ?? [];
 
 try {
-    $bdd->beginTransaction(); // Démarrer une transaction
+    // Connexion BDD
+    $bdd = createDatabaseConnection();
+    $bdd->beginTransaction();
+    $resultat = null;
 
     // Route spéciale pour générer un token de test (GET?action=token&user_id=...)
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'token' && isset($_GET['user_id'])) {
         $userId = (int)$_GET['user_id'];
-        // Récupérer les données utilisateur depuis la base
-        $stmt = $bdd->prepare("
-            SELECT u.id_utilisateur, u.prenom, u.email, u.role, u.id_entreprise
-            FROM stock_utilisateur u
-            WHERE u.id_utilisateur = :id
-        ");
+        $stmt = $bdd->prepare("SELECT u.id_utilisateur, u.prenom, u.email, u.role, u.id_entreprise FROM stock_utilisateur u WHERE u.id_utilisateur = :id");
         $stmt->execute(['id' => $userId]);
         $user = $stmt->fetch();
-        
         if (!$user) {
             throw new Exception("Utilisateur non trouvé");
         }
-        
         $userData = [
             'user_id' => (int)$user['id_utilisateur'],
             'user_first_name' => $user['prenom'] ?? '',
@@ -62,156 +43,113 @@ try {
             'user_role' => strtolower($user['role']),
             'user_enterprise_id' => (int)$user['id_entreprise']
         ];
-        
         $token = generateJWT($userData, JWT_SECRET);
         echo json_encode(['success' => true, 'token' => $token]);
         exit;
     }
 
-    // Pour toutes les autres actions, authentification requise
-    $currentUser = authenticateAndAuthorize($bdd);
-    $currentUser['role'] = strtolower($currentUser['role']);
+    // Endpoint public : GET?action=single&id=...
+    if ($_SERVER['REQUEST_METHOD'] === 'GET' && $action === 'single' && $id !== null) {
+        $enterprise = getEnterpriseById($bdd, $id);
+        $resultat = $enterprise;
+    } else {
+        // Authentification requise pour toutes les autres actions
+        $currentUser = authenticateAndAuthorize($bdd);
+        $currentUser['role'] = strtolower($currentUser['role']);
 
-    // Traiter la requête en fonction de la méthode HTTP
-    switch ($_SERVER['REQUEST_METHOD']) {
-        case 'GET':
-            // Récupération des entreprises
-            if ($action === 'all') {
-                // Récupérer toutes les entreprises (filtré par rôle d'utilisateur)
-                $resultat = getAllEnterprises($bdd, $currentUser);
-            } elseif ($action === 'single' && $id !== null) {
-                // Récupérer une entreprise spécifique
-                $enterprise = getEnterpriseById($bdd, $id);
-                
-                // Vérifier que l'utilisateur a accès à cette entreprise
-                if ($currentUser['role'] !== 'admin' && $enterprise['entreprise_id'] != $currentUser['enterprise_id']) {
-                    throw new Exception("Accès non autorisé à cette entreprise", 403);
+        switch ($_SERVER['REQUEST_METHOD']) {
+            case 'GET':
+                if ($action === 'all') {
+                    $resultat = getAllEnterprises($bdd, $currentUser);
+                } elseif ($action === 'search' && isset($_GET['query'])) {
+                    $resultat = searchEnterprises($bdd, $_GET['query'], $currentUser);
+                } else {
+                    throw new Exception("Action non valide ou paramètres manquants");
                 }
-                
-                $resultat = $enterprise;
-            } elseif ($action === 'search' && isset($_GET['query'])) {
-                // Rechercher des entreprises
-                $resultat = searchEnterprises($bdd, $_GET['query'], $currentUser);
-            } else {
-                // Action non reconnue
-                throw new Exception("Action non valide ou paramètres manquants");
-            }
-            break;
-
-        case 'POST':
-            // Création d'une nouvelle entreprise
-            if ($action === 'create') {
-                // Vérifier que les données nécessaires sont présentes
-                if (!isset($data['nom_entreprise']) || empty($data['nom_entreprise'])) {
-                    throw new Exception("Le nom de l'entreprise est requis");
-                }
-                
-                // Vérifier que l'utilisateur a les droits pour créer une entreprise
-                if ($currentUser['role'] !== 'admin') {
-                    throw new Exception("Seuls les administrateurs peuvent créer des entreprises", 403);
-                }
-                
-                $resultat = createEnterprise($bdd, $data);
-            } else {
-                // Action non reconnue
-                throw new Exception("Action non valide pour la méthode POST");
-            }
-            break;
-
-        case 'PUT':
-            // Mise à jour d'une entreprise existante
-            if ($action === 'update' && $id !== null) {
-                // Permettre la mise à jour partielle : il faut au moins un champ modifiable
-                $modifiableFields = [
-                    'nom_entreprise', 'slug', 'sigle', 'telephone', 'email', 'adresse', 'ville', 'pays', 'code_postal', 'logo', 'registre_commerce', 'ncc', 'devise', 'site_web', 'fax', 'capital_social', 'forme_juridique', 'numero_tva', 'date_abonnement', 'date_expiration_abonnement', 'statut'
-                ];
-                $hasField = false;
-                foreach ($modifiableFields as $field) {
-                    if (isset($data[$field])) {
-                        $hasField = true;
-                        break;
+                break;
+            case 'POST':
+                if ($action === 'create') {
+                    if (!isset($data['nom_entreprise']) || empty($data['nom_entreprise'])) {
+                        throw new Exception("Le nom de l'entreprise est requis");
                     }
+                    if ($currentUser['role'] !== 'admin') {
+                        throw new Exception("Seuls les administrateurs peuvent créer des entreprises", 403);
+                    }
+                    $resultat = createEnterprise($bdd, $data);
+                } else {
+                    throw new Exception("Action non valide pour la méthode POST");
                 }
-                if (!$hasField) {
-                    throw new Exception("Aucune donnée à mettre à jour");
+                break;
+            case 'PUT':
+                if ($action === 'update' && $id !== null) {
+                    $modifiableFields = [
+                        'nom_entreprise', 'slug', 'sigle', 'telephone', 'email', 'adresse', 'ville', 'pays', 'code_postal', 'logo', 'registre_commerce', 'ncc', 'devise', 'site_web', 'fax', 'capital_social', 'forme_juridique', 'numero_tva', 'date_abonnement', 'date_expiration_abonnement', 'statut'
+                    ];
+                    $hasField = false;
+                    foreach ($modifiableFields as $field) {
+                        if (isset($data[$field])) {
+                            $hasField = true;
+                            break;
+                        }
+                    }
+                    if (!$hasField) {
+                        throw new Exception("Aucune donnée à mettre à jour");
+                    }
+                    $resultat = updateEnterprise($bdd, $id, $data);
+                } elseif ($action === 'status' && $id !== null && isset($data['statut'])) {
+                    if ($currentUser['role'] !== 'admin') {
+                        throw new Exception("Seuls les administrateurs peuvent modifier le statut d'une entreprise", 403);
+                    }
+                    $resultat = updateEnterpriseStatus($bdd, $id, $data['statut']);
+                } else {
+                    throw new Exception("Action non valide ou paramètres manquants pour la méthode PUT");
                 }
-                $resultat = updateEnterprise($bdd, $id, $data);
-            } elseif ($action === 'status' && $id !== null && isset($data['statut'])) {
-                // Vérifier que l'utilisateur a les droits pour modifier le statut
-                if ($currentUser['role'] !== 'admin') {
-                    throw new Exception("Seuls les administrateurs peuvent modifier le statut d'une entreprise", 403);
+                break;
+            case 'DELETE':
+                if ($action === 'delete' && $id !== null) {
+                    if ($currentUser['role'] !== 'admin') {
+                        throw new Exception("Seuls les administrateurs peuvent supprimer des entreprises", 403);
+                    }
+                    $resultat = deleteEnterprise($bdd, $id);
+                } elseif ($action === 'bulk' && isset($data['ids']) && is_array($data['ids'])) {
+                    if ($currentUser['role'] !== 'admin') {
+                        throw new Exception("Seuls les administrateurs peuvent supprimer des entreprises", 403);
+                    }
+                    $resultat = bulkDeleteEnterprises($bdd, $data['ids']);
+                } else {
+                    throw new Exception("Action non valide ou paramètres manquants pour la méthode DELETE");
                 }
-                
-                // Mettre à jour le statut d'une entreprise
-                $resultat = updateEnterpriseStatus($bdd, $id, $data['statut']);
-            } else {
-                // Action non reconnue
-                throw new Exception("Action non valide ou paramètres manquants pour la méthode PUT");
-            }
-            break;
-
-        case 'DELETE':
-            // Suppression d'une entreprise
-            if ($action === 'delete' && $id !== null) {
-                // Vérifier que l'utilisateur a les droits pour supprimer une entreprise
-                if ($currentUser['role'] !== 'admin') {
-                    throw new Exception("Seuls les administrateurs peuvent supprimer des entreprises", 403);
-                }
-                
-                $resultat = deleteEnterprise($bdd, $id);
-            } elseif ($action === 'bulk' && isset($data['ids']) && is_array($data['ids'])) {
-                // Suppression en masse d'entreprises
-                if ($currentUser['role'] !== 'admin') {
-                    throw new Exception("Seuls les administrateurs peuvent supprimer des entreprises", 403);
-                }
-                
-                $resultat = bulkDeleteEnterprises($bdd, $data['ids']);
-            } else {
-                // Action non reconnue
-                throw new Exception("Action non valide ou paramètres manquants pour la méthode DELETE");
-            }
-            break;
-
-        case 'OPTIONS':
-            // Répondre aux requêtes OPTIONS (pour CORS)
-            $resultat = ['success' => true, 'message' => 'CORS preflight request successful'];
-            break;
-
-        default:
-            // Méthode HTTP non supportée
-            throw new Exception("Méthode HTTP non supportée");
+                break;
+            case 'OPTIONS':
+                $resultat = ['success' => true, 'message' => 'CORS preflight request successful'];
+                break;
+            default:
+                throw new Exception("Méthode HTTP non supportée");
+        }
     }
 
-    // Valider la transaction si tout s'est bien passé
     $bdd->commit();
-
-    // Envoyer la réponse
     echo json_encode([
         'success' => true,
         'data' => $resultat
     ]);
 
 } catch (Exception $e) {
-    // Annuler la transaction en cas d'erreur
-    if ($bdd->inTransaction()) {
+    if (isset($bdd) && $bdd->inTransaction()) {
         $bdd->rollBack();
     }
-
-    // Déterminer le code HTTP approprié
-    $httpCode = 400; // Par défaut
+    $httpCode = 400;
     if (strpos($e->getMessage(), "non autorisé") !== false) {
-        $httpCode = 403; // Forbidden
+        $httpCode = 403;
     } elseif (strpos($e->getMessage(), "Authentification requise") !== false || strpos($e->getMessage(), "Token invalide") !== false) {
-        $httpCode = 401; // Unauthorized
+        $httpCode = 401;
     } elseif (strpos($e->getMessage(), "non trouvé") !== false) {
-        $httpCode = 404; // Not Found
+        $httpCode = 404;
     }
-
-    // Envoyer une réponse d'erreur
     http_response_code($httpCode);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage()
     ]);
 }
-?>
+

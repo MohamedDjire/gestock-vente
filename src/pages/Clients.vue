@@ -128,33 +128,107 @@
       </div>
     </div>
 
-    <!-- Modale de suppression -->
-    <div v-if="showDeleteModal" class="modal" @click.self="closeDeleteModal">
-      <div class="modal-content">
-        <div class="modal-header confirmation">
+    <!-- Modale de suppression harmonisée -->
+    <div v-if="showDeleteModal" class="confirmation-overlay" @click.self="closeDeleteModal">
+      <div class="confirmation-modal">
+        <div class="confirmation-header">
           <span class="confirmation-icon">⚠️</span>
-          <h2 class="modal-title" style="flex:1;">Confirmer la suppression</h2>
-          <button @click="closeDeleteModal" class="btn-close">×</button>
+          <h3>Confirmer la suppression</h3>
         </div>
-        <div class="modal-body" style="padding: 1.5rem 2rem;">
+        <div class="confirmation-body">
           <p>Êtes-vous sûr de vouloir supprimer ce client&nbsp;?
             <span v-if="clientToDelete?.type === 'entreprise'">Entreprise : <b>{{ clientToDelete.nom_entreprise }}</b></span>
             <span v-else>Client : <b>{{ clientToDelete.nom }} {{ clientToDelete.prenom }}</b></span>
           </p>
           <p style="color:#dc2626;font-weight:600;">Cette action est irréversible.</p>
         </div>
-        <div class="modal-footer">
+        <div class="confirmation-actions">
           <button @click="closeDeleteModal" class="btn-cancel">Annuler</button>
           <button @click="confirmDeleteClient" class="btn-danger">Supprimer</button>
         </div>
       </div>
     </div>
-  
   </div>
 </template>
+<style scoped>
+  /* Modale de suppression harmonisée (style Produits/Stock) */
+  .confirmation-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  .confirmation-modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  .confirmation-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .confirmation-header h3 {
+    margin: 0;
+    flex: 1;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1a5f4a;
+  }
+  .confirmation-icon {
+    font-size: 2rem;
+  }
+  .confirmation-body {
+    padding: 1.5rem 0;
+  }
+  .confirmation-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+  }
+  .btn-cancel {
+    background: #e5e7eb;
+    color: #1a1a1a;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-cancel:hover {
+    background: #d1d5db;
+  }
+  .btn-danger {
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-danger:hover {
+    background: #991b1b;
+  }
+</style>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { logJournal } from '../composables/useJournal'
 import apiClient from '../composables/api/apiClient'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
@@ -201,6 +275,7 @@ const filteredClients = computed(() => {
 const submitForm = async () => {
   formError.value = '';
   let response;
+  let actionType = '';
   try {
     if (editingClient.value) {
       const data = {
@@ -210,14 +285,21 @@ const submitForm = async () => {
         id: editingClient.value.id
       };
       response = await apiClient.post('/clients.php?_method=PUT', data);
+      actionType = 'Modification client';
     } else {
       const data = { ...form.value, id_utilisateur, id_entreprise };
       response = await apiClient.post('/clients.php', data);
+      actionType = 'Ajout client';
     }
     if (response.data && response.data.error && response.data.message && response.data.message.includes('Duplicate entry')) {
       formError.value = "L'email est déjà utilisé par un autre client.";
       return;
     }
+    await logJournal({
+      user: getJournalUser(),
+      action: actionType,
+      details: `Email: ${form.value.email}`
+    });
     closeForm();
     fetchClients();
   } catch (e) {
@@ -244,6 +326,11 @@ const deleteClient = async (id) => {
   clientToDelete.value = null
   const response = await apiClient.delete(`/clients.php?id=${id}`)
   console.log('Réponse suppression', response.data)
+  await logJournal({
+    user: getJournalUser(),
+    action: 'Suppression client',
+    details: `ID: ${id}`
+  });
   fetchClients()
 }
 
@@ -296,6 +383,19 @@ function exportPDF() {
     styles: { fontSize: 10 }
   })
   doc.save('clients.pdf')
+}
+
+function getJournalUser() {
+  const userStr = localStorage.getItem('prostock_user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      return user.nom || user.email || 'inconnu';
+    } catch {
+      return 'inconnu';
+    }
+  }
+  return 'inconnu';
 }
 </script>
 
