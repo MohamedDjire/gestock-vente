@@ -1,7 +1,9 @@
+
 <template>
-  <MainLayout>
+  <MainLayout v-if="requiresAuth">
     <RouterView />
   </MainLayout>
+  <RouterView v-else />
 </template>
 
 <script setup>
@@ -13,12 +15,7 @@ const route = useRoute()
 const requiresAuth = computed(() => route.meta.requiresAuth !== false)
 </script>
 
-<template>
-  <MainLayout v-if="requiresAuth">
-    <RouterView />
-  </MainLayout>
-  <RouterView v-else />
-</template>
+
 <style>
 * {
   margin: 0;
