@@ -1,27 +1,33 @@
-// src/composables/api/apiFournisseur.js
-import axios from 'axios';
-
-const API_URL = 'https://aliadjame.com/api-stock/api_fournisseur.php';
+// src/composables/Api/apiFournisseur.js
+import { apiService } from './apiService.js';
 
 export default {
   async getAll() {
-    const { data } = await axios.get(API_URL);
-    if (data.success) return data.data;
-    throw new Error(data.message || 'Erreur API');
+    const response = await apiService.get('/api_fournisseur.php?action=all');
+    if (response && response.success) {
+      return response.data || [];
+    }
+    throw new Error(response?.message || 'Erreur lors du chargement des fournisseurs');
   },
   async create(fournisseur) {
-    const { data } = await axios.post(API_URL, fournisseur);
-    if (data.success) return data.data;
-    throw new Error(data.message || 'Erreur API');
+    const response = await apiService.post('/api_fournisseur.php?action=create', fournisseur);
+    if (response && response.success) {
+      return response.data;
+    }
+    throw new Error(response?.message || 'Erreur lors de la création du fournisseur');
   },
   async update(id, fournisseur) {
-    const { data } = await axios.put(`${API_URL}?id=${id}`, fournisseur);
-    if (data.success) return data.data;
-    throw new Error(data.message || 'Erreur API');
+    const response = await apiService.put(`/api_fournisseur.php?action=update&id=${id}`, fournisseur);
+    if (response && response.success) {
+      return response.data;
+    }
+    throw new Error(response?.message || 'Erreur lors de la mise à jour du fournisseur');
   },
   async delete(id) {
-    const { data } = await axios.delete(`${API_URL}?id=${id}`);
-    if (data.success) return true;
-    throw new Error(data.message || 'Erreur API');
+    const response = await apiService.delete(`/api_fournisseur.php?action=delete&id=${id}`);
+    if (response && response.success) {
+      return true;
+    }
+    throw new Error(response?.message || 'Erreur lors de la suppression du fournisseur');
   }
 };

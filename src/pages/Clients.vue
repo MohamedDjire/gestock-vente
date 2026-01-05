@@ -229,9 +229,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { logJournal } from '../composables/useJournal'
-import apiClient from '../composables/api/apiClient'
-import Sidebar from '../components/Sidebar.vue'
-import Topbar from '../components/Topbar.vue'
+import apiClient from '../composables/Api/apiClient'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'

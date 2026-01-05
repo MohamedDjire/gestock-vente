@@ -1,12 +1,19 @@
-// src/composables/api/apiJournal.js
-import apiClient from './apiClient';
+// src/composables/Api/apiJournal.js
+import apiClient from './apiClient.js';
 
 export default {
   async getJournal() {
-    const res = await apiClient.get('/api_journal.php');
-    return res.data.data;
+    const response = await apiClient.get('/api_journal.php');
+    if (response.data && response.data.success) {
+      return response.data.data || [];
+    }
+    throw new Error(response.data?.message || 'Erreur lors du chargement du journal');
   },
   async addJournalEntry(entry) {
-    return apiClient.post('/api_journal.php', entry);
+    const response = await apiClient.post('/api_journal.php', entry);
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Erreur lors de l\'ajout de l\'entrée');
   }
 };
