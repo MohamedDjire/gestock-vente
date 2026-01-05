@@ -840,7 +840,14 @@ const loadProducts = async () => {
     }
   } catch (error) {
     console.error('Erreur lors du chargement des produits:', error)
-    alert('Erreur lors du chargement des produits')
+    console.error('Détails de l\'erreur:', {
+      message: error.message,
+      response: error.response,
+      stack: error.stack
+    })
+    // Afficher un message plus détaillé
+    const errorMessage = error.message || 'Erreur inconnue'
+    alert(`Erreur lors du chargement des produits: ${errorMessage}`)
   } finally {
     loading.value = false
   }

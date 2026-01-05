@@ -50,7 +50,33 @@ apiClient.interceptors.request.use(
       }
       
       // Ajouter le token aux headers
+      // Utiliser Authorization (standard) et X-Auth-Token (fallback pour certains proxies/CDN)
       config.headers.Authorization = `Bearer ${token}`
+      config.headers['X-Auth-Token'] = token
+    }
+    
+    // Vérifier le forfait pour toutes les requêtes sauf login, signup et vérification du forfait
+    const url = config.url || ''
+    const isAuthRoute = url.includes('login.php') || url.includes('register.php') || url.includes('api_forfait.php')
+    
+    if (!isAuthRoute && token) {
+      // Vérifier le statut du forfait depuis localStorage
+      try {
+        const forfaitStatus = localStorage.getItem('forfait_status')
+        if (forfaitStatus) {
+          const status = JSON.parse(forfaitStatus)
+          // Ne bloquer que si :
+          // 1. Le forfait est explicitement expiré (pas juste "no_subscription")
+          // 2. Il n'y a pas d'erreur de connexion
+          // 3. Ce n'est pas un cas de "no_subscription" (première utilisation)
+          if ((status.expire === true || status.actif === false) && !status.error && !status.no_subscription) {
+            // Forfait expiré, bloquer la requête
+            return Promise.reject(new Error('FORFAIT_EXPIRE'))
+          }
+        }
+      } catch (e) {
+        console.error('Erreur lors de la vérification du forfait:', e)
+      }
     }
     
     return config
@@ -66,6 +92,32 @@ apiClient.interceptors.response.use(
     return response.data
   },
   (error) => {
+    // Vérifier si c'est une erreur de forfait expiré
+    if (error.message === 'FORFAIT_EXPIRE' || (error.response && error.response.status === 403 && error.response.data?.message?.includes('forfait'))) {
+      // Mettre à jour le statut du forfait
+      try {
+        const forfaitStatus = localStorage.getItem('forfait_status')
+        if (forfaitStatus) {
+          const status = JSON.parse(forfaitStatus)
+          status.expire = true
+          status.actif = false
+          localStorage.setItem('forfait_status', JSON.stringify(status))
+        }
+      } catch (e) {
+        console.error('Erreur lors de la mise à jour du statut du forfait:', e)
+      }
+      
+      // Émettre un événement pour notifier les composants
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('forfait-expired'))
+      }
+      
+      return Promise.reject({
+        message: 'Votre forfait a expiré. Veuillez renouveler votre abonnement pour continuer.',
+        code: 'FORFAIT_EXPIRE'
+      })
+    }
+    
     if (error.response) {
       // Erreur de réponse du serveur
       const status = error.response.status
@@ -139,5 +191,11 @@ export const apiService = {
   put: (url, data = {}, config = {}) => apiClient.put(url, data, config),
   delete: (url, config = {}) => apiClient.delete(url, config)
 }
+
+
+
+
+
+
 
 

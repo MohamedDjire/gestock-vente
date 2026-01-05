@@ -1,6 +1,27 @@
 <template>
   <header class="topbar">
-    <div style="flex:1"></div>
+    <div style="flex:1; display: flex; align-items: center;">
+      <!-- Affichage de la date d'expiration du forfait -->
+      <div v-if="loading && !forfaitStatus" class="forfait-expiration forfait-loading">
+        <span>Chargement du forfait...</span>
+      </div>
+      <div v-else-if="forfaitStatus" class="forfait-expiration" :class="forfaitStatusColor">
+        <template v-if="forfaitStatus.date_fin">
+          <span class="forfait-label">Forfait expire le:</span>
+          <span class="forfait-date">{{ formatDateExpiration }}</span>
+          <span v-if="joursRestants !== null && joursRestants > 0" class="forfait-jours">
+            ({{ joursRestants }} jour{{ joursRestants > 1 ? 's' : '' }} restant{{ joursRestants > 1 ? 's' : '' }})
+          </span>
+          <span v-else-if="isExpired" class="forfait-expired">⚠️ Expiré</span>
+        </template>
+        <template v-else>
+          <span class="forfait-label">⚠️ Aucun forfait actif</span>
+        </template>
+      </div>
+      <div v-else class="forfait-expiration forfait-no-subscription">
+        <span class="forfait-label">⚠️ Aucun forfait</span>
+      </div>
+    </div>
     <div class="topbar-actions">
       <div class="currency-select-topbar">
         <label>Devise:</label>
@@ -57,11 +78,27 @@
 <script setup>
 import { useStorage } from '../composables/storage/useStorage'
 import { useCurrencyStore } from '../stores/currency'
-import { ref, onMounted, provide, watch, computed } from 'vue'
+import { useAuthStore } from '../stores/auth.js'
+import { useForfait } from '../composables/useForfait.js'
+import { ref, onMounted, provide, watch, computed, onUnmounted } from 'vue'
 
 const { getUser } = useStorage()
 const user = ref(null)
 const currencyStore = useCurrencyStore()
+
+// Gestion du forfait
+const {
+  forfaitStatus,
+  loading,
+  isExpired,
+  joursRestants,
+  statusColor: forfaitStatusColor,
+  formatDateExpiration,
+  checkForfait,
+  startAutoCheck,
+  stopAutoCheck,
+  loadFromStorage
+} = useForfait()
 
 // Utiliser le store pour la devise
 const currencyCode = ref(currencyStore.currency || 'XOF')
@@ -88,6 +125,24 @@ onMounted(() => {
   user.value = getUser()
   // S'assurer que la devise du store est synchronisée
   currencyCode.value = currencyStore.currency || 'XOF'
+  
+  // Ne vérifier le forfait que si l'utilisateur est authentifié
+  const authStore = useAuthStore()
+  if (authStore.isAuthenticated) {
+    // Charger le statut du forfait depuis localStorage (pour synchronisation rapide)
+    loadFromStorage()
+    
+    // Démarrer la vérification automatique du forfait
+    startAutoCheck()
+    
+    // Vérifier aussi lors du changement de focus de la fenêtre
+    window.addEventListener('focus', checkForfait)
+  }
+})
+
+onUnmounted(() => {
+  stopAutoCheck()
+  window.removeEventListener('focus', checkForfait)
 })
 
 // Synchroniser avec le store
@@ -201,5 +256,70 @@ watch(() => currencyStore.currency, (newCurrency) => {
   font-weight: 600;
   color: #1a5f4a;
   font-size: 1.08rem;
+}
+
+/* Affichage de l'expiration du forfait */
+.forfait-expiration {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.forfait-expiration.forfait-loading {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.forfait-expiration.forfait-no-subscription {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.forfait-expiration.black {
+  color: #1f2937;
+  background: #f3f4f6;
+}
+
+.forfait-expiration.orange {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.forfait-expiration.red {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.forfait-label {
+  font-weight: 600;
+}
+
+.forfait-date {
+  font-weight: 700;
+}
+
+.forfait-jours {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.forfait-expired {
+  font-weight: 700;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 </style>

@@ -12,3 +12,9 @@ AFTER `actif`;
 UPDATE `stock_produit` SET `entrepot` = 'Magasin' WHERE `entrepot` IS NULL OR `entrepot` = '';
 
 
+
+
+
+
+
+

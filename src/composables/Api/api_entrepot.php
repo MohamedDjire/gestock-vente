@@ -5,14 +5,14 @@
  */
 
 // Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
-@header('Content-Type: application/json');
-@header('Access-Control-Allow-Origin: *');
-@header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-@header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token');
 
 // Répondre immédiatement aux requêtes OPTIONS (préflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    @http_response_code(200);
+    http_response_code(200);
     exit;
 }
 
@@ -25,7 +25,7 @@ error_reporting(E_ALL);
 // =====================================================
 $dbFile = __DIR__ . '/config/database.php';
 if (!file_exists($dbFile)) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fichier config/database.php introuvable sur le serveur',
@@ -37,7 +37,7 @@ if (!file_exists($dbFile)) {
 require_once $dbFile;
 
 if (!function_exists('createDatabaseConnection')) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fonction createDatabaseConnection() introuvable',
@@ -49,7 +49,7 @@ if (!function_exists('createDatabaseConnection')) {
 try {
     $bdd = createDatabaseConnection();
 } catch (PDOException $e) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Erreur de connexion à la base de données',
@@ -67,7 +67,7 @@ if (!file_exists($middlewareFile)) {
 }
 
 if (!file_exists($middlewareFile)) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fichier middleware_auth.php introuvable',
@@ -79,7 +79,7 @@ if (!file_exists($middlewareFile)) {
 require_once $middlewareFile;
 
 if (!function_exists('authenticateAndAuthorize')) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fonction authenticateAndAuthorize() introuvable',
@@ -93,7 +93,7 @@ try {
     $currentUser = authenticateAndAuthorize($bdd);
     $enterpriseId = $currentUser['enterprise_id'];
 } catch (Exception $e) {
-    @http_response_code(401);
+    http_response_code(401);
     echo json_encode([
         'success' => false,
         'message' => 'Non autorisé',
@@ -112,22 +112,49 @@ try {
     switch ($method) {
         case 'GET':
             if ($action === 'all') {
+                // Vérifier d'abord si la table existe
+                try {
+                    $testStmt = $bdd->query("SHOW TABLES LIKE 'stock_entrepot'");
+                    $tableExists = $testStmt->fetch();
+                    
+                    if (!$tableExists) {
+                        echo json_encode([
+                            'success' => true,
+                            'data' => []
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    // En cas d'erreur, retourner un tableau vide
+                    echo json_encode([
+                        'success' => true,
+                        'data' => []
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                
                 // Récupérer tous les entrepôts de l'entreprise
-                $stmt = $bdd->prepare("
-                    SELECT 
-                        e.*,
-                        COUNT(DISTINCT p.id_produit) AS nombre_produits,
-                        COALESCE(SUM(p.quantite_stock), 0) AS stock_total,
-                        COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) AS valeur_stock_achat,
-                        COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) AS valeur_stock_vente
-                    FROM stock_entrepot e
-                    LEFT JOIN stock_produit p ON p.entrepot = e.nom_entrepot AND p.id_entreprise = e.id_entreprise
-                    WHERE e.id_entreprise = :id_entreprise
-                    GROUP BY e.id_entrepot
-                    ORDER BY e.date_creation DESC
-                ");
-                $stmt->execute(['id_entreprise' => $enterpriseId]);
-                $entrepots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                try {
+                    $stmt = $bdd->prepare("
+                        SELECT 
+                            e.*,
+                            COUNT(DISTINCT p.id_produit) AS nombre_produits,
+                            COALESCE(SUM(p.quantite_stock), 0) AS stock_total,
+                            COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) AS valeur_stock_achat,
+                            COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) AS valeur_stock_vente
+                        FROM stock_entrepot e
+                        LEFT JOIN stock_produit p ON p.entrepot = e.nom_entrepot AND p.id_entreprise = e.id_entreprise
+                        WHERE e.id_entreprise = :id_entreprise
+                        GROUP BY e.id_entrepot
+                        ORDER BY e.date_creation DESC
+                    ");
+                    $stmt->execute(['id_entreprise' => $enterpriseId]);
+                    $entrepots = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                } catch (PDOException $e) {
+                    // Si erreur SQL (table n'existe pas, colonne manquante, etc.), retourner un tableau vide
+                    error_log("Erreur SQL api_entrepot: " . $e->getMessage());
+                    $entrepots = [];
+                }
                 
                 echo json_encode([
                     'success' => true,
@@ -144,7 +171,7 @@ try {
                 $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$entrepot) {
-                    @http_response_code(404);
+                    http_response_code(404);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Entrepôt non trouvé'
@@ -242,7 +269,7 @@ try {
                 $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$entrepot) {
-                    @http_response_code(404);
+                    http_response_code(404);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Entrepôt non trouvé'
@@ -291,7 +318,7 @@ try {
                 $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$entrepot) {
-                    @http_response_code(404);
+                    http_response_code(404);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Entrepôt non trouvé'
@@ -311,7 +338,7 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (empty($data['nom_entrepot'])) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Le nom de l\'entrepôt est requis'
@@ -323,7 +350,7 @@ try {
             $stmt = $bdd->prepare("SELECT id_entrepot FROM stock_entrepot WHERE nom_entrepot = :nom AND id_entreprise = :id_entreprise");
             $stmt->execute(['nom' => $data['nom_entrepot'], 'id_entreprise' => $enterpriseId]);
             if ($stmt->fetch()) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Un entrepôt avec ce nom existe déjà'
@@ -368,7 +395,7 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (empty($data['id_entrepot'])) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'ID entrepôt requis'
@@ -382,7 +409,7 @@ try {
             $stmt = $bdd->prepare("SELECT id_entrepot FROM stock_entrepot WHERE id_entrepot = :id AND id_entreprise = :id_entreprise");
             $stmt->execute(['id' => $idEntrepot, 'id_entreprise' => $enterpriseId]);
             if (!$stmt->fetch()) {
-                @http_response_code(404);
+                http_response_code(404);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Entrepôt non trouvé'
@@ -395,7 +422,7 @@ try {
                 $stmt = $bdd->prepare("SELECT id_entrepot FROM stock_entrepot WHERE nom_entrepot = :nom AND id_entreprise = :id_entreprise AND id_entrepot != :id");
                 $stmt->execute(['nom' => $data['nom_entrepot'], 'id_entreprise' => $enterpriseId, 'id' => $idEntrepot]);
                 if ($stmt->fetch()) {
-                    @http_response_code(400);
+                    http_response_code(400);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Un entrepôt avec ce nom existe déjà'
@@ -443,7 +470,7 @@ try {
             $idEntrepot = (int)($_GET['id_entrepot'] ?? 0);
             
             if (!$idEntrepot) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'ID entrepôt requis'
@@ -457,7 +484,7 @@ try {
             $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$entrepot) {
-                @http_response_code(404);
+                http_response_code(404);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Entrepôt non trouvé'
@@ -471,7 +498,7 @@ try {
             $count = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
             
             if ($count > 0) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Impossible de supprimer l\'entrepôt : il contient des produits. Transférez d\'abord les produits vers un autre entrepôt.'
@@ -489,20 +516,36 @@ try {
             break;
             
         default:
-            @http_response_code(405);
+            http_response_code(405);
             echo json_encode([
                 'success' => false,
                 'message' => 'Méthode non autorisée'
             ], JSON_UNESCAPED_UNICODE);
     }
     
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Erreur base de données',
+        'error' => $e->getMessage(),
+        'code' => $e->getCode()
+    ], JSON_UNESCAPED_UNICODE);
 } catch (Exception $e) {
-    @http_response_code(500);
+    $code = $e->getCode() ?: 500;
+    http_response_code($code);
     echo json_encode([
         'success' => false,
         'message' => 'Erreur serveur',
-        'error' => $e->getMessage()
+        'error' => $e->getMessage(),
+        'code' => $code
     ], JSON_UNESCAPED_UNICODE);
 }
+
+
+
+
+
+
 
 

@@ -5,14 +5,14 @@
  */
 
 // Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
-@header('Content-Type: application/json');
-@header('Access-Control-Allow-Origin: *');
-@header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-@header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token');
 
 // Répondre immédiatement aux requêtes OPTIONS (préflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    @http_response_code(200);
+    http_response_code(200);
     exit;
 }
 
@@ -25,7 +25,7 @@ error_reporting(E_ALL);
 // =====================================================
 $dbFile = __DIR__ . '/config/database.php';
 if (!file_exists($dbFile)) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fichier config/database.php introuvable sur le serveur',
@@ -37,7 +37,7 @@ if (!file_exists($dbFile)) {
 require_once $dbFile;
 
 if (!function_exists('createDatabaseConnection')) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fonction createDatabaseConnection() introuvable',
@@ -49,7 +49,7 @@ if (!function_exists('createDatabaseConnection')) {
 try {
     $bdd = createDatabaseConnection();
 } catch (PDOException $e) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Erreur de connexion à la base de données',
@@ -67,7 +67,7 @@ if (!file_exists($middlewareFile)) {
 }
 
 if (!file_exists($middlewareFile)) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fichier middleware_auth.php introuvable',
@@ -79,7 +79,7 @@ if (!file_exists($middlewareFile)) {
 require_once $middlewareFile;
 
 if (!function_exists('authenticateAndAuthorize')) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false, 
         'message' => 'Fonction authenticateAndAuthorize() introuvable',
@@ -93,7 +93,7 @@ try {
     $currentUser = authenticateAndAuthorize($bdd);
     $enterpriseId = $currentUser['enterprise_id'];
 } catch (Exception $e) {
-    @http_response_code(401);
+    http_response_code(401);
     echo json_encode([
         'success' => false,
         'message' => 'Non autorisé',
@@ -147,7 +147,7 @@ try {
                 $stmt = $bdd->prepare("SELECT id_point_vente FROM stock_point_vente WHERE id_point_vente = :id AND id_entreprise = :id_entreprise");
                 $stmt->execute(['id' => $idPointVente, 'id_entreprise' => $enterpriseId]);
                 if (!$stmt->fetch()) {
-                    @http_response_code(404);
+                    http_response_code(404);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Point de vente non trouvé'
@@ -242,7 +242,7 @@ try {
                 $pointVente = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if (!$pointVente) {
-                    @http_response_code(404);
+                    http_response_code(404);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Point de vente non trouvé'
@@ -262,7 +262,7 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (empty($data['nom_point_vente'])) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Le nom du point de vente est requis'
@@ -274,7 +274,7 @@ try {
             $stmt = $bdd->prepare("SELECT id_point_vente FROM stock_point_vente WHERE nom_point_vente = :nom AND id_entreprise = :id_entreprise");
             $stmt->execute(['nom' => $data['nom_point_vente'], 'id_entreprise' => $enterpriseId]);
             if ($stmt->fetch()) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Un point de vente avec ce nom existe déjà'
@@ -319,7 +319,7 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (empty($data['id_point_vente'])) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'ID point de vente requis'
@@ -333,7 +333,7 @@ try {
             $stmt = $bdd->prepare("SELECT id_point_vente FROM stock_point_vente WHERE id_point_vente = :id AND id_entreprise = :id_entreprise");
             $stmt->execute(['id' => $idPointVente, 'id_entreprise' => $enterpriseId]);
             if (!$stmt->fetch()) {
-                @http_response_code(404);
+                http_response_code(404);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Point de vente non trouvé'
@@ -346,7 +346,7 @@ try {
                 $stmt = $bdd->prepare("SELECT id_point_vente FROM stock_point_vente WHERE nom_point_vente = :nom AND id_entreprise = :id_entreprise AND id_point_vente != :id");
                 $stmt->execute(['nom' => $data['nom_point_vente'], 'id_entreprise' => $enterpriseId, 'id' => $idPointVente]);
                 if ($stmt->fetch()) {
-                    @http_response_code(400);
+                    http_response_code(400);
                     echo json_encode([
                         'success' => false,
                         'message' => 'Un point de vente avec ce nom existe déjà'
@@ -394,7 +394,7 @@ try {
             $idPointVente = (int)($_GET['id_point_vente'] ?? 0);
             
             if (!$idPointVente) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'ID point de vente requis'
@@ -408,7 +408,7 @@ try {
             $pointVente = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$pointVente) {
-                @http_response_code(404);
+                http_response_code(404);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Point de vente non trouvé'
@@ -422,7 +422,7 @@ try {
             $count = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
             
             if ($count > 0) {
-                @http_response_code(400);
+                http_response_code(400);
                 echo json_encode([
                     'success' => false,
                     'message' => 'Impossible de supprimer le point de vente : il contient des ventes enregistrées.'
@@ -440,7 +440,7 @@ try {
             break;
             
         default:
-            @http_response_code(405);
+            http_response_code(405);
             echo json_encode([
                 'success' => false,
                 'message' => 'Méthode non autorisée'
@@ -448,11 +448,17 @@ try {
     }
     
 } catch (Exception $e) {
-    @http_response_code(500);
+    http_response_code(500);
     echo json_encode([
         'success' => false,
         'message' => 'Erreur serveur',
         'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
 }
+
+
+
+
+
+
 

@@ -5,14 +5,14 @@
  */
 
 // Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
-@header('Content-Type: application/json');
-@header('Access-Control-Allow-Origin: *');
-@header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-@header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token');
 
 // Répondre immédiatement aux requêtes OPTIONS (préflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    @http_response_code(200);
+    http_response_code(200);
     exit;
 }
 
@@ -94,7 +94,7 @@ try {
     $enterpriseId = $currentUser['enterprise_id'];
     $userId = $currentUser['user_id'];
 } catch (Exception $e) {
-    @http_response_code(401);
+    http_response_code(401);
     echo json_encode([
         'success' => false,
         'message' => 'Non autorisé',
@@ -458,5 +458,11 @@ try {
         'line' => $e->getLine()
     ], JSON_UNESCAPED_UNICODE);
 }
+
+
+
+
+
+
 
 

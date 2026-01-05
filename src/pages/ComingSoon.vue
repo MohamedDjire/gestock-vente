@@ -60,3 +60,9 @@ const title = computed(() => titles[route.path] || 'Page en construction')
 </style>
 
 
+
+
+
+
+
+

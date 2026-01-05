@@ -1,20 +1,36 @@
-# Configuration CORS pour l'API
-<IfModule mod_headers.c>
-    # Autoriser les requêtes depuis n'importe quelle origine (en développement)
-    # En production, remplacez * par votre domaine frontend
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-    Header always set Access-Control-Max-Age "3600"
-    
-    # Répondre immédiatement aux requêtes OPTIONS (preflight)
+# =====================================================
+# CONFIGURATION CORS - OBLIGATOIRE EN PREMIER
+# =====================================================
+# Cette configuration gère CORS au niveau Apache, AVANT que PHP ne s'exécute
+# Cela garantit que les requêtes OPTIONS (preflight) sont toujours gérées
+
+# Gérer les requêtes OPTIONS (preflight) EN PREMIER - AVANT TOUTE REDIRECTION
+<IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteCond %{REQUEST_METHOD} OPTIONS
+    # Répondre directement aux requêtes OPTIONS avec 200 OK, sans redirection
+    RewriteCond %{REQUEST_METHOD} ^OPTIONS
     RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>
+
+# Définir les headers CORS pour TOUTES les requêtes (y compris OPTIONS)
+<IfModule mod_headers.c>
+    # Autoriser localhost:5173 en développement (spécifique)
+    # En production, remplacez par votre domaine
+    Header always set Access-Control-Allow-Origin "http://localhost:5173"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Auth-Token, X-Requested-With"
+    Header always set Access-Control-Allow-Credentials "true"
+    Header always set Access-Control-Max-Age "86400"
 </IfModule>
 
 # Activer les erreurs PHP (en développement uniquement)
 php_flag display_errors On
 php_value error_reporting E_ALL
+
+
+
+
+
+
 
 

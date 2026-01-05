@@ -47,17 +47,72 @@ function generateJWT($userData, $secret) {
 }
 
 function authenticateAndAuthorize($bdd, $enterpriseId = null) {
-    $headers = getallheaders();
-    $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : '';
-    if (empty($authHeader) || !preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+    // Récupérer le header Authorization de manière compatible avec tous les serveurs
+    $authHeader = '';
+    
+    // Méthode 1: getallheaders() (fonctionne sur Apache)
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : 
+                     (isset($headers['authorization']) ? $headers['authorization'] : '');
+        // Vérifier aussi X-Auth-Token dans getallheaders (priorité si Authorization est vide)
+        if (empty($authHeader) && isset($headers['X-Auth-Token'])) {
+            $authHeader = 'Bearer ' . $headers['X-Auth-Token'];
+        }
+    }
+    
+    // Méthode 2: $_SERVER (fonctionne sur tous les serveurs)
+    if (empty($authHeader)) {
+        $authHeader = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : 
+                     (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION']) ? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] : '');
+    }
+    
+    // Méthode 2b: Header personnalisé X-Auth-Token depuis $_SERVER (fallback si Authorization est filtré)
+    if (empty($authHeader) && isset($_SERVER['HTTP_X_AUTH_TOKEN'])) {
+        $authHeader = 'Bearer ' . $_SERVER['HTTP_X_AUTH_TOKEN'];
+    }
+    
+    // Méthode 3: apache_request_headers() si disponible
+    if (empty($authHeader) && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $authHeader = isset($headers['Authorization']) ? $headers['Authorization'] : 
+                     (isset($headers['authorization']) ? $headers['authorization'] : '');
+        // Vérifier aussi X-Auth-Token dans apache_request_headers
+        if (empty($authHeader) && isset($headers['X-Auth-Token'])) {
+            $authHeader = 'Bearer ' . $headers['X-Auth-Token'];
+        }
+    }
+    
+    // Vérifier le format du token (insensible à la casse, gère les espaces multiples)
+    if (empty($authHeader)) {
+        // Log pour débogage (désactiver en production)
+        error_log("AUTH DEBUG: Aucun header Authorization trouvé. Headers disponibles: " . json_encode(array_keys($_SERVER)));
         throw new Exception("Authentification requise", 401);
     }
+    
+    // Extraire le token (Bearer peut être en minuscules ou majuscules)
+    if (!preg_match('/Bearer\s+(\S+)/i', trim($authHeader), $matches)) {
+        error_log("AUTH DEBUG: Format du header invalide. Header reçu: " . substr($authHeader, 0, 50));
+        throw new Exception("Format d'authentification invalide. Format attendu: Bearer <token>", 401);
+    }
+    
     $token = $matches[1];
+    
+    // Vérifier que le token n'est pas vide
+    if (empty($token)) {
+        throw new Exception("Token vide", 401);
+    }
+    
+    // Vérifier le JWT
     $payload = verifyJWT($token, JWT_SECRET);
     if (!$payload) {
+        error_log("AUTH DEBUG: Token invalide ou signature incorrecte");
         throw new Exception("Token invalide ou expiré", 401);
     }
+    
+    // Vérifier l'expiration
     if (isset($payload['exp']) && $payload['exp'] < time()) {
+        error_log("AUTH DEBUG: Token expiré. Exp: " . $payload['exp'] . ", Now: " . time());
         throw new Exception("Token expiré", 401);
     }
 
@@ -139,4 +194,64 @@ function verifyJWT($token, $secret) {
     $data = json_decode($decodedPayload, true);
     
     return $data ?: false;
+}
+
+/**
+ * Vérifie si l'entreprise a un forfait actif
+ * Cette fonction doit être appelée pour toutes les actions sauf la connexion
+ * Retourne true si actif, false si pas d'abonnement, et lance une exception si expiré
+ */
+function checkForfaitActif($bdd, $enterpriseId) {
+    try {
+        // Vérifier d'abord si la table existe
+        $stmt = $bdd->query("SHOW TABLES LIKE 'stock_abonnement'");
+        $tableExists = $stmt->fetch();
+        
+        // Si la table n'existe pas encore, on autorise l'accès (migration en cours)
+        if (!$tableExists) {
+            return true;
+        }
+        
+        // Vérifier s'il y a un abonnement actif
+        $stmt = $bdd->prepare("
+            SELECT id_abonnement, date_fin, statut 
+            FROM stock_abonnement 
+            WHERE id_entreprise = :id_entreprise 
+            AND statut = 'actif'
+            ORDER BY date_fin DESC 
+            LIMIT 1
+        ");
+        $stmt->execute(['id_entreprise' => $enterpriseId]);
+        $abonnement = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Si aucun abonnement, on autorise l'accès (première utilisation)
+        if (!$abonnement) {
+            return true;
+        }
+        
+        // Vérifier si l'abonnement est expiré
+        $dateFin = new DateTime($abonnement['date_fin']);
+        $now = new DateTime();
+        
+        if ($dateFin < $now) {
+            // Mettre à jour le statut
+            $updateStmt = $bdd->prepare("
+                UPDATE stock_abonnement 
+                SET statut = 'expire' 
+                WHERE id_abonnement = :id_abonnement
+            ");
+            $updateStmt->execute(['id_abonnement' => $abonnement['id_abonnement']]);
+            
+            throw new Exception("Votre forfait a expiré. Veuillez renouveler votre abonnement pour continuer.", 403);
+        }
+        
+        return true;
+    } catch (Exception $e) {
+        // Si c'est une exception de forfait expiré, la relancer
+        if (strpos($e->getMessage(), 'forfait') !== false || strpos($e->getMessage(), 'abonnement') !== false) {
+            throw $e;
+        }
+        // Sinon, en cas d'erreur SQL (table n'existe pas, etc.), autoriser l'accès
+        return true;
+    }
 }

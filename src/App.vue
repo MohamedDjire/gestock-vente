@@ -4,13 +4,21 @@
   </MainLayout>
 </template>
 
-
 <script setup>
 import { RouterView, useRoute } from 'vue-router'
 import { computed } from 'vue'
 import MainLayout from './components/MainLayout.vue'
+
+const route = useRoute()
+const requiresAuth = computed(() => route.meta.requiresAuth !== false)
 </script>
 
+<template>
+  <MainLayout v-if="requiresAuth">
+    <RouterView />
+  </MainLayout>
+  <RouterView v-else />
+</template>
 <style>
 * {
   margin: 0;

@@ -147,8 +147,24 @@ export const useAuthStore = defineStore('auth', () => {
       if (response && response.success && response.data) {
         const { token: authToken, user: userData, expires_in } = response.data
         
+        // Vérifier que le token est bien présent
+        if (!authToken) {
+          console.error('❌ Token manquant dans la réponse du serveur')
+          throw new Error('Token manquant dans la réponse du serveur')
+        }
+        
+        console.log('✅ Token reçu:', authToken.substring(0, 20) + '...')
+        
         // Sauvegarder dans le store et localStorage
         setAuthData(authToken, userData)
+        
+        // Vérifier que le token est bien sauvegardé
+        const savedToken = localStorage.getItem('prostock_token')
+        if (!savedToken) {
+          console.error('❌ Token non sauvegardé dans localStorage')
+        } else {
+          console.log('✅ Token sauvegardé dans localStorage')
+        }
         
         return { success: true, user: userData }
       } else {
@@ -298,5 +314,11 @@ export const useAuthStore = defineStore('auth', () => {
     isTokenExpired
   }
 })
+
+
+
+
+
+
 
 

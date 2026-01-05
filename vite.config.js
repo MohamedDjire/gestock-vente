@@ -11,5 +11,16 @@ export default defineConfig({
     alias: {
       'chart.js': 'chart.js'
     }
+  },
+  // Proxy pour contourner CORS en développement (solution alternative)
+  server: {
+    proxy: {
+      '/api-stock': {
+        target: 'https://aliadjame.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api-stock/, '/api-stock')
+      }
+    }
   }
 })

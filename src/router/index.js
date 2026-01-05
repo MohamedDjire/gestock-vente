@@ -11,6 +11,7 @@ import Entrepot from '../pages/Entrepot.vue'
 import PointVente from '../pages/PointVente.vue'
 import Journal from '../pages/Journal.vue'
 import Fournisseurs from '../pages/Fournisseurs.vue'
+import Settings from '../pages/Settings.vue'
 
 const routes = [
   {
@@ -94,6 +95,12 @@ const routes = [
     path: '/parametres',
     name: 'Parametres',
     component: () => import('../pages/Parametres.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
     meta: { requiresAuth: true }
   },
   {

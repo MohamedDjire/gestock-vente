@@ -4,20 +4,19 @@
  * Endpoint: /api-stock/register.php
  */
 
-// Activer la gestion des erreurs et définir les headers
+// =====================================================
+// CORS - OBLIGATOIRE EN PREMIER (avant tout autre code)
+// =====================================================
+// Inclure le fichier CORS central qui gère tous les headers
+require_once __DIR__ . '/cors.php';
+
+// Pour les autres requêtes, définir le Content-Type
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-// Répondre immédiatement aux requêtes OPTIONS (préflight)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Désactiver l'affichage des erreurs pour éviter qu'elles n'interfèrent avec les headers CORS
+// Les erreurs seront quand même loggées
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 // =====================================================
@@ -239,5 +238,11 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 }
 ?>
+
+
+
+
+
+
 
 
