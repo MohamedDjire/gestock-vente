@@ -11,6 +11,10 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token');
 header('Access-Control-Max-Age: 86400');
 
+
+// Initialiser l'action dès le début pour éviter les warnings
+$action = $_GET['action'] ?? '';
+
 // Répondre immédiatement aux requêtes OPTIONS (préflight) - AVANT TOUT AUTRE TRAITEMENT
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -178,7 +182,7 @@ function hasActiveAbonnement($bdd, $enterpriseId) {
 // GESTION DES REQUÊTES
 // =====================================================
 $method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
+
 
 try {
     switch ($method) {

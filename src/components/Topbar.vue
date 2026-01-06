@@ -67,9 +67,22 @@
         </span>
       </div>
       <span class="notif-icon">🔔</span>
-      <div class="profile">
+      <div class="profile" @click="showProfileMenu = !showProfileMenu">
         <img :src="user?.avatar || 'https://randomuser.me/api/portraits/women/44.jpg'" alt="profile" />
         <span class="profile-name">{{ user?.nom || 'Danielle Campbell' }}</span>
+        <div v-if="showProfileMenu" class="profile-menu">
+          <button class="profile-menu-btn" @click="showLogoutModal = true">Déconnexion</button>
+        </div>
+      </div>
+      <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
+        <div class="modal-logout">
+          <div class="modal-title">Déconnexion</div>
+          <div class="modal-message">Êtes-vous sûr de vouloir vous déconnecter&nbsp;?</div>
+          <div class="modal-actions">
+            <button class="btn-secondary" @click="showLogoutModal = false">Annuler</button>
+            <button class="btn-primary" @click="logout">Se déconnecter</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -81,10 +94,14 @@ import { useCurrencyStore } from '../stores/currency'
 import { useAuthStore } from '../stores/auth.js'
 import { useForfait } from '../composables/useForfait.js'
 import { ref, onMounted, provide, watch, computed, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 
 const { getUser } = useStorage()
 const user = ref(null)
 const currencyStore = useCurrencyStore()
+const showProfileMenu = ref(false)
+const showLogoutModal = ref(false)
+const router = useRouter()
 
 // Gestion du forfait
 const {
@@ -121,21 +138,22 @@ const handleCurrencyChange = () => {
   currencyStore.setCurrency(currencyCode.value)
 }
 
+function logout() {
+  localStorage.clear();
+  showLogoutModal.value = false;
+  showProfileMenu.value = false;
+  router.push('/login').then(() => {
+    window.location.reload();
+  });
+}
+
 onMounted(() => {
   user.value = getUser()
-  // S'assurer que la devise du store est synchronisée
   currencyCode.value = currencyStore.currency || 'XOF'
-  
-  // Ne vérifier le forfait que si l'utilisateur est authentifié
   const authStore = useAuthStore()
   if (authStore.isAuthenticated) {
-    // Charger le statut du forfait depuis localStorage (pour synchronisation rapide)
     loadFromStorage()
-    
-    // Démarrer la vérification automatique du forfait
     startAutoCheck()
-    
-    // Vérifier aussi lors du changement de focus de la fenêtre
     window.addEventListener('focus', checkForfait)
   }
 })
@@ -145,11 +163,112 @@ onUnmounted(() => {
   window.removeEventListener('focus', checkForfait)
 })
 
-// Synchroniser avec le store
 watch(() => currencyStore.currency, (newCurrency) => {
   currencyCode.value = newCurrency
 })
 </script>
+
+/* Modale de déconnexion identique à la Sidebar */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-logout {
+  background: #fff;
+  color: #1a5f4a;
+  border-radius: 16px;
+  padding: 2.5rem 2rem 2rem 2rem;
+  min-width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.modal-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.modal-message {
+  font-size: 1.05rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+.modal-actions {
+  display: flex;
+  gap: 1.2rem;
+}
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.btn-secondary:hover {
+  background: #e5e7eb;
+}
+.btn-primary {
+  background: #1a5f4a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.btn-primary:hover {
+  background: #145040;
+}
+.profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.profile-menu {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background: #fff;
+  box-shadow: 0 2px 12px #0002;
+  border-radius: 8px;
+  padding: 0.5rem 1.2rem;
+  z-index: 1003;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.profile-menu-btn {
+  background: #1a5f4a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 0.18s;
+}
+.profile-menu-btn:hover {
+  background: #145040;
+}
 
 <style scoped>
 /* Topbar moderne, fond blanc, arrondi, avatar, notification, recherche */
