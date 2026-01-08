@@ -703,7 +703,7 @@
       </div>
       <div class="modal-footer">
         <button @click="closeViewModal" class="btn-secondary">Fermer</button>
-        <button @click="() => { closeViewModal(); openEditModal(viewingProduct); }" class="btn-primary">Modifier</button>
+        <button @click="handleEditFromView" class="btn-primary">Modifier</button>
       </div>
     </div>
   </div>
@@ -745,26 +745,24 @@
     </div>
   </div>
 
-  <!-- Modale de notification -->
-  <div v-if="notification.show" class="modal-overlay notification-overlay" @click="closeNotification">
-    <div class="modal-content notification-modal" :class="notification.type" @click.stop>
-      <div class="notification-header">
-        <span class="notification-icon">
+  <!-- Notification Toast -->
+  <Transition name="toast">
+    <div v-if="notification.show" class="toast-notification" :class="notification.type">
+      <div class="toast-content">
+        <span class="toast-icon">
           <span v-if="notification.type === 'success'">✅</span>
           <span v-else-if="notification.type === 'error'">❌</span>
+          <span v-else-if="notification.type === 'warning'">⚠️</span>
           <span v-else>ℹ️</span>
         </span>
-        <h3>{{ notification.title }}</h3>
-        <button @click="closeNotification" class="modal-close">×</button>
-      </div>
-      <div class="notification-body">
-        <p>{{ notification.message }}</p>
-      </div>
-      <div class="notification-actions">
-        <button @click="closeNotification" class="btn-primary">OK</button>
+        <div class="toast-text">
+          <div class="toast-title">{{ notification.title }}</div>
+          <div class="toast-message">{{ notification.message }}</div>
+        </div>
+        <button @click="closeNotification" class="toast-close">×</button>
       </div>
     </div>
-  </div>
+  </Transition>
 
   <!-- Modal Import Excel -->
   <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
@@ -976,7 +974,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, inject, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
@@ -1144,11 +1142,17 @@ const loadProducts = async () => {
   loading.value = true
   try {
     const response = await apiService.get('/api_produit.php?action=all')
-    if (response.success) {
-      products.value = response.data
+    if (response && response.success) {
+      // Forcer la mise à jour réactive en remplaçant complètement le tableau
+      products.value = []
+      await nextTick()
+      products.value = Array.isArray(response.data) ? response.data : []
+      console.log('Produits rechargés:', products.value.length)
       // Générer les alertes après chargement des produits
       await generateAlertes()
       await loadAlertes()
+    } else {
+      console.error('Erreur lors du chargement des produits - réponse:', response)
     }
   } catch (error) {
     console.error('Erreur lors du chargement des produits:', error)
@@ -1159,7 +1163,7 @@ const loadProducts = async () => {
     })
     // Afficher un message plus détaillé
     const errorMessage = error.message || 'Erreur inconnue'
-    alert(`Erreur lors du chargement des produits: ${errorMessage}`)
+    showNotification('error', 'Erreur', `Erreur lors du chargement des produits: ${errorMessage}`)
   } finally {
     loading.value = false
   }
@@ -1256,6 +1260,17 @@ const openViewModal = (product) => {
 const closeViewModal = () => {
   showViewModal.value = false
   viewingProduct.value = null
+}
+
+// Gérer l'édition depuis la modale de visualisation
+const handleEditFromView = async () => {
+  if (viewingProduct.value) {
+    const productToEdit = { ...viewingProduct.value }
+    closeViewModal()
+    // Attendre que la modale de visualisation soit fermée avant d'ouvrir celle d'édition
+    await nextTick()
+    openEditModal(productToEdit)
+  }
 }
 
 // Ouvrir modal d'import
@@ -1657,24 +1672,41 @@ const saveProduct = async () => {
   if (!dataToSave.code_produit || dataToSave.code_produit.trim() === '') {
     dataToSave.code_produit = generateProductCode(dataToSave.nom)
   }
+  
+  // S'assurer que l'entrepôt est toujours inclus (même si c'est 'Magasin')
+  if (!dataToSave.entrepot || dataToSave.entrepot.trim() === '') {
+    dataToSave.entrepot = 'Magasin'
+  }
 
   saving.value = true
   try {
     if (editingProduct.value) {
       // Mise à jour
+      console.log('Données à sauvegarder:', dataToSave)
       const response = await apiService.put(`/api_produit.php?id=${editingProduct.value.id_produit}`, dataToSave)
-      if (response.success) {
+      console.log('Réponse API:', response)
+      if (response && response.success) {
+        // Mettre à jour immédiatement le produit dans le tableau
+        const productIndex = products.value.findIndex(p => p.id_produit === editingProduct.value.id_produit)
+        if (productIndex !== -1 && response.data) {
+          // Mettre à jour le produit avec les nouvelles données de l'API
+          products.value[productIndex] = { ...products.value[productIndex], ...response.data }
+        }
+        
         await logJournal({
           user: getJournalUser(),
           action: 'Modification produit',
-          details: `ID: ${editingProduct.value.id_produit}`
+          details: `ID: ${editingProduct.value.id_produit}, Entrepôt: ${dataToSave.entrepot}`
         })
+        // Recharger les produits pour s'assurer que tout est à jour
         await loadProducts()
         await loadAlertes() // Recharger les alertes après modification
         closeModal()
         showNotification('success', 'Succès', 'Produit modifié avec succès')
       } else {
-        showNotification('error', 'Erreur', response.message || 'Erreur lors de la modification du produit')
+        const errorMsg = response?.message || response?.error || 'Erreur inconnue'
+        console.error('Erreur lors de la modification:', response)
+        showNotification('error', 'Erreur', errorMsg)
       }
     } else {
       // Création
@@ -1706,12 +1738,20 @@ const showNotification = (type, title, message) => {
     title,
     message
   }
-  // Auto-fermeture après 3 secondes pour les succès
+  
+  // Auto-fermeture automatique selon le type
+  let timeout = 4000 // 4 secondes par défaut
   if (type === 'success') {
-    setTimeout(() => {
-      closeNotification()
-    }, 3000)
+    timeout = 3000 // 3 secondes pour les succès
+  } else if (type === 'error') {
+    timeout = 5000 // 5 secondes pour les erreurs
+  } else if (type === 'warning') {
+    timeout = 4000 // 4 secondes pour les avertissements
   }
+  
+  setTimeout(() => {
+    closeNotification()
+  }, timeout)
 }
 
 const closeNotification = () => {
@@ -3479,28 +3519,132 @@ onMounted(() => {
   color: #1a1a1a;
 }
 
-/* Modales de notification et confirmation */
-.notification-overlay,
+/* Toast Notifications */
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  min-width: 320px;
+  max-width: 500px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.toast-notification.success {
+  border-left-color: #10b981;
+}
+
+.toast-notification.error {
+  border-left-color: #ef4444;
+}
+
+.toast-notification.warning {
+  border-left-color: #f59e0b;
+}
+
+.toast-notification.info {
+  border-left-color: #3b82f6;
+}
+
+.toast-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.toast-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.toast-message {
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-top: -0.25rem;
+  margin-right: -0.25rem;
+}
+
+.toast-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-enter-active {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.toast-leave-active {
+  animation: slideInRight 0.3s ease-out reverse;
+}
+
+/* Modales de confirmation */
 .confirmation-overlay {
   z-index: 2000;
 }
 
-.notification-modal,
 .confirmation-modal {
   max-width: 450px;
   padding: 0;
 }
 
-.notification-header,
 .confirmation-header {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 1.5rem;
   border-bottom: 1px solid #e5e7eb;
+  background: #fffbeb;
+  border-bottom-color: #f59e0b;
 }
 
-.notification-header h3,
 .confirmation-header h3 {
   margin: 0;
   flex: 1;
@@ -3508,51 +3652,21 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.notification-icon,
 .confirmation-icon {
   font-size: 2rem;
+  color: #f59e0b;
 }
 
-.notification-modal.success .notification-header {
-  background: #f0fdf4;
-  border-bottom-color: #10b981;
-}
-
-.notification-modal.success .notification-icon {
-  color: #10b981;
-}
-
-.notification-modal.error .notification-header {
-  background: #fef2f2;
-  border-bottom-color: #ef4444;
-}
-
-.notification-modal.error .notification-icon {
-  color: #ef4444;
-}
-
-.notification-modal.info .notification-header {
-  background: #eff6ff;
-  border-bottom-color: #3b82f6;
-}
-
-.notification-modal.info .notification-icon {
-  color: #3b82f6;
-}
-
-.notification-body,
 .confirmation-body {
   padding: 1.5rem;
 }
 
-.notification-body p,
 .confirmation-body p {
   margin: 0;
   color: #374151;
   line-height: 1.6;
 }
 
-.notification-actions,
 .confirmation-actions {
   display: flex;
   justify-content: flex-end;

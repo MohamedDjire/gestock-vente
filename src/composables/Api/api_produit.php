@@ -276,7 +276,12 @@ function updateProduct($bdd, $productId, $data, $enterpriseId) {
     foreach ($allowedFields as $field) {
         if (isset($data[$field])) {
             $fields[] = "$field = :$field";
-            $params[$field] = $data[$field];
+            // Pour le champ entrepot, s'assurer qu'il a toujours une valeur
+            if ($field === 'entrepot' && (empty($data[$field]) || trim($data[$field]) === '')) {
+                $params[$field] = 'Magasin';
+            } else {
+                $params[$field] = $data[$field];
+            }
         }
     }
     
