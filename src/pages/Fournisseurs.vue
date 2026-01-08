@@ -61,41 +61,43 @@
 
     <!-- Formulaire d'ajout/modification (modale harmonisée) -->
     <div v-if="showAddForm || editingFournisseur" class="modal" @click.self="closeForm">
-      <div class="modal-content">
+      <div class="modal-content entrepot-modal" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ editingFournisseur ? 'Modifier' : 'Ajouter' }} un fournisseur</h2>
-          <button @click="closeForm" class="btn-close">×</button>
+          <h3 class="modal-title">{{ editingFournisseur ? 'Modifier' : 'Ajouter' }} un fournisseur</h3>
+          <button @click="closeForm" class="modal-close">×</button>
         </div>
-        <form @submit.prevent="submitForm" class="modal-form">
-          <div v-if="formError" class="form-error">{{ formError }}</div>
-          <div class="form-group">
-            <label>Nom *</label>
-            <input v-model="form.nom" placeholder="Nom du fournisseur" required class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input v-model="form.email" placeholder="Email" type="email" class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>Téléphone</label>
-            <input v-model="form.telephone" placeholder="Téléphone" class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>Adresse</label>
-            <input v-model="form.adresse" placeholder="Adresse" class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>Statut</label>
-            <select v-model="form.statut" class="form-input">
-              <option value="actif">Actif</option>
-              <option value="inactif">Inactif</option>
-            </select>
-          </div>
-          <div class="modal-footer">
-            <button type="button" @click="closeForm" class="btn-secondary">Annuler</button>
-            <button type="submit" class="btn-primary">Valider</button>
-          </div>
-        </form>
+        <div class="modal-body">
+          <form @submit.prevent="submitForm" class="modal-form">
+            <div v-if="formError" class="form-error">{{ formError }}</div>
+            <div class="form-group">
+              <label>Nom *</label>
+              <input v-model="form.nom" placeholder="Nom du fournisseur" required class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input v-model="form.email" placeholder="Email" type="email" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Téléphone</label>
+              <input v-model="form.telephone" placeholder="Téléphone" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Adresse</label>
+              <input v-model="form.adresse" placeholder="Adresse" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Statut</label>
+              <select v-model="form.statut" class="form-input">
+                <option value="actif">Actif</option>
+                <option value="inactif">Inactif</option>
+              </select>
+            </div>
+            <div class="modal-footer">
+              <button type="button" @click="closeForm" class="btn-secondary">Annuler</button>
+              <button type="submit" class="btn-primary">Valider</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -128,6 +130,7 @@ import apiFournisseur from '../composables/Api/apiFournisseur'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { useAuthStore } from '../stores/auth.js'
 
 const fournisseurs = ref([])
 const loading = ref(false)
@@ -139,6 +142,8 @@ const showDeleteModal = ref(false)
 const fournisseurToDelete = ref(null)
 const formError = ref('')
 const form = ref({ nom: '', email: '', telephone: '', adresse: '', statut: 'actif' })
+const authStore = useAuthStore()
+const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise'
 
 const filteredFournisseurs = computed(() => {
   if (!search.value) return fournisseurs.value
@@ -241,17 +246,64 @@ function exportExcel() {
 }
 
 function exportPDF() {
-  const doc = new jsPDF()
-  doc.text('Liste des fournisseurs', 14, 16)
-  const rows = fournisseurs.value.map(f => [f.nom, f.email, f.telephone, f.adresse, f.statut])
+  const doc = new jsPDF();
+
+  // Header chic : logo rond + nom entreprise + fond
+  doc.setFillColor(26, 95, 74);
+  doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
+  doc.setFillColor(255,255,255);
+  doc.circle(22, 15, 8, 'F');
+  doc.setTextColor(26,95,74);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PS', 18, 18);
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15);
+  doc.text(entrepriseNom, 210-14, 18, { align: 'right' });
+
+  // Titre centré
+  doc.setFontSize(16);
+  doc.setTextColor(26,95,74);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Liste des fournisseurs', 105, 38, { align: 'center' });
+
+  // Bloc stats
+  const total = fournisseurs.value.length;
+  const actifs = fournisseurs.value.filter(f => f.statut === 'actif').length;
+  const inactifs = fournisseurs.value.filter(f => f.statut === 'inactif').length;
+  doc.setFillColor(240, 253, 244);
+  doc.roundedRect(40, 44, 130, 12, 4, 4, 'F');
+  doc.setFontSize(11);
+  doc.setTextColor(26,95,74);
+  doc.text(`Total : ${total}   |   Actifs : ${actifs}   |   Inactifs : ${inactifs}`, 105, 52, { align: 'center' });
+
+  // Tableau stylé
+  const rows = fournisseurs.value.map(f => [f.nom, f.email, f.telephone, f.adresse, f.statut]);
   autoTable(doc, {
     head: [['Nom', 'Email', 'Téléphone', 'Adresse', 'Statut']],
     body: rows,
-    startY: 22,
-    theme: 'grid',
-    styles: { fontSize: 10 }
-  })
-  doc.save('fournisseurs.pdf')
+    startY: 60,
+    theme: 'striped',
+    styles: { fontSize: 10, cellPadding: 2 },
+    headStyles: { fillColor: [26, 95, 74], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [240, 253, 244] },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Pied de page chic
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(220);
+    doc.line(14, 285, 196, 285);
+    doc.setFontSize(9);
+    doc.setTextColor(120,120,120);
+    doc.text('ProStock - Export PDF', 14, 290);
+    doc.text(`Page ${i} / ${pageCount}`, 200, 290, { align: 'right' });
+    doc.text(new Date().toLocaleDateString(), 105, 290, { align: 'center' });
+  }
+
+  doc.save('fournisseurs.pdf');
 }
 
 function getJournalUser() {

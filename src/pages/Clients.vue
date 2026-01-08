@@ -69,62 +69,62 @@
 
     <!-- Formulaire d'ajout/modification -->
     <div v-if="showAddForm || editingClient" class="modal" @click.self="closeForm">
-      <div class="modal-content">
+      <div class="modal-content entrepot-modal" @click.stop>
         <div class="modal-header">
-          <h2 class="modal-title">{{ editingClient ? 'Modifier' : 'Ajouter' }} un client</h2>
-          <button @click="closeForm" class="btn-close">
-            <!-- ...svg... -->
-          </button>
+          <h3 class="modal-title">{{ editingClient ? 'Modifier' : 'Ajouter' }} un client</h3>
+          <button @click="closeForm" class="modal-close">×</button>
         </div>
-        <form @submit.prevent="submitForm" class="modal-form">
-          <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
-          <div class="form-group">
-            <label>Type de client *</label>
-            <select v-model="form.type" class="form-input" required>
-              <option value="particulier">Particulier</option>
-              <option value="entreprise">Entreprise</option>
-            </select>
-          </div>
-          <div v-if="form.type === 'particulier'" class="form-row">
+        <div class="modal-body">
+          <form @submit.prevent="submitForm" class="modal-form">
+            <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
             <div class="form-group">
-              <label>Nom *</label>
-              <input v-model="form.nom" placeholder="Nom" required class="form-input" />
+              <label>Type de client *</label>
+              <select v-model="form.type" class="form-input" required>
+                <option value="particulier">Particulier</option>
+                <option value="entreprise">Entreprise</option>
+              </select>
+            </div>
+            <div v-if="form.type === 'particulier'" class="form-row">
+              <div class="form-group">
+                <label>Nom *</label>
+                <input v-model="form.nom" placeholder="Nom" required class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>Prénom *</label>
+                <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
+              </div>
+            </div>
+            <div v-else class="form-group">
+              <label>Nom de l'entreprise *</label>
+              <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Email</label>
+                <input v-model="form.email" type="email" placeholder="email@exemple.com" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>Téléphone</label>
+                <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" class="form-input" />
+              </div>
             </div>
             <div class="form-group">
-              <label>Prénom *</label>
-              <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
-            </div>
-          </div>
-          <div v-else class="form-group">
-            <label>Nom de l'entreprise *</label>
-            <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Email</label>
-              <input v-model="form.email" type="email" placeholder="email@exemple.com" class="form-input" />
+              <label>Adresse</label>
+              <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
             </div>
             <div class="form-group">
-              <label>Téléphone</label>
-              <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" class="form-input" />
+              <label>Statut</label>
+              <select v-model="form.statut" class="form-input">
+                <option value="actif">Actif</option>
+                <option value="inactif">Inactif</option>
+              </select>
             </div>
-          </div>
-          <div class="form-group">
-            <label>Adresse</label>
-            <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
-          </div>
-          <div class="form-group">
-            <label>Statut</label>
-            <select v-model="form.statut" class="form-input">
-              <option value="actif">Actif</option>
-              <option value="inactif">Inactif</option>
-            </select>
-          </div>
-          <div class="modal-footer">
-            <button type="button" @click="closeForm" class="btn-secondary">Annuler</button>
-            <button type="submit" class="btn-primary">Valider</button>
-          </div>
-        </form>
+            <div class="modal-footer">
+              <button type="button" @click="closeForm" class="btn-secondary">Annuler</button>
+              <button type="submit" class="btn-primary">Valider</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
@@ -233,6 +233,7 @@ import apiClient from '../composables/Api/apiClient'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { useAuthStore } from '../stores/auth.js'
 
 const clients = ref([])
 const search = ref('')
@@ -252,6 +253,9 @@ const form = ref({
 
 const id_utilisateur = 1
 const id_entreprise = 1
+
+const authStore = useAuthStore()
+const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise'
 
 const fetchClients = async () => {
   const res = await apiClient.get('/clients.php')
@@ -370,20 +374,63 @@ function exportExcel() {
 }
 
 function exportPDF() {
-  const doc = new jsPDF()
-  doc.text('Liste des clients', 14, 16)
-  const rows = clients.value.map(c => [c.type === 'entreprise' ? c.nom_entreprise : c.nom + ' ' + c.prenom, c.email, c.telephone, c.statut, c.nom_utilisateur])
+  const doc = new jsPDF();
+
+  // Header chic : logo rond + nom entreprise + fond
+  doc.setFillColor(26, 95, 74);
+  doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
+  doc.setFillColor(255,255,255);
+  doc.circle(22, 15, 8, 'F');
+  doc.setTextColor(26,95,74);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PS', 18, 18);
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15);
+  doc.text(entrepriseNom, 210-14, 18, { align: 'right' });
+
+  // Titre centré
+  doc.setFontSize(16);
+  doc.setTextColor(30,30,30);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Liste des clients', 105, 32, { align: 'center' });
+
+  // Bloc statistiques (exemple)
+  const total = clients.value.length;
+  const actifs = clients.value.filter(c => c.statut === 'actif').length;
+  const inactifs = clients.value.filter(c => c.statut === 'inactif').length;
+  doc.setFontSize(11);
+  doc.setTextColor(60,60,60);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Total : ${total}   |   Actifs : ${actifs}   |   Inactifs : ${inactifs}`, 105, 42, { align: 'center' });
+
+  // Tableau
+  const rows = clients.value.map(c => [c.type === 'entreprise' ? c.nom_entreprise : c.nom + ' ' + c.prenom, c.email, c.telephone, c.statut, c.nom_utilisateur]);
   autoTable(doc, {
     head: [['Nom', 'Email', 'Téléphone', 'Statut', 'Ajouté par']],
     body: rows,
-    startY: 22,
+    startY: 48,
     theme: 'grid',
-    styles: { fontSize: 10 }
-  })
-  doc.save('clients.pdf')
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [26, 95, 74] },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Pied de page
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9);
+    doc.setTextColor(120,120,120);
+    doc.text('ProStock - Export PDF', 14, 290);
+    doc.text(`Page ${i} / ${pageCount}`, 200, 290, { align: 'right' });
+    doc.text(new Date().toLocaleDateString(), 105, 290, { align: 'center' });
+  }
+
+  doc.save('clients.pdf');
 }
 
-function getJournalUser() {
+const getJournalUser = () => {
   const userStr = localStorage.getItem('prostock_user');
   if (userStr) {
     try {

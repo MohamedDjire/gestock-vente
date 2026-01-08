@@ -39,7 +39,7 @@
               <span>Aucun mouvement trouvé</span>
             </td>
           </tr>
-          <tr v-else v-for="(entry, index) in filteredJournalEntries" :key="index" class="data-row">
+          <tr v-else v-for="(entry, index) in paginatedJournalEntries" :key="index" class="data-row">
             <td class="date-cell">{{ entry.date }}</td>
             <td class="user-cell">
               <div class="user-badge">
@@ -55,6 +55,12 @@
         </tbody>
       </table>
     </div>
+    <!-- Pagination UI sous le tableau -->
+    <div class="pagination" v-if="pageCount > 1">
+      <button @click="page--" :disabled="page === 1">Précédent</button>
+      <span>Page {{ page }} / {{ pageCount }}</span>
+      <button @click="page++" :disabled="page === pageCount">Suivant</button>
+    </div>
   </div>
 </template>
 
@@ -65,7 +71,7 @@ import apiJournal from '../composables/Api/apiJournal';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
+import { useAuthStore } from '../stores/auth.js'
 
 const journalEntries = ref([]);
 const loading = ref(true);
@@ -73,6 +79,8 @@ const error = ref(null);
 const search = ref('');
 const dateFrom = ref('');
 const dateTo = ref('');
+const authStore = useAuthStore()
+const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise'
 
 const filteredJournalEntries = computed(() => {
   let entries = journalEntries.value;
@@ -94,6 +102,15 @@ const filteredJournalEntries = computed(() => {
   }
   return entries;
 });
+
+// Pagination pour le journal des mouvements
+const page = ref(1)
+const pageSize = 10
+const pageCount = computed(() => Math.ceil(filteredJournalEntries.value.length / pageSize))
+const paginatedJournalEntries = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return filteredJournalEntries.value.slice(start, start + pageSize)
+})
 
 const fetchJournal = async () => {
   loading.value = true;
@@ -123,15 +140,60 @@ function exportExcel() {
 
 function exportPDF() {
   const doc = new jsPDF();
-  doc.text('Journal des mouvements', 14, 16);
+
+  // Header chic : logo rond + nom entreprise + fond
+  doc.setFillColor(26, 95, 74);
+  doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
+  doc.setFillColor(255,255,255);
+  doc.circle(22, 15, 8, 'F');
+  doc.setTextColor(26,95,74);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PS', 18, 18);
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15);
+  doc.text(entrepriseNom, 210-14, 18, { align: 'right' });
+
+  // Titre centré
+  doc.setFontSize(16);
+  doc.setTextColor(26,95,74);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Journal des mouvements', 105, 38, { align: 'center' });
+
+  // Bloc stats
+  const total = filteredJournalEntries.value.length;
+  doc.setFillColor(240, 253, 244);
+  doc.roundedRect(40, 44, 130, 12, 4, 4, 'F');
+  doc.setFontSize(11);
+  doc.setTextColor(26,95,74);
+  doc.text(`Total mouvements : ${total}`, 105, 52, { align: 'center' });
+
+  // Tableau stylé
   const rows = filteredJournalEntries.value.map(e => [e.date, e.user, e.action, e.details]);
   autoTable(doc, {
     head: [['Date', 'Utilisateur', 'Action', 'Détails']],
     body: rows,
-    startY: 22,
-    theme: 'grid',
-    styles: { fontSize: 10 }
+    startY: 60,
+    theme: 'striped',
+    styles: { fontSize: 10, cellPadding: 2 },
+    headStyles: { fillColor: [26, 95, 74], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [240, 253, 244] },
+    margin: { left: 14, right: 14 }
   });
+
+  // Pied de page chic
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(220);
+    doc.line(14, 285, 196, 285);
+    doc.setFontSize(9);
+    doc.setTextColor(120,120,120);
+    doc.text('ProStock - Export PDF', 14, 290);
+    doc.text(`Page ${i} / ${pageCount}`, 200, 290, { align: 'right' });
+    doc.text(new Date().toLocaleDateString(), 105, 290, { align: 'center' });
+  }
+
   doc.save('journal_mouvements.pdf');
 }
 </script>
@@ -395,6 +457,32 @@ function exportPDF() {
 
 .journal-offset {
   margin-left: 0;
+}
+
+/* Styles de pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.pagination button {
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.pagination button:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 </style>
 
