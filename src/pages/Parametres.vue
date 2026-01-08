@@ -116,11 +116,24 @@
                       <input v-model="userForm.email" type="email" required class="form-input" />
                     </div>
                     <div class="form-group">
+                      <label>Téléphone</label>
+                      <input v-model="userForm.telephone" type="text" required class="form-input" />
+                    </div>
+                    <div class="form-group">
                       <label>Rôle</label>
                       <select v-model="userForm.role" required class="form-input">
-                        <option value="admin">Admin</option>
+                        <option value="admin">Administrateur</option>
                         <option value="utilisateur">Utilisateur</option>
                       </select>
+                      <small class="form-hint">Le rôle détermine les droits d'accès de l'utilisateur.</small>
+                    </div>
+                    <div class="form-group">
+                      <label>Nom d'utilisateur</label>
+                      <input v-model="userForm.username" required class="form-input" />
+                    </div>
+                    <div class="form-group">
+                      <label>Mot de passe</label>
+                      <input v-model="userForm.mot_de_passe" type="password" required class="form-input" />
                     </div>
                     <div class="modal-footer">
                       <button type="button" @click="closeUserModal" class="btn-secondary">Annuler</button>
@@ -227,7 +240,7 @@ const users = ref([])
 const userError = ref('')
 const showAddUser = ref(false)
 const editingUser = ref(null)
-const userForm = ref({ prenom: '', nom: '', email: '', role: 'utilisateur' })
+const userForm = ref({ prenom: '', nom: '', email: '', telephone: '', role: 'utilisateur', username: '', mot_de_passe: '' })
 const userFormError = ref('')
 const showDeleteUserModal = ref(false)
 const userToDelete = ref(null)
@@ -251,13 +264,13 @@ async function fetchUsers() {
 
 function editUser(user) {
   editingUser.value = user
-  userForm.value = { prenom: user.prenom, nom: user.nom, email: user.email, role: user.role }
+  userForm.value = { prenom: user.prenom, nom: user.nom, email: user.email, telephone: user.telephone || '', role: user.role, username: user.username || '', mot_de_passe: '' }
   showAddUser.value = false
 }
 function closeUserModal() {
   showAddUser.value = false
   editingUser.value = null
-  userForm.value = { prenom: '', nom: '', email: '', role: 'utilisateur' }
+  userForm.value = { prenom: '', nom: '', email: '', telephone: '', role: 'utilisateur', username: '', mot_de_passe: '' }
   userFormError.value = ''
 }
 async function submitUserForm() {
@@ -267,7 +280,7 @@ async function submitUserForm() {
       await apiUtilisateur.update(editingUser.value.id_utilisateur, userForm.value)
       logJournal({ user: getJournalUser(), action: 'Modification utilisateur', details: `Utilisateur ${userForm.value.prenom} ${userForm.value.nom} modifié.` })
     } else {
-      await apiUtilisateur.create(userForm.value)
+      await apiUtilisateur.create({ ...userForm.value, id_entreprise: entrepriseId })
       logJournal({ user: getJournalUser(), action: 'Ajout utilisateur', details: `Utilisateur ${userForm.value.prenom} ${userForm.value.nom} ajouté.` })
     }
     closeUserModal()
