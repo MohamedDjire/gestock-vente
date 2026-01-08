@@ -23,7 +23,12 @@
           </div>
 
     <div class="table-container">
-            <table class="clients-table">
+            <div v-if="loading" class="loading-message">Chargement des clients...</div>
+            <div v-else-if="error" class="error-message">
+              <p>⚠️ {{ error }}</p>
+              <button @click="fetchClients" class="btn-retry">Réessayer</button>
+            </div>
+            <table v-else class="clients-table">
               <thead>
                 <tr>
                   <th>Nom complet</th>
@@ -35,7 +40,10 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="client in filteredClients" :key="client.id">
+                <tr v-if="filteredClients.length === 0">
+                  <td colspan="6" class="empty-message">Aucun client trouvé</td>
+                </tr>
+                <tr v-else v-for="client in filteredClients" :key="client.id">
                   <td class="font-medium">
                     <span v-if="client.type === 'entreprise'">{{ client.nom_entreprise }}</span>
                     <span v-else>{{ client.nom }} {{ client.prenom }}</span>
@@ -239,6 +247,8 @@ const search = ref('')
 const showAddForm = ref(false)
 const formError = ref('')
 const editingClient = ref(null)
+const loading = ref(false)
+const error = ref(null)
 const form = ref({
   type: 'particulier',
   nom: '',
@@ -250,13 +260,50 @@ const form = ref({
   statut: 'actif',
 })
 
-const id_utilisateur = 1
-const id_entreprise = 1
+const getUserId = () => {
+  const userStr = localStorage.getItem('prostock_user')
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      return user.id_utilisateur || user.id || null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+const getEnterpriseId = () => {
+  const userStr = localStorage.getItem('prostock_user')
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      return user.id_entreprise || null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
 
 const fetchClients = async () => {
-  const res = await apiClient.get('/clients.php')
-  clients.value = res.data
-  console.log('Clients rechargés', clients.value)
+  loading.value = true
+  error.value = null
+  try {
+    const res = await apiClient.get('/clients.php')
+    if (res && res.data) {
+      clients.value = Array.isArray(res.data) ? res.data : []
+      console.log('Clients rechargés', clients.value)
+    } else {
+      clients.value = []
+    }
+  } catch (err) {
+    console.error('Erreur lors du chargement des clients:', err)
+    error.value = err.message || 'Erreur lors du chargement des clients'
+    clients.value = []
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(fetchClients)
@@ -274,6 +321,15 @@ const submitForm = async () => {
   formError.value = '';
   let response;
   let actionType = '';
+  
+  const id_utilisateur = getUserId()
+  const id_entreprise = getEnterpriseId()
+  
+  if (!id_utilisateur || !id_entreprise) {
+    formError.value = "Erreur: Impossible de récupérer les informations utilisateur. Veuillez vous reconnecter."
+    return
+  }
+  
   try {
     if (editingClient.value) {
       const data = {
@@ -570,9 +626,37 @@ function getJournalUser() {
   background: #f9fafb;
 }
 
-.clients-table tbody tr:last-child td {
-  border-bottom: none;
-}
+  .clients-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .loading-message, .error-message, .empty-message {
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+  }
+
+  .error-message {
+    color: #dc2626;
+  }
+
+  .error-message p {
+    margin-bottom: 1rem;
+  }
+
+  .btn-retry {
+    padding: 0.5rem 1rem;
+    background: #1a5f4a;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .btn-retry:hover {
+    background: #145040;
+  }
 
 .font-medium {
   font-weight: 600;
