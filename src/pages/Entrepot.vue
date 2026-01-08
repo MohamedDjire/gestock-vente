@@ -377,15 +377,18 @@
                 <label>Unité</label>
                 <select v-model="productFormData.unite">
                   <option value="unité">Unité</option>
-                  <option value="kg">Kg</option>
-                  <option value="g">g</option>
-                  <option value="l">Litre</option>
-                  <option value="ml">ml</option>
-                  <option value="m">m</option>
-                  <option value="cm">cm</option>
                   <option value="paquet">Paquet</option>
                   <option value="boîte">Boîte</option>
                   <option value="carton">Carton</option>
+                  <option value="casier">Casier</option>
+                  <option value="palette">Palette</option>
+                  <option value="lot">Lot</option>
+                  <option value="sac">Sac</option>
+                  <option value="sachet">Sachet</option>
+                  <option value="pièce">Pièce</option>
+                  <option value="bouteille">Bouteille</option>
+                  <option value="caisse">Caisse</option>
+                  <option value="pack">Pack</option>
                 </select>
                 <small class="form-hint">Sélectionnez l'unité</small>
               </div>

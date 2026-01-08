@@ -271,7 +271,7 @@ function updateProduct($bdd, $productId, $data, $enterpriseId) {
     $params = ['id' => $productId, 'enterprise_id' => $enterpriseId];
     
     $allowedFields = ['code_produit', 'nom', 'id_categorie', 'prix_achat', 'prix_vente', 
-                     'quantite_stock', 'seuil_minimum', 'date_expiration', 'actif'];
+                     'quantite_stock', 'seuil_minimum', 'date_expiration', 'entrepot', 'actif'];
     
     foreach ($allowedFields as $field) {
         if (isset($data[$field])) {

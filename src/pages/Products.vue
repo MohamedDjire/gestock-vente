@@ -537,15 +537,18 @@
                 <label>Unité</label>
                 <select v-model="formData.unite">
                   <option value="unité">Unité</option>
-                  <option value="kg">Kg</option>
-                  <option value="g">g</option>
-                  <option value="l">Litre</option>
-                  <option value="ml">ml</option>
-                  <option value="m">m</option>
-                  <option value="cm">cm</option>
                   <option value="paquet">Paquet</option>
                   <option value="boîte">Boîte</option>
                   <option value="carton">Carton</option>
+                  <option value="casier">Casier</option>
+                  <option value="palette">Palette</option>
+                  <option value="lot">Lot</option>
+                  <option value="sac">Sac</option>
+                  <option value="sachet">Sachet</option>
+                  <option value="pièce">Pièce</option>
+                  <option value="bouteille">Bouteille</option>
+                  <option value="caisse">Caisse</option>
+                  <option value="pack">Pack</option>
                 </select>
                 <small class="form-hint">Sélectionnez l'unité</small>
               </div>
@@ -771,52 +774,184 @@
         <button @click="closeImportModal" class="modal-close">×</button>
       </div>
       <div class="modal-body">
-        <div class="import-instructions">
-          <div class="instruction-card">
-            <div class="instruction-icon">📋</div>
-            <div class="instruction-content">
-              <h4>Format attendu</h4>
-              <p>Votre fichier Excel doit contenir les colonnes suivantes :</p>
-              <ul class="column-list">
-                <li><strong>Code Produit</strong> (ou Code)</li>
-                <li><strong>Nom</strong></li>
-                <li><strong>Prix Achat</strong> (ou prix_achat)</li>
-                <li><strong>Prix Vente</strong> (ou prix_vente)</li>
-                <li><strong>Stock</strong> (ou Quantité)</li>
-                <li><strong>Seuil Minimum</strong> (ou Seuil)</li>
-                <li><strong>Entrepôt</strong> (optionnel, défaut: Magasin)</li>
-              </ul>
+        <div v-if="!showImportTable" class="import-step-1">
+          <div class="import-instructions">
+            <div class="instruction-card">
+              <div class="instruction-icon">📋</div>
+              <div class="instruction-content">
+                <h4>Format attendu</h4>
+                <p>Votre fichier Excel peut contenir les colonnes suivantes (certaines sont optionnelles) :</p>
+                <ul class="column-list">
+                  <li><strong>Code Produit</strong> (ou Code) - Optionnel</li>
+                  <li><strong>Nom</strong> - Requis</li>
+                  <li><strong>Prix Achat</strong> (ou prix_achat) - Optionnel</li>
+                  <li><strong>Prix Vente</strong> (ou prix_vente) - Optionnel</li>
+                  <li><strong>Stock</strong> (ou Quantité) - Optionnel</li>
+                  <li><strong>Seuil Minimum</strong> (ou Seuil) - Optionnel</li>
+                  <li><strong>Entrepôt</strong> - Optionnel (défaut: Magasin)</li>
+                  <li><strong>Unité</strong> - Optionnel (défaut: unité)</li>
+                </ul>
+                <p class="import-note">💡 <strong>Note:</strong> Vous pourrez compléter les informations manquantes après l'import.</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="file-label">
+              <span class="file-label-icon">📁</span>
+              <span>Choisir un fichier Excel</span>
+            </label>
+            <input 
+              type="file" 
+              accept=".xlsx,.xls"
+              @change="handleFileSelect"
+              class="file-input"
+              id="excel-file-input"
+            />
+            <div v-if="importFile" class="file-selected">
+              <span class="file-icon">✅</span>
+              <span class="file-name">{{ importFile.name }}</span>
+              <span class="file-size">({{ formatFileSize(importFile.size) }})</span>
+            </div>
+            <div v-else class="file-placeholder">
+              <span>Aucun fichier sélectionné</span>
             </div>
           </div>
         </div>
-        <div class="form-group">
-          <label class="file-label">
-            <span class="file-label-icon">📁</span>
-            <span>Choisir un fichier Excel</span>
-          </label>
-          <input 
-            type="file" 
-            accept=".xlsx,.xls"
-            @change="handleFileSelect"
-            class="file-input"
-            id="excel-file-input"
-          />
-          <div v-if="importFile" class="file-selected">
-            <span class="file-icon">✅</span>
-            <span class="file-name">{{ importFile.name }}</span>
-            <span class="file-size">({{ formatFileSize(importFile.size) }})</span>
+        
+        <!-- Tableau de complétion manuelle -->
+        <div v-else class="import-step-2">
+          <div class="import-table-header">
+            <h4>Compléter les informations des produits importés</h4>
+            <p class="import-table-note">Veuillez compléter les champs manquants (marqués en rouge) avant de sauvegarder.</p>
           </div>
-          <div v-else class="file-placeholder">
-            <span>Aucun fichier sélectionné</span>
+          <div class="import-table-container">
+            <table class="import-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Nom *</th>
+                  <th>Prix Achat</th>
+                  <th>Prix Vente</th>
+                  <th>Stock</th>
+                  <th>Seuil Min.</th>
+                  <th>Date Exp.</th>
+                  <th>Entrepôt</th>
+                  <th>Unité</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(product, index) in importedProducts" :key="index" :class="{ 'has-errors': hasImportErrors(product) }">
+                  <td>
+                    <input 
+                      v-model="product.code_produit" 
+                      type="text" 
+                      class="import-input"
+                      placeholder="Auto-généré"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      v-model="product.nom" 
+                      type="text" 
+                      class="import-input"
+                      :class="{ 'error': !product.nom || product.nom.trim() === '' }"
+                      required
+                      placeholder="Nom du produit *"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      v-model.number="product.prix_achat" 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      class="import-input"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      v-model.number="product.prix_vente" 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      class="import-input"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      v-model.number="product.quantite_stock" 
+                      type="number" 
+                      min="0"
+                      class="import-input"
+                      placeholder="0"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      v-model.number="product.seuil_minimum" 
+                      type="number" 
+                      min="0"
+                      class="import-input"
+                      placeholder="0"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      v-model="product.date_expiration" 
+                      type="date"
+                      class="import-input"
+                      placeholder="Date d'expiration"
+                    />
+                  </td>
+                  <td>
+                    <select v-model="product.entrepot" class="import-input">
+                      <option value="Magasin">Magasin</option>
+                      <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot.nom_entrepot">
+                        {{ entrepot.nom_entrepot }}
+                      </option>
+                    </select>
+                  </td>
+                  <td>
+                    <select v-model="product.unite" class="import-input">
+                      <option value="unité">Unité</option>
+                      <option value="paquet">Paquet</option>
+                      <option value="boîte">Boîte</option>
+                      <option value="carton">Carton</option>
+                      <option value="casier">Casier</option>
+                      <option value="palette">Palette</option>
+                      <option value="lot">Lot</option>
+                      <option value="sac">Sac</option>
+                      <option value="sachet">Sachet</option>
+                      <option value="pièce">Pièce</option>
+                      <option value="bouteille">Bouteille</option>
+                      <option value="caisse">Caisse</option>
+                      <option value="pack">Pack</option>
+                    </select>
+                  </td>
+                  <td>
+                    <button @click="removeImportedProduct(index)" class="btn-remove-import" title="Supprimer">🗑️</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button @click="closeImportModal" class="btn-secondary">Annuler</button>
-        <button @click="importProducts" class="btn-primary" :disabled="!importFile || importing">
+        <button v-if="!showImportTable" @click="closeImportModal" class="btn-secondary">Annuler</button>
+        <button v-if="!showImportTable" @click="parseImportFile" class="btn-primary" :disabled="!importFile || importing">
           <span v-if="importing">⏳</span>
           <span v-else>📥</span>
-          {{ importing ? 'Import en cours...' : 'Importer' }}
+          {{ importing ? 'Analyse en cours...' : 'Analyser le fichier' }}
+        </button>
+        <button v-if="showImportTable" @click="showImportTable = false" class="btn-secondary">Retour</button>
+        <button v-if="showImportTable" @click="saveImportedProducts" class="btn-primary" :disabled="savingImported || !canSaveImported">
+          <span v-if="savingImported">⏳</span>
+          <span v-else>💾</span>
+          {{ savingImported ? 'Sauvegarde...' : `Sauvegarder (${importedProducts.length})` }}
         </button>
       </div>
     </div>
@@ -869,6 +1004,9 @@ const viewingProduct = ref(null)
 const stockProduct = ref(null)
 const importFile = ref(null)
 const importing = ref(false)
+const showImportTable = ref(false)
+const importedProducts = ref([])
+const savingImported = ref(false)
 const historyProduct = ref(null)
 const productHistory = ref([])
 const loadingHistory = ref(false)
@@ -1052,24 +1190,51 @@ const generateAlertes = async () => {
 // Marquer une alerte comme vue
 const markAlerteAsVue = async (alerteId) => {
   try {
-    const response = await apiService.put(`/api_alerte.php?id=${alerteId}&action=vue`)
-    if (response.success) {
+    const response = await apiService.put(`/api_alerte.php?id=${alerteId}&action=vue`, {})
+    if (response && response.success) {
       await loadAlertes()
+    } else {
+      const errorMsg = response?.message || response?.error || 'Erreur inconnue'
+      console.error('Erreur API marquage alerte:', response)
+      showNotification('error', 'Erreur', `Erreur lors du marquage de l'alerte: ${errorMsg}`)
     }
   } catch (error) {
     console.error('Erreur lors du marquage de l\'alerte:', error)
+    const errorMsg = error?.response?.data?.message || error?.message || 'Erreur lors du marquage de l\'alerte'
+    showNotification('error', 'Erreur', errorMsg)
   }
 }
 
 // Marquer toutes les alertes comme vues
 const markAllAlertesAsVue = async () => {
   try {
-    const response = await apiService.put('/api_alerte.php?action=vue_all')
-    if (response.success) {
+    console.log('Marquage de toutes les alertes...')
+    const response = await apiService.put('/api_alerte.php?action=vue_all', {})
+    console.log('Réponse API:', response)
+    
+    if (response && response.success) {
+      const message = response.data?.message || 'Toutes les alertes ont été marquées comme lues'
       await loadAlertes()
+      showNotification('success', 'Succès', message)
+    } else {
+      // Si response n'a pas success, c'est peut-être que l'API a retourné directement les données
+      if (response && !response.success && response.message) {
+        showNotification('error', 'Erreur', response.message)
+      } else {
+        const errorMsg = response?.message || response?.error || 'Erreur inconnue'
+        console.error('Erreur API marquage alertes - Réponse complète:', response)
+        showNotification('error', 'Erreur', `Erreur lors du marquage des alertes: ${errorMsg}`)
+      }
     }
   } catch (error) {
     console.error('Erreur lors du marquage des alertes:', error)
+    console.error('Détails de l\'erreur:', {
+      message: error.message,
+      response: error.response,
+      data: error.response?.data
+    })
+    const errorMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Erreur lors du marquage des alertes'
+    showNotification('error', 'Erreur', errorMsg)
   }
 }
 
@@ -1103,6 +1268,8 @@ const openImportModal = () => {
 const closeImportModal = () => {
   showImportModal.value = false
   importFile.value = null
+  showImportTable.value = false
+  importedProducts.value = []
 }
 
 // Gérer la sélection de fichier
@@ -1122,8 +1289,44 @@ const formatFileSize = (bytes) => {
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
 }
 
-// Importer les produits depuis Excel
-const importProducts = async () => {
+// Fonction helper pour trouver une valeur dans les colonnes avec correspondance flexible
+const findColumnValue = (row, possibleNames) => {
+  const rowKeys = Object.keys(row)
+  
+  // D'abord, essayer les correspondances exactes
+  for (const name of possibleNames) {
+    if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+      return String(row[name]).trim()
+    }
+  }
+  
+  // Ensuite, chercher dans toutes les clés du row pour une correspondance partielle (insensible à la casse)
+  for (const possibleName of possibleNames) {
+    const lowerPossible = possibleName.toLowerCase().trim()
+    for (const key of rowKeys) {
+      const lowerKey = key.toLowerCase().trim()
+      // Vérifier si la clé contient le nom recherché (au moins 3 caractères pour éviter les faux positifs)
+      if (lowerPossible.length >= 3 && lowerKey.includes(lowerPossible)) {
+        const value = row[key]
+        if (value !== undefined && value !== null && value !== '') {
+          return String(value).trim()
+        }
+      }
+      // Vérifier aussi l'inverse si le nom recherché est court
+      if (lowerPossible.length < 3 && (lowerKey.includes(lowerPossible) || lowerPossible.includes(lowerKey))) {
+        const value = row[key]
+        if (value !== undefined && value !== null && value !== '') {
+          return String(value).trim()
+        }
+      }
+    }
+  }
+  
+  return ''
+}
+
+// Parser le fichier Excel et afficher le tableau de complétion
+const parseImportFile = async () => {
   if (!importFile.value) return
   
   importing.value = true
@@ -1136,62 +1339,119 @@ const importProducts = async () => {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
         const jsonData = XLSX.utils.sheet_to_json(firstSheet)
         
-        let successCount = 0
-        let errorCount = 0
-        const errors = []
+        // Debug: afficher les premières lignes pour voir la structure
+        if (jsonData.length > 0) {
+          console.log('Première ligne du fichier:', jsonData[0])
+          console.log('Colonnes disponibles:', Object.keys(jsonData[0]))
+        }
         
-        for (const row of jsonData) {
-          try {
-            // Mapper les colonnes (flexible)
-            const productData = {
-              code_produit: row['Code Produit'] || row['Code'] || row['code_produit'] || generateProductCode(row['Nom'] || row['nom'] || ''),
-              nom: row['Nom'] || row['nom'] || '',
-              prix_achat: parseFloat(row['Prix Achat'] || row['prix_achat'] || row['Prix Achat'] || 0),
-              prix_vente: parseFloat(row['Prix Vente'] || row['prix_vente'] || row['Prix Vente'] || 0),
-              quantite_stock: parseInt(row['Stock'] || row['stock'] || row['Quantité'] || 0),
-              seuil_minimum: parseInt(row['Seuil Minimum'] || row['seuil_minimum'] || row['Seuil'] || 0),
-              entrepot: row['Entrepôt'] || row['entrepot'] || row['Entrepot'] || 'Magasin',
-              actif: 1
+        // Parser toutes les lignes, même avec des données incomplètes
+        importedProducts.value = jsonData.map((row, index) => {
+          // Utiliser la fonction helper pour trouver les valeurs avec correspondance flexible
+          // Chercher "nom" dans toutes les variantes possibles - chercher d'abord les colonnes qui contiennent "nom"
+          let nom = ''
+          const rowKeys = Object.keys(row)
+          
+          // Chercher une colonne qui contient "nom" (insensible à la casse)
+          for (const key of rowKeys) {
+            const lowerKey = key.toLowerCase().trim()
+            if (lowerKey.includes('nom') || lowerKey.includes('name') || lowerKey.includes('libellé') || lowerKey.includes('libelle') || lowerKey.includes('designation') || lowerKey.includes('description')) {
+              const value = row[key]
+              if (value !== undefined && value !== null && value !== '' && String(value).trim() !== '') {
+                nom = String(value).trim()
+                break
+              }
             }
-            
-            if (!productData.nom) {
-              errors.push(`Ligne ignorée: nom manquant`)
-              errorCount++
-              continue
-            }
-            
-            const response = await apiService.post('/api_produit.php', productData)
-            if (response.success) {
-              successCount++
-            } else {
-              errors.push(`${productData.nom}: ${response.message || 'Erreur'}`)
-              errorCount++
-            }
-          } catch (error) {
-            errors.push(`Erreur ligne: ${error.message}`)
-            errorCount++
           }
-        }
-        
-        await loadProducts()
-        closeImportModal()
-        
-        if (errorCount > 0) {
-          showNotification('warning', 'Import partiel', 
-            `${successCount} produit(s) importé(s) avec succès. ${errorCount} erreur(s).`)
-        } else {
-          showNotification('success', 'Succès', `${successCount} produit(s) importé(s) avec succès`)
-        }
-        
-        await logJournal({
-          user: getJournalUser(),
-          action: 'Import produits Excel',
-          details: `${successCount} produit(s) importé(s)`
+          
+          // Si pas trouvé, utiliser la fonction helper
+          if (!nom) {
+            nom = findColumnValue(row, [
+              'Nom', 'nom', 
+              'Nom de produit', 'Nom de pi', 'Nom produit', 'Nom de pièce',
+              'Libellé', 'libellé', 'libelle',
+              'Product Name', 'product name', 'ProductName',
+              'Désignation', 'designation',
+              'Description', 'description'
+            ])
+          }
+          const code = findColumnValue(row, ['Code Produit', 'Code', 'code_produit', 'Code Prod', 'code', 'Product Code', 'product code'])
+          const prixAchat = findColumnValue(row, ['Prix Achat', 'prix_achat', 'Prix d\'Ach', 'Prix d\'Achat', 'Purchase Price', 'purchase price'])
+          const prixVente = findColumnValue(row, ['Prix Vente', 'prix_vente', 'Prix de Ve', 'Prix de Vente', 'Sale Price', 'sale price'])
+          const stock = findColumnValue(row, ['Stock', 'stock', 'Quantité', 'Quantité e', 'quantite_stock', 'Quantity', 'quantity', 'Qty', 'qty'])
+          const seuil = findColumnValue(row, ['Seuil Minimum', 'seuil_minimum', 'Seuil Mini', 'Seuil', 'seuil', 'Minimum Threshold', 'minimum threshold', 'Min Stock', 'min stock'])
+          const entrepot = findColumnValue(row, ['Entrepôt', 'entrepot', 'Entrepot', 'Warehouse', 'warehouse'])
+          const unite = findColumnValue(row, ['Unité', 'unite', 'Unite', 'Unit', 'unit', 'Unité de mesure'])
+          // Normaliser "casio" en "casier" si trouvé
+          const uniteNormalized = unite && unite.toLowerCase() === 'casio' ? 'casier' : unite
+          const dateExp = findColumnValue(row, ['Date d\'Exp', 'Date d\'Expiration', 'date_expiration', 'Expiration Date', 'expiration date', 'Date Exp'])
+          
+          // Convertir la date d'expiration si elle est au format DD/MM/YYYY
+          let dateExpFormatted = ''
+          if (dateExp) {
+            // Si c'est déjà au format YYYY-MM-DD, l'utiliser tel quel
+            if (typeof dateExp === 'string' && dateExp.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              dateExpFormatted = dateExp
+            } else if (typeof dateExp === 'string' && dateExp.match(/\d{2}\/\d{2}\/\d{4}/)) {
+              // Convertir DD/MM/YYYY en YYYY-MM-DD
+              const parts = dateExp.split('/')
+              if (parts.length === 3) {
+                dateExpFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`
+              }
+            } else if (dateExp instanceof Date) {
+              // Si c'est un objet Date
+              dateExpFormatted = dateExp.toISOString().split('T')[0]
+            } else {
+              dateExpFormatted = dateExp
+            }
+          }
+          
+          // Générer un code produit si nécessaire
+          const finalCode = code || (nom ? generateProductCode(nom) : `PROD-${Date.now()}-${index}`)
+          
+          return {
+            code_produit: finalCode,
+            nom: nom || '',
+            prix_achat: parseFloat(prixAchat) || 0,
+            prix_vente: parseFloat(prixVente) || 0,
+            quantite_stock: parseInt(stock) || 0,
+            seuil_minimum: parseInt(seuil) || 0,
+            entrepot: entrepot || 'Magasin',
+            unite: uniteNormalized || 'unité',
+            date_expiration: dateExpFormatted || '',
+            actif: 1,
+            _rowIndex: index + 1
+          }
+        }).filter(p => {
+          // Accepter les lignes qui ont au moins un nom (même vide, on pourra le compléter)
+          // Mais préférer celles qui ont déjà un nom
+          return true // On accepte tout pour permettre la complétion manuelle
+        }).filter(p => {
+          // Filtrer les lignes complètement vides (pas de nom, pas de code, pas de prix)
+          return p.nom || p.code_produit || p.prix_achat > 0 || p.prix_vente > 0
         })
+        
+        if (importedProducts.value.length === 0) {
+          // Afficher les colonnes disponibles pour aider au diagnostic
+          const availableColumns = jsonData.length > 0 ? Object.keys(jsonData[0]).join(', ') : 'Aucune colonne trouvée'
+          const firstRowData = jsonData.length > 0 ? JSON.stringify(jsonData[0], null, 2) : 'Aucune donnée'
+          const errorMsg = `Aucun produit valide trouvé dans le fichier.\n\nColonnes détectées: ${availableColumns}\n\nVérifiez que votre fichier contient au moins une colonne avec "Nom" dans son nom (ex: "Nom", "Nom de pi", "Nom de produit", etc.) ou des données dans les colonnes de prix.`
+          console.error('=== ERREUR IMPORT EXCEL ===')
+          console.error('Colonnes disponibles:', availableColumns)
+          console.error('Première ligne complète:', firstRowData)
+          console.error('Nombre de lignes:', jsonData.length)
+          showNotification('error', 'Erreur d\'import', errorMsg)
+          importing.value = false
+          return
+        }
+        
+        console.log(`✅ ${importedProducts.value.length} produit(s) détecté(s) dans le fichier`)
+        
+        showImportTable.value = true
+        importing.value = false
       } catch (error) {
-        console.error('Erreur lors de l\'import:', error)
-        showNotification('error', 'Erreur', 'Erreur lors de l\'import du fichier Excel')
-      } finally {
+        console.error('Erreur lors du parsing:', error)
+        showNotification('error', 'Erreur', 'Erreur lors de l\'analyse du fichier Excel')
         importing.value = false
       }
     }
@@ -1200,6 +1460,114 @@ const importProducts = async () => {
     console.error('Erreur lors de la lecture du fichier:', error)
     showNotification('error', 'Erreur', 'Erreur lors de la lecture du fichier')
     importing.value = false
+  }
+}
+
+// Vérifier si un produit importé a des erreurs
+const hasImportErrors = (product) => {
+  return !product.nom || product.nom.trim() === '' || 
+         (product.prix_achat > 0 && product.prix_vente > 0 && product.prix_vente < product.prix_achat)
+}
+
+// Vérifier si on peut sauvegarder les produits importés
+const canSaveImported = computed(() => {
+  return importedProducts.value.length > 0 && 
+         importedProducts.value.every(p => {
+           const hasNom = p.nom && p.nom.trim() !== ''
+           const prixValides = (p.prix_achat === 0 && p.prix_vente === 0) || 
+                              (p.prix_achat > 0 && p.prix_vente > 0 && p.prix_vente >= p.prix_achat)
+           return hasNom && prixValides
+         })
+})
+
+// Supprimer un produit de la liste d'import
+const removeImportedProduct = (index) => {
+  importedProducts.value.splice(index, 1)
+}
+
+// Sauvegarder les produits importés
+const saveImportedProducts = async () => {
+  if (!canSaveImported.value) {
+    showNotification('error', 'Erreur de validation', 'Veuillez compléter tous les champs requis et corriger les erreurs avant de sauvegarder.')
+    return
+  }
+  
+  savingImported.value = true
+  let successCount = 0
+  let errorCount = 0
+  const errors = []
+  
+  try {
+    for (const product of importedProducts.value) {
+      try {
+        // Générer le code si vide
+        const productData = {
+          code_produit: product.code_produit || generateProductCode(product.nom),
+          nom: product.nom.trim(),
+          prix_achat: product.prix_achat || 0,
+          prix_vente: product.prix_vente || 0,
+          quantite_stock: product.quantite_stock || 0,
+          seuil_minimum: product.seuil_minimum || 0,
+          entrepot: product.entrepot || 'Magasin',
+          unite: product.unite || 'unité',
+          date_expiration: product.date_expiration || null,
+          actif: 1
+        }
+        
+        // Validation finale
+        if (!productData.nom || productData.nom.trim() === '') {
+          errors.push(`${productData.nom || 'Produit'}: Nom manquant`)
+          errorCount++
+          continue
+        }
+        
+        if (productData.prix_achat > 0 && productData.prix_vente > 0 && productData.prix_vente < productData.prix_achat) {
+          errors.push(`${productData.nom}: Le prix de vente doit être supérieur ou égal au prix d'achat`)
+          errorCount++
+          continue
+        }
+        
+        const response = await apiService.post('/api_produit.php', productData)
+        if (response && response.success) {
+          successCount++
+        } else {
+          const errorMsg = response?.message || response?.error || 'Erreur inconnue'
+          errors.push(`${productData.nom}: ${errorMsg}`)
+          errorCount++
+        }
+      } catch (error) {
+        const errorMsg = error?.response?.data?.message || error?.message || 'Erreur inconnue'
+        errors.push(`${product.nom || 'Produit'}: ${errorMsg}`)
+        errorCount++
+        console.error('Erreur lors de la sauvegarde:', error)
+      }
+    }
+    
+    await loadProducts()
+    await loadAlertes()
+    closeImportModal()
+    
+    if (errorCount > 0 && successCount === 0) {
+      showNotification('error', 'Échec de l\'import', 
+        `Aucun produit importé. ${errorCount} erreur(s).`)
+    } else if (errorCount > 0) {
+      showNotification('warning', 'Import partiel', 
+        `${successCount} produit(s) importé(s) avec succès. ${errorCount} erreur(s).`)
+      console.log('Erreurs détaillées:', errors)
+    } else {
+      showNotification('success', 'Succès', `${successCount} produit(s) importé(s) avec succès`)
+    }
+    
+    await logJournal({
+      user: getJournalUser(),
+      action: 'Import produits Excel',
+      details: `${successCount} produit(s) importé(s)`
+    })
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de la sauvegarde des produits')
+  } finally {
+    savingImported.value = false
   }
 }
 
@@ -1302,8 +1670,11 @@ const saveProduct = async () => {
           details: `ID: ${editingProduct.value.id_produit}`
         })
         await loadProducts()
+        await loadAlertes() // Recharger les alertes après modification
         closeModal()
         showNotification('success', 'Succès', 'Produit modifié avec succès')
+      } else {
+        showNotification('error', 'Erreur', response.message || 'Erreur lors de la modification du produit')
       }
     } else {
       // Création
@@ -2926,6 +3297,127 @@ onMounted(() => {
   color: #6b7280;
   font-size: 0.9rem;
   text-align: center;
+}
+
+.import-note {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #eff6ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #1e40af;
+}
+
+.import-step-1,
+.import-step-2 {
+  width: 100%;
+}
+
+.import-table-header {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.import-table-header h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.import-table-note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.import-table-container {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.import-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.import-table thead {
+  background: #f9fafb;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.import-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.import-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.import-table tbody tr.has-errors {
+  background: #fef2f2;
+}
+
+.import-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.import-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.import-input:focus {
+  outline: none;
+  border-color: #1a5f4a;
+}
+
+.import-input.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.import-input[type="number"] {
+  text-align: right;
+}
+
+.btn-remove-import {
+  background: #fee2e2;
+  color: #991b1b;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-remove-import:hover {
+  background: #fecaca;
+  transform: scale(1.1);
 }
 
 .btn-mark-vue {

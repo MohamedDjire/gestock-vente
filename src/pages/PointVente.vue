@@ -9,6 +9,51 @@
 
     <!-- Contenu masqué jusqu'à ce qu'un point de vente soit ajouté -->
     <div v-if="pointsVente.length > 0">
+      <!-- Dashboard des Ventes - Métriques comme dans la capture -->
+      <div class="ventes-dashboard">
+        <div class="ventes-dashboard-header">
+          <h3>Gestion des Ventes - Point de Vente</h3>
+        </div>
+        <div class="ventes-metrics-grid">
+          <div class="vente-metric-card">
+            <div class="vente-metric-label">VENTES (AUJOURD'HUI)</div>
+            <div class="vente-metric-value">
+              <span class="vente-value-badge">{{ statsGlobales.ventesAujourdhui }}</span>
+            </div>
+          </div>
+          <div class="vente-metric-card">
+            <div class="vente-metric-label">CA JOURNALIER</div>
+            <div class="vente-metric-value">
+              <span class="vente-value-text">{{ formatCurrency(statsGlobales.caJournalier) }}</span>
+            </div>
+          </div>
+          <div class="vente-metric-card">
+            <div class="vente-metric-label">RETOURS</div>
+            <div class="vente-metric-value">
+              <span class="vente-value-badge">{{ statsGlobales.retours }}</span>
+            </div>
+          </div>
+          <div class="vente-metric-card">
+            <div class="vente-metric-label">À LIVRER</div>
+            <div class="vente-metric-value">
+              <span class="vente-value-badge">{{ statsGlobales.aLivrer }}</span>
+            </div>
+          </div>
+          <div class="vente-metric-card">
+            <div class="vente-metric-label">À EXPÉDIER</div>
+            <div class="vente-metric-value">
+              <span class="vente-value-badge">{{ statsGlobales.aExpedier }}</span>
+            </div>
+          </div>
+          <div class="vente-metric-card">
+            <div class="vente-metric-label">COMMANDES</div>
+            <div class="vente-metric-value">
+              <span class="vente-value-badge">{{ statsGlobales.commandes }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Statistiques -->
       <div class="stats-row">
         <StatCard 
@@ -442,11 +487,30 @@ const formData = ref({
 const notification = ref({ show: false, type: 'success', title: '', message: '' })
 const confirmation = ref({ show: false, title: '', message: '', action: null })
 
+const statsGlobales = ref({
+  ventesAujourdhui: 0,
+  caJournalier: 0,
+  retours: 0,
+  aLivrer: 0,
+  aExpedier: 0,
+  commandes: 0
+})
+
 const stats = computed(() => {
   const totalPointsVente = pointsVente.value.length
   const ventesJournalieres = pointsVente.value.reduce((sum, pv) => sum + (parseInt(pv.ventes_journalieres) || 0), 0)
   const chiffreAffairesJournalier = pointsVente.value.reduce((sum, pv) => sum + (parseFloat(pv.chiffre_affaires_journalier) || 0), 0)
   const commandesEnAttente = pointsVente.value.reduce((sum, pv) => sum + (parseInt(pv.commandes_en_attente) || 0), 0)
+  
+  // Mettre à jour les statistiques globales pour le dashboard
+  statsGlobales.value = {
+    ventesAujourdhui: ventesJournalieres,
+    caJournalier: chiffreAffairesJournalier,
+    retours: pointsVente.value.reduce((sum, pv) => sum + (parseInt(pv.nombre_retours) || 0), 0),
+    aLivrer: pointsVente.value.reduce((sum, pv) => sum + (parseInt(pv.a_livrer) || 0), 0),
+    aExpedier: pointsVente.value.reduce((sum, pv) => sum + (parseInt(pv.a_expedier) || 0), 0),
+    commandes: commandesEnAttente
+  }
   
   return {
     totalPointsVente,
@@ -1303,6 +1367,94 @@ onMounted(() => {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
+}
+
+/* Dashboard des Ventes */
+.ventes-dashboard {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ventes-dashboard-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ventes-dashboard-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.ventes-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1rem;
+}
+
+.vente-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.vente-metric-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.vente-metric-value {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.vente-value-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 20px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  min-width: 60px;
+}
+
+.vente-value-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+@media (max-width: 1200px) {
+  .ventes-metrics-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ventes-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ventes-metrics-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 

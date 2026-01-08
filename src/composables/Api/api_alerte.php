@@ -403,13 +403,15 @@ try {
             break;
             
         case 'PUT':
-            if ($id === null) {
-                throw new Exception("ID manquant");
-            }
-            if ($action === 'vue') {
-                $resultat = markAlerteAsVue($bdd, $id, $enterpriseId);
-            } elseif ($action === 'vue_all') {
+            if ($action === 'vue_all') {
+                // Action vue_all ne nécessite pas d'ID
                 $resultat = markAllAlertesAsVue($bdd, $enterpriseId);
+            } elseif ($action === 'vue') {
+                // Action vue nécessite un ID
+                if ($id === null) {
+                    throw new Exception("ID manquant");
+                }
+                $resultat = markAlerteAsVue($bdd, $id, $enterpriseId);
             } else {
                 throw new Exception("Action non valide");
             }
