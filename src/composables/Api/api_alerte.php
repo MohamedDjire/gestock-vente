@@ -272,66 +272,99 @@ function generateAlertes($bdd, $enterpriseId) {
     
     $created = 0;
     
-    // Créer les alertes de rupture (si elles n'existent pas déjà)
+    // Créer les alertes de rupture (si elles n'existent pas déjà et si le produit est toujours en rupture)
     foreach ($ruptures as $rupture) {
-        $checkStmt = $bdd->prepare("
-            SELECT id_alerte FROM stock_alerte 
-            WHERE id_produit = :id AND type_alerte = 'rupture' AND vue = 0
+        // Vérifier que le produit est toujours en rupture
+        $checkProductStmt = $bdd->prepare("
+            SELECT quantite_stock FROM stock_produit 
+            WHERE id_produit = :id AND id_entreprise = :enterprise_id
         ");
-        $checkStmt->execute(['id' => $rupture['id_produit']]);
-        if (!$checkStmt->fetch()) {
-            $stmt = $bdd->prepare("
-                INSERT INTO stock_alerte (id_produit, id_entreprise, type_alerte, message)
-                VALUES (:id_produit, :id_entreprise, 'rupture', :message)
+        $checkProductStmt->execute(['id' => $rupture['id_produit'], 'enterprise_id' => $enterpriseId]);
+        $product = $checkProductStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($product && $product['quantite_stock'] == 0) {
+            $checkStmt = $bdd->prepare("
+                SELECT id_alerte FROM stock_alerte 
+                WHERE id_produit = :id AND type_alerte = 'rupture' AND vue = 0
             ");
-            $stmt->execute([
-                'id_produit' => $rupture['id_produit'],
-                'id_entreprise' => $enterpriseId,
-                'message' => "Rupture de stock pour le produit: " . $rupture['nom']
-            ]);
-            $created++;
+            $checkStmt->execute(['id' => $rupture['id_produit']]);
+            if (!$checkStmt->fetch()) {
+                $stmt = $bdd->prepare("
+                    INSERT INTO stock_alerte (id_produit, id_entreprise, type_alerte, message)
+                    VALUES (:id_produit, :id_entreprise, 'rupture', :message)
+                ");
+                $stmt->execute([
+                    'id_produit' => $rupture['id_produit'],
+                    'id_entreprise' => $enterpriseId,
+                    'message' => "Rupture de stock pour le produit: " . $rupture['nom']
+                ]);
+                $created++;
+            }
         }
     }
     
-    // Créer les alertes de stock faible
+    // Créer les alertes de stock faible (si elles n'existent pas déjà et si le produit est toujours en alerte)
     foreach ($faibles as $faible) {
-        $checkStmt = $bdd->prepare("
-            SELECT id_alerte FROM stock_alerte 
-            WHERE id_produit = :id AND type_alerte = 'stock_faible' AND vue = 0
+        // Vérifier que le produit est toujours en alerte
+        $checkProductStmt = $bdd->prepare("
+            SELECT quantite_stock, seuil_minimum FROM stock_produit 
+            WHERE id_produit = :id AND id_entreprise = :enterprise_id
         ");
-        $checkStmt->execute(['id' => $faible['id_produit']]);
-        if (!$checkStmt->fetch()) {
-            $stmt = $bdd->prepare("
-                INSERT INTO stock_alerte (id_produit, id_entreprise, type_alerte, message)
-                VALUES (:id_produit, :id_entreprise, 'stock_faible', :message)
+        $checkProductStmt->execute(['id' => $faible['id_produit'], 'enterprise_id' => $enterpriseId]);
+        $product = $checkProductStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($product && $product['quantite_stock'] > 0 && $product['quantite_stock'] <= $product['seuil_minimum']) {
+            $checkStmt = $bdd->prepare("
+                SELECT id_alerte FROM stock_alerte 
+                WHERE id_produit = :id AND type_alerte = 'stock_faible' AND vue = 0
             ");
-            $stmt->execute([
-                'id_produit' => $faible['id_produit'],
-                'id_entreprise' => $enterpriseId,
-                'message' => "Stock faible pour le produit: " . $faible['nom'] . " (" . $faible['quantite_stock'] . " unités restantes)"
-            ]);
-            $created++;
+            $checkStmt->execute(['id' => $faible['id_produit']]);
+            if (!$checkStmt->fetch()) {
+                $stmt = $bdd->prepare("
+                    INSERT INTO stock_alerte (id_produit, id_entreprise, type_alerte, message)
+                    VALUES (:id_produit, :id_entreprise, 'stock_faible', :message)
+                ");
+                $stmt->execute([
+                    'id_produit' => $faible['id_produit'],
+                    'id_entreprise' => $enterpriseId,
+                    'message' => "Stock faible pour le produit: " . $faible['nom'] . " (" . $faible['quantite_stock'] . " unités restantes)"
+                ]);
+                $created++;
+            }
         }
     }
     
-    // Créer les alertes d'expiration
+    // Créer les alertes d'expiration (si elles n'existent pas déjà et si le produit expire toujours)
     foreach ($expirations as $expiration) {
-        $checkStmt = $bdd->prepare("
-            SELECT id_alerte FROM stock_alerte 
-            WHERE id_produit = :id AND type_alerte = 'expiration' AND vue = 0
+        // Vérifier que le produit expire toujours
+        $checkProductStmt = $bdd->prepare("
+            SELECT date_expiration FROM stock_produit 
+            WHERE id_produit = :id AND id_entreprise = :enterprise_id
+                AND date_expiration IS NOT NULL
+                AND date_expiration <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                AND date_expiration > CURDATE()
         ");
-        $checkStmt->execute(['id' => $expiration['id_produit']]);
-        if (!$checkStmt->fetch()) {
-            $stmt = $bdd->prepare("
-                INSERT INTO stock_alerte (id_produit, id_entreprise, type_alerte, message)
-                VALUES (:id_produit, :id_entreprise, 'expiration', :message)
+        $checkProductStmt->execute(['id' => $expiration['id_produit'], 'enterprise_id' => $enterpriseId]);
+        $product = $checkProductStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($product) {
+            $checkStmt = $bdd->prepare("
+                SELECT id_alerte FROM stock_alerte 
+                WHERE id_produit = :id AND type_alerte = 'expiration' AND vue = 0
             ");
-            $stmt->execute([
-                'id_produit' => $expiration['id_produit'],
-                'id_entreprise' => $enterpriseId,
-                'message' => "Produit " . $expiration['nom'] . " expire le " . $expiration['date_expiration']
-            ]);
-            $created++;
+            $checkStmt->execute(['id' => $expiration['id_produit']]);
+            if (!$checkStmt->fetch()) {
+                $stmt = $bdd->prepare("
+                    INSERT INTO stock_alerte (id_produit, id_entreprise, type_alerte, message)
+                    VALUES (:id_produit, :id_entreprise, 'expiration', :message)
+                ");
+                $stmt->execute([
+                    'id_produit' => $expiration['id_produit'],
+                    'id_entreprise' => $enterpriseId,
+                    'message' => "Produit " . $expiration['nom'] . " expire le " . $expiration['date_expiration']
+                ]);
+                $created++;
+            }
         }
     }
     

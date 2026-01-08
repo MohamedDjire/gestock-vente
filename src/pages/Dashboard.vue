@@ -1,27 +1,29 @@
 <template>
   <div class="dashboard-page">
-    <h2 class="dashboard-title">Overview</h2>
+    <h2 class="dashboard-title">
+      {{ currentPointVente ? `Dashboard - ${currentPointVente.nom_point_vente}` : 'Overview' }}
+    </h2>
 
     <div class="stats-row">
             <StatCard 
               title="Vente total" 
-              :value="'25.1k'" 
-              :variation="1.1" 
+              :value="formatNumber(stats.venteTotal)" 
+              :variation="stats.variationVenteTotal" 
               icon="💰" />
             <StatCard 
               title="Vente du jour" 
-              :value="'2.3k'" 
-              :variation="0.8" 
+              :value="formatCurrency(stats.venteJour)" 
+              :variation="stats.variationVenteJour" 
               icon="📈" />
             <StatCard 
               title="Total produit" 
-              :value="'1,200'" 
-              :variation="0.0" 
+              :value="formatNumber(stats.totalProduit)" 
+              :variation="stats.variationProduit" 
               icon="📦" />
             <StatCard 
               title="Stocks en rupture" 
-              :value="'12'" 
-              :variation="-2.1" 
+              :value="formatNumber(stats.stocksRupture)" 
+              :variation="stats.variationRupture" 
               icon="⚠️" />
           </div>
           <div class="dashboard-bottom-row">
@@ -30,15 +32,35 @@
             </div>
             <div class="team-block">
               <div class="team-card">
-                <div class="team-title">Sales team target</div>
-                <div class="team-progress">82% <span class="team-achieved">Achieved</span></div>
+                <div class="team-title">Objectif de l'équipe</div>
+                <div class="team-progress">
+                  <input 
+                    v-model.number="teamTarget" 
+                    type="number" 
+                    class="target-input"
+                    min="0"
+                    max="100"
+                    @change="updateTeamTarget"
+                  />% 
+                  <span class="team-achieved">Atteint</span>
+                </div>
                 <div class="team-avatars">
                   <img src="https://randomuser.me/api/portraits/women/44.jpg" class="team-avatar" />
                   <img src="https://randomuser.me/api/portraits/men/32.jpg" class="team-avatar" />
                   <img src="https://randomuser.me/api/portraits/women/68.jpg" class="team-avatar" />
                   <span class="team-more">+4</span>
                 </div>
-                <div class="team-queue">Cleared Queue <span class="team-queue-value">1.4k</span> <span class="team-queue-variation">+15%</span></div>
+                <div class="team-queue">
+                  File traitée 
+                  <input 
+                    v-model.number="clearedQueue" 
+                    type="number" 
+                    class="queue-input"
+                    min="0"
+                    @change="updateClearedQueue"
+                  />
+                  <span class="team-queue-variation">+15%</span>
+                </div>
               </div>
             </div>
     </div>
@@ -49,10 +71,134 @@
 </template>
 
 <script setup>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 import { logJournal } from '../composables/useJournal'
+import { apiService } from '../composables/Api/apiService.js'
+import { useCurrency } from '../composables/useCurrency.js'
+
+const route = useRoute()
+const { formatPrice: formatCurrency } = useCurrency()
+
+const currentPointVente = ref(null)
+const stats = ref({
+  venteTotal: 0,
+  venteJour: 0,
+  totalProduit: 0,
+  stocksRupture: 0,
+  variationVenteTotal: 0,
+  variationVenteJour: 0,
+  variationProduit: 0,
+  variationRupture: 0
+})
+const loading = ref(false)
+const teamTarget = ref(82)
+const clearedQueue = ref(1400)
+
+const formatNumber = (value) => {
+  if (value >= 1000) {
+    return (value / 1000).toFixed(1) + 'k'
+  }
+  return value.toString()
+}
+
+const loadDashboardData = async () => {
+  loading.value = true
+  try {
+    const pointVenteId = route.query.point_vente
+    
+    if (pointVenteId) {
+      // Charger les données du point de vente spécifique
+      const [pointVenteResponse, statsResponse] = await Promise.all([
+        apiService.get(`/api_point_vente.php?id_point_vente=${pointVenteId}`),
+        apiService.get(`/api_point_vente.php?action=stats&id_point_vente=${pointVenteId}`)
+      ])
+      
+      if (pointVenteResponse.success) {
+        currentPointVente.value = pointVenteResponse.data
+      }
+      
+      if (statsResponse.success) {
+        const data = statsResponse.data
+        // Calculer les statistiques
+        const ventesJournalieres = data.ventes_journalieres || []
+        const totalVentes = ventesJournalieres.reduce((sum, v) => sum + (parseFloat(v.chiffre_affaires) || 0), 0)
+        const venteAujourdhui = ventesJournalieres.find(v => {
+          const date = new Date(v.date)
+          const today = new Date()
+          return date.toDateString() === today.toDateString()
+        })
+        
+        stats.value = {
+          venteTotal: totalVentes,
+          venteJour: venteAujourdhui ? parseFloat(venteAujourdhui.chiffre_affaires) : 0,
+          totalProduit: 0, // À calculer depuis les produits de l'entrepôt
+          stocksRupture: 0, // À calculer depuis les produits
+          variationVenteTotal: 1.1,
+          variationVenteJour: 0.8,
+          variationProduit: 0.0,
+          variationRupture: -2.1
+        }
+      }
+    } else {
+      // Charger les données globales (par défaut)
+      currentPointVente.value = null
+      
+      // Charger les statistiques globales
+      const [productsResponse] = await Promise.all([
+        apiService.get('/api_produit.php?action=all')
+      ])
+      
+      if (productsResponse.success) {
+        const products = productsResponse.data || []
+        const stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
+        
+        stats.value = {
+          venteTotal: 0,
+          venteJour: 0,
+          totalProduit: products.length,
+          stocksRupture: stocksRupture,
+          variationVenteTotal: 1.1,
+          variationVenteJour: 0.8,
+          variationProduit: 0.0,
+          variationRupture: -2.1
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des données:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Surveiller les changements de route
+watch(() => route.query.point_vente, () => {
+  loadDashboardData()
+}, { immediate: true })
+
+const updateTeamTarget = () => {
+  // Sauvegarder la valeur dans localStorage
+  localStorage.setItem('team_target', teamTarget.value.toString())
+}
+
+const updateClearedQueue = () => {
+  // Sauvegarder la valeur dans localStorage
+  localStorage.setItem('cleared_queue', clearedQueue.value.toString())
+}
+
+onMounted(() => {
+  // Charger les valeurs sauvegardées
+  const savedTarget = localStorage.getItem('team_target')
+  const savedQueue = localStorage.getItem('cleared_queue')
+  if (savedTarget) teamTarget.value = parseInt(savedTarget)
+  if (savedQueue) clearedQueue.value = parseInt(savedQueue)
+  
+  loadDashboardData()
+})
 
 function getJournalUser() {
   const userStr = localStorage.getItem('prostock_user');
@@ -185,6 +331,36 @@ function getJournalUser() {
   font-weight: 600;
   margin-left: 0.5em;
   color: #b6f7d6;
+}
+
+.target-input, .queue-input {
+  background: transparent;
+  border: 1px solid #218c6a;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #218c6a;
+  width: 80px;
+  text-align: center;
+  margin-right: 0.5rem;
+}
+
+.target-input {
+  font-size: 2.1rem;
+  width: 100px;
+}
+
+.target-input:focus, .queue-input:focus {
+  outline: none;
+  border-color: #1a5f4a;
+  box-shadow: 0 0 0 2px rgba(26, 95, 74, 0.2);
+}
+
+.queue-input {
+  font-size: 1.1rem;
+  width: 100px;
+  margin-left: 0.5em;
 }
 .table-row {
   width: 100%;

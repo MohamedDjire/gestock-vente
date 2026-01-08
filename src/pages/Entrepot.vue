@@ -2,7 +2,7 @@
   <div class="entrepot-page">
           <div class="products-header">
             <h2 class="dashboard-title">Entrepôts</h2>
-            <button @click="openCreateModal" class="btn-primary">
+            <button @click.stop="openCreateModal" class="btn-primary">
               <span>+</span> Nouvel Entrepôt
             </button>
           </div>
@@ -62,6 +62,9 @@
                 >
                   Inactifs
                 </button>
+                <button @click.stop="openExportModal" class="btn-export" title="Exporter">
+                  📥 Exporter
+                </button>
               </div>
             </div>
 
@@ -112,10 +115,10 @@
                     </span>
                   </td>
                   <td class="actions-cell">
-                    <button @click="viewEntrepot(entrepot)" class="btn-view" title="Voir détails">👁️</button>
-                    <button @click="openRapportModal(entrepot)" class="btn-rapport" title="Rapport hebdomadaire">📊</button>
-                    <button @click="openEditModal(entrepot)" class="btn-edit" title="Modifier">✏️</button>
-                    <button @click="confirmDelete(entrepot)" class="btn-delete" title="Supprimer">🗑️</button>
+                    <button @click.stop="viewEntrepot(entrepot)" class="btn-view" title="Voir détails">👁️</button>
+                    <button @click.stop="openRapportModal(entrepot)" class="btn-rapport" title="Rapport hebdomadaire">📊</button>
+                    <button @click.stop="openEditModal(entrepot)" class="btn-edit" title="Modifier">✏️</button>
+                    <button @click.stop="confirmDelete(entrepot)" class="btn-delete" title="Supprimer">🗑️</button>
                   </td>
                 </tr>
               </tbody>
@@ -262,7 +265,62 @@
           </table>
         </div>
         <div class="modal-footer">
+          <button @click="goToProductsWithEntrepot(selectedEntrepot)" class="btn-secondary">➕ Ajouter un Produit</button>
+          <div class="export-dropdown">
+            <button @click="toggleExportMenu" class="btn-export-main">📥 Exporter</button>
+            <div v-if="showExportMenu" class="export-menu">
+              <button @click="exportEntrepotExcel(selectedEntrepot)" class="export-option excel">
+                📊 Excel
+              </button>
+              <button @click="exportEntrepotPDF(selectedEntrepot)" class="export-option pdf">
+                📄 PDF
+              </button>
+            </div>
+          </div>
           <button @click="closeDetailsModal" class="btn-primary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Export -->
+    <div v-if="showExportModal" class="modal-overlay" @click.self="closeExportModal">
+      <div class="modal-content export-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Exporter les Produits</h3>
+          <button @click="closeExportModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Entrepôt</label>
+            <select v-model="exportEntrepot" class="form-input">
+              <option :value="null">Tous les entrepôts</option>
+              <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot">
+                {{ entrepot.nom_entrepot }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Type de Produits</label>
+            <select v-model="exportType" class="form-input">
+              <option value="all">Tous les produits</option>
+              <option value="in_stock">En stock</option>
+              <option value="out_of_stock">En rupture</option>
+              <option value="alert">En alerte</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="export-dropdown">
+            <button @click="toggleExportMenu" class="btn-export-main">📥 Exporter</button>
+            <div v-if="showExportMenu" class="export-menu">
+              <button @click="exportProductsExcel" class="export-option excel">
+                📊 Excel
+              </button>
+              <button @click="exportProductsPDF" class="export-option pdf">
+                📄 PDF
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -375,7 +433,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
@@ -383,6 +441,9 @@ import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const router = useRouter()
 const { formatPrice: formatCurrency } = useCurrency()
@@ -408,6 +469,10 @@ const rapportData = ref({
 })
 const loadingRapport = ref(false)
 const rapportPeriod = ref({ debut: '', fin: '' })
+const showExportModal = ref(false)
+const showExportMenu = ref(false)
+const exportEntrepot = ref(null)
+const exportType = ref('all')
 
 const formData = ref({
   nom_entrepot: '',
@@ -579,6 +644,27 @@ const closeDetailsModal = () => {
   showDetailsModal.value = false
   selectedEntrepot.value = null
   produitsEntrepot.value = []
+  showExportMenu.value = false
+}
+
+// Fermer le menu d'export si on clique en dehors
+const handleClickOutside = (event) => {
+  if (showExportMenu.value && !event.target.closest('.export-dropdown')) {
+    showExportMenu.value = false
+  }
+}
+
+onMounted(() => {
+  loadEntrepots()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
+const toggleExportMenu = () => {
+  showExportMenu.value = !showExportMenu.value
 }
 
 const confirmDelete = (entrepot) => {
@@ -705,6 +791,189 @@ function getJournalUser() {
     }
   }
   return 'inconnu';
+}
+
+const openExportModal = () => {
+  showExportModal.value = true
+  exportEntrepot.value = null
+  exportType.value = 'all'
+  showExportMenu.value = false
+}
+
+const closeExportModal = () => {
+  showExportModal.value = false
+  showExportMenu.value = false
+}
+
+const getProductsToExport = async () => {
+  let products = []
+  
+  if (exportEntrepot.value) {
+    // Produits d'un entrepôt spécifique
+    const response = await apiService.get(`/api_entrepot.php?action=produits&id_entrepot=${exportEntrepot.value.id_entrepot}`)
+    if (response.success) {
+      products = response.data || []
+    }
+  } else {
+    // Tous les produits
+    const response = await apiService.get('/api_produit.php?action=all')
+    if (response.success) {
+      products = response.data || []
+    }
+  }
+  
+  // Filtrer par type
+  if (exportType.value === 'in_stock') {
+    products = products.filter(p => p.quantite_stock > 0 && p.statut_stock === 'normal')
+  } else if (exportType.value === 'out_of_stock') {
+    products = products.filter(p => p.statut_stock === 'rupture')
+  } else if (exportType.value === 'alert') {
+    products = products.filter(p => p.statut_stock === 'alerte' || p.statut_stock === 'rupture')
+  }
+  
+  return products
+}
+
+const exportProductsExcel = async () => {
+  showExportMenu.value = false
+  try {
+    const products = await getProductsToExport()
+    const data = products.map(p => ({
+      'Code Produit': p.code_produit,
+      'Nom': p.nom,
+      'Entrepôt': p.entrepot || 'Magasin',
+      'Prix Achat': p.prix_achat,
+      'Prix Vente': p.prix_vente,
+      'Stock': p.quantite_stock,
+      'Seuil Minimum': p.seuil_minimum,
+      'Statut': p.statut_stock === 'rupture' ? 'Rupture' : p.statut_stock === 'alerte' ? 'Alerte' : 'Normal',
+      'Valeur Stock (Achat)': (p.quantite_stock || 0) * (p.prix_achat || 0),
+      'Valeur Stock (Vente)': (p.quantite_stock || 0) * (p.prix_vente || 0)
+    }))
+    
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Produits')
+    const fileName = exportEntrepot.value 
+      ? `produits_${exportEntrepot.value.nom_entrepot}_${exportType.value}.xlsx`
+      : `produits_${exportType.value}.xlsx`
+    XLSX.writeFile(wb, fileName)
+    showNotification('success', 'Succès', 'Export Excel réussi')
+    closeExportModal()
+  } catch (error) {
+    console.error('Erreur export Excel:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'export Excel')
+  }
+}
+
+const exportProductsPDF = async () => {
+  showExportMenu.value = false
+  try {
+    const products = await getProductsToExport()
+    const doc = new jsPDF()
+    const title = exportEntrepot.value 
+      ? `Produits - ${exportEntrepot.value.nom_entrepot}`
+      : 'Produits'
+    doc.text(title, 14, 16)
+    
+    const rows = products.map(p => [
+      p.code_produit,
+      p.nom,
+      p.entrepot || 'Magasin',
+      formatCurrency(p.prix_achat),
+      formatCurrency(p.prix_vente),
+      p.quantite_stock.toString(),
+      p.statut_stock === 'rupture' ? 'Rupture' : p.statut_stock === 'alerte' ? 'Alerte' : 'Normal'
+    ])
+    
+    autoTable(doc, {
+      head: [['Code', 'Nom', 'Entrepôt', 'Prix Achat', 'Prix Vente', 'Stock', 'Statut']],
+      body: rows,
+      startY: 22,
+      theme: 'grid',
+      styles: { fontSize: 9 }
+    })
+    
+    const fileName = exportEntrepot.value 
+      ? `produits_${exportEntrepot.value.nom_entrepot}_${exportType.value}.pdf`
+      : `produits_${exportType.value}.pdf`
+    doc.save(fileName)
+    showNotification('success', 'Succès', 'Export PDF réussi')
+    closeExportModal()
+  } catch (error) {
+    console.error('Erreur export PDF:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'export PDF')
+  }
+}
+
+const exportEntrepotExcel = async (entrepot) => {
+  showExportMenu.value = false
+  try {
+    const response = await apiService.get(`/api_entrepot.php?action=produits&id_entrepot=${entrepot.id_entrepot}`)
+    if (response.success) {
+      const products = response.data || []
+      const data = products.map(p => ({
+        'Code Produit': p.code_produit,
+        'Nom': p.nom,
+        'Prix Achat': p.prix_achat,
+        'Prix Vente': p.prix_vente,
+        'Stock': p.quantite_stock,
+        'Valeur Stock (Achat)': p.valeur_stock_achat || 0,
+        'Valeur Stock (Vente)': p.valeur_stock_vente || 0
+      }))
+      
+      const ws = XLSX.utils.json_to_sheet(data)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Produits')
+      XLSX.writeFile(wb, `produits_${entrepot.nom_entrepot}.xlsx`)
+      showNotification('success', 'Succès', 'Export Excel réussi')
+    }
+  } catch (error) {
+    console.error('Erreur export Excel:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'export Excel')
+  }
+}
+
+const exportEntrepotPDF = async (entrepot) => {
+  showExportMenu.value = false
+  try {
+    const response = await apiService.get(`/api_entrepot.php?action=produits&id_entrepot=${entrepot.id_entrepot}`)
+    if (response.success) {
+      const products = response.data || []
+      const doc = new jsPDF()
+      doc.text(`Produits - ${entrepot.nom_entrepot}`, 14, 16)
+      
+      const rows = products.map(p => [
+        p.code_produit,
+        p.nom,
+        formatCurrency(p.prix_achat),
+        formatCurrency(p.prix_vente),
+        p.quantite_stock.toString(),
+        formatCurrency(p.valeur_stock_achat || 0),
+        formatCurrency(p.valeur_stock_vente || 0)
+      ])
+      
+      autoTable(doc, {
+        head: [['Code', 'Nom', 'Prix Achat', 'Prix Vente', 'Stock', 'Valeur (Achat)', 'Valeur (Vente)']],
+        body: rows,
+        startY: 22,
+        theme: 'grid',
+        styles: { fontSize: 9 }
+      })
+      
+      doc.save(`produits_${entrepot.nom_entrepot}.pdf`)
+      showNotification('success', 'Succès', 'Export PDF réussi')
+    }
+  } catch (error) {
+    console.error('Erreur export PDF:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'export PDF')
+  }
+}
+
+const goToProductsWithEntrepot = (entrepot) => {
+  // Stocker l'entrepôt sélectionné dans localStorage pour pré-remplir le formulaire
+  localStorage.setItem('selected_entrepot', entrepot.nom_entrepot)
+  router.push('/products')
 }
 
 onMounted(() => {
@@ -840,6 +1109,93 @@ onMounted(() => {
   background: #1a5f4a;
   color: white;
   border-color: #1a5f4a;
+}
+
+.btn-export {
+  padding: 0.5rem 1rem;
+  border: 1.5px solid #3b82f6;
+  background: #3b82f6;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+
+.btn-export:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-export-main {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.btn-export-main:hover {
+  background: #2563eb;
+}
+
+.export-dropdown {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 0.5rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  z-index: 100;
+  min-width: 150px;
+}
+
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border: none;
+  background: white;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.export-option.excel {
+  color: #10b981;
+}
+
+.export-option.excel:hover {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.export-option.pdf {
+  color: #ef4444;
+  border-top: 1px solid #e5e7eb;
+}
+
+.export-option.pdf:hover {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .products-table-container {

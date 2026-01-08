@@ -5,8 +5,8 @@
       <span class="logo-text">PROSTOCK</span>
     </div>
     <ul class="menu">
-      <li v-for="item in menuItems" :key="item.name" :class="{ active: item.route === $route.path }">
-        <router-link :to="item.route" class="menu-link">
+      <li v-for="item in menuItems" :key="item.route">
+        <router-link :to="item.route" class="menu-link" active-class="active-link" exact-active-class="active-link">
           <span class="icon" v-if="item.icon">{{ item.icon }}</span>
           {{ item.name }}
         </router-link>
@@ -180,8 +180,13 @@ function logout() {
   border-radius: 12px;
   transition: background 0.18s, color 0.18s;
 }
-.menu-link:hover,
-.menu .active .menu-link {
+.menu-link:hover {
+  background: #218c6a;
+  color: #ffe082;
+}
+
+.menu-link.active-link,
+.menu-link.router-link-active.router-link-exact-active {
   background: #218c6a;
   color: #ffe082;
 }

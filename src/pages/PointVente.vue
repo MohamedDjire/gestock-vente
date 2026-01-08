@@ -91,7 +91,7 @@
             <tr v-else-if="filteredPointsVente.length === 0">
               <td colspan="12" class="empty-cell">Aucun point de vente trouvé</td>
             </tr>
-            <tr v-else v-for="pointVente in filteredPointsVente" :key="pointVente.id_point_vente">
+            <tr v-else v-for="pointVente in filteredPointsVente" :key="pointVente.id_point_vente" @click="goToPointVenteDashboard(pointVente)" style="cursor: pointer;">
               <td>
                 <strong>{{ pointVente.nom_point_vente }}</strong>
               </td>
@@ -129,11 +129,11 @@
                   {{ pointVente.actif ? 'Actif' : 'Inactif' }}
                 </span>
               </td>
-              <td class="actions-cell">
-                <button @click="viewPointVente(pointVente)" class="btn-view" title="Voir détails">👁️</button>
-                <button @click="openRapportModal(pointVente)" class="btn-rapport" title="Rapport">📊</button>
-                <button @click="openEditModal(pointVente)" class="btn-edit" title="Modifier">✏️</button>
-                <button @click="confirmDelete(pointVente)" class="btn-delete" title="Supprimer">🗑️</button>
+              <td class="actions-cell" @click.stop>
+                <button @click.stop="viewPointVente(pointVente)" class="btn-view" title="Voir détails">👁️</button>
+                <button @click.stop="openRapportModal(pointVente)" class="btn-rapport" title="Rapport">📊</button>
+                <button @click.stop="openEditModal(pointVente)" class="btn-edit" title="Modifier">✏️</button>
+                <button @click.stop="confirmDelete(pointVente)" class="btn-delete" title="Supprimer">🗑️</button>
               </td>
             </tr>
           </tbody>
@@ -245,26 +245,54 @@
           <button @click="closeDetailsModal" class="modal-close">×</button>
         </div>
         <div class="modal-body">
-          <div class="details-info">
-            <div class="detail-item">
-              <strong>Entrepôt:</strong> {{ selectedPointVente?.nom_entrepot || 'Magasin' }}
+          <div class="details-grid">
+            <div class="detail-card">
+              <div class="detail-icon">🏭</div>
+              <div class="detail-content">
+                <div class="detail-label">Entrepôt</div>
+                <div class="detail-value">{{ selectedPointVente?.nom_entrepot || 'Magasin' }}</div>
+              </div>
             </div>
-            <div class="detail-item">
-              <strong>Ville:</strong> {{ selectedPointVente?.ville || '—' }}
+            <div class="detail-card">
+              <div class="detail-icon">📍</div>
+              <div class="detail-content">
+                <div class="detail-label">Ville</div>
+                <div class="detail-value">{{ selectedPointVente?.ville || '—' }}</div>
+              </div>
             </div>
-            <div class="detail-item">
-              <strong>Responsable:</strong> {{ selectedPointVente?.responsable || '—' }}
+            <div class="detail-card">
+              <div class="detail-icon">👤</div>
+              <div class="detail-content">
+                <div class="detail-label">Responsable</div>
+                <div class="detail-value">{{ selectedPointVente?.responsable || '—' }}</div>
+              </div>
             </div>
-            <div class="detail-item">
-              <strong>Téléphone:</strong> {{ selectedPointVente?.telephone || '—' }}
+            <div class="detail-card">
+              <div class="detail-icon">📞</div>
+              <div class="detail-content">
+                <div class="detail-label">Téléphone</div>
+                <div class="detail-value">{{ selectedPointVente?.telephone || '—' }}</div>
+              </div>
             </div>
-            <div class="detail-item">
-              <strong>Email:</strong> {{ selectedPointVente?.email || '—' }}
+            <div class="detail-card">
+              <div class="detail-icon">📧</div>
+              <div class="detail-content">
+                <div class="detail-label">Email</div>
+                <div class="detail-value">{{ selectedPointVente?.email || '—' }}</div>
+              </div>
+            </div>
+            <div class="detail-card" v-if="selectedPointVente?.adresse">
+              <div class="detail-icon">🏠</div>
+              <div class="detail-content">
+                <div class="detail-label">Adresse</div>
+                <div class="detail-value">{{ selectedPointVente.adresse }}</div>
+              </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button @click="closeDetailsModal" class="btn-primary">Fermer</button>
+          <button @click="goToPointVenteDashboard(selectedPointVente)" class="btn-primary">Accéder au Dashboard</button>
+          <button @click="closeDetailsModal" class="btn-secondary">Fermer</button>
         </div>
       </div>
     </div>
@@ -368,10 +396,13 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
+
+const router = useRouter()
 
 const { formatPrice: formatCurrency } = useCurrency()
 
@@ -569,6 +600,11 @@ const savePointVente = async () => {
 const viewPointVente = (pointVente) => {
   selectedPointVente.value = pointVente
   showDetailsModal.value = true
+}
+
+const goToPointVenteDashboard = (pointVente) => {
+  // Naviguer vers le dashboard avec l'ID du point de vente
+  router.push(`/dashboard?point_vente=${pointVente.id_point_vente}`)
 }
 
 const closeDetailsModal = () => {
@@ -1035,17 +1071,51 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.details-info {
-  display: flex;
-  flex-direction: column;
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1rem;
 }
 
-.detail-item {
-  padding: 0.75rem;
-  background: #f9fafb;
-  border-radius: 8px;
-  font-size: 0.95rem;
+.detail-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.detail-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #1a5f4a;
+}
+
+.detail-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.detail-content {
+  flex: 1;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.detail-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
 }
 
 /* Styles pour le rapport */

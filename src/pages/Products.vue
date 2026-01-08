@@ -6,6 +6,9 @@
         <button @click="goToEntrepot" class="btn-secondary" style="background: #3b82f6; color: white;">
           <span>🏭</span> Gérer les Entrepôts
         </button>
+        <button @click="openImportModal" class="btn-secondary" style="background: #10b981; color: white;">
+          <span>📥</span> Importer Excel
+        </button>
         <button @click="openCreateModal" class="btn-primary">
           <span>+</span> Nouveau Produit
         </button>
@@ -244,6 +247,7 @@
                     {{ formatCurrency((product.quantite_stock || 0) * (product.prix_achat || 0)) }}
                   </td>
                   <td class="actions-cell">
+                    <button @click="openViewModal(product)" class="btn-view" title="Voir détails">👁️</button>
                     <button @click="openEntreeModal(product)" class="btn-entree" title="Entrée stock">➕</button>
                     <button @click="openSortieModal(product)" class="btn-sortie" title="Sortie stock">➖</button>
                     <button @click="openHistoryModal(product)" class="btn-history" title="Historique">📋</button>
@@ -573,6 +577,17 @@
               />
             </div>
             <div class="form-group">
+              <label>Entrepôt</label>
+              <input 
+                v-model="formData.entrepot" 
+                type="text"
+                placeholder="Magasin"
+              />
+              <small class="form-hint">Par défaut: Magasin</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
               <label>Statut</label>
               <select v-model="formData.actif">
                 <option :value="1">Actif</option>
@@ -595,6 +610,97 @@
             </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal de visualisation (lecture seule) -->
+  <div v-if="showViewModal" class="modal-overlay" @click="closeViewModal">
+    <div class="modal-content view-modal" @click.stop>
+      <div class="modal-header">
+        <h3>Détails du Produit</h3>
+        <button @click="closeViewModal" class="modal-close">×</button>
+      </div>
+      <div class="view-modal-body" v-if="viewingProduct">
+        <div class="view-section">
+          <h4 class="view-section-title">📦 Informations Générales</h4>
+          <div class="view-grid">
+            <div class="view-item">
+              <label>Code Produit:</label>
+              <span class="view-value">{{ viewingProduct.code_produit }}</span>
+            </div>
+            <div class="view-item">
+              <label>Nom:</label>
+              <span class="view-value">{{ viewingProduct.nom }}</span>
+            </div>
+            <div class="view-item">
+              <label>Entrepôt:</label>
+              <span class="view-value">{{ viewingProduct.entrepot || 'Magasin' }}</span>
+            </div>
+            <div class="view-item">
+              <label>Statut:</label>
+              <span :class="['status-badge', viewingProduct.statut_stock]">
+                {{ getStatusLabel(viewingProduct.statut_stock) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-section">
+          <h4 class="view-section-title">💰 Prix</h4>
+          <div class="view-grid">
+            <div class="view-item">
+              <label>Prix d'Achat:</label>
+              <span class="view-value">{{ formatCurrency(viewingProduct.prix_achat) }}</span>
+            </div>
+            <div class="view-item">
+              <label>Prix de Vente:</label>
+              <span class="view-value">{{ formatCurrency(viewingProduct.prix_vente) }}</span>
+            </div>
+            <div class="view-item">
+              <label>Marge Bénéficiaire:</label>
+              <span class="view-value" :class="getMargeClass(viewingProduct.marge_beneficiaire)">
+                {{ formatCurrency(viewingProduct.marge_beneficiaire) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-section">
+          <h4 class="view-section-title">📊 Stock</h4>
+          <div class="view-grid">
+            <div class="view-item">
+              <label>Quantité en Stock:</label>
+              <span class="view-value" :class="['stock-badge', getStockClass(viewingProduct.statut_stock)]">
+                {{ viewingProduct.quantite_stock }}
+              </span>
+            </div>
+            <div class="view-item">
+              <label>Seuil Minimum:</label>
+              <span class="view-value">{{ viewingProduct.seuil_minimum }}</span>
+            </div>
+            <div class="view-item">
+              <label>Valeur Stock (Achat):</label>
+              <span class="view-value">{{ formatCurrency((viewingProduct.quantite_stock || 0) * (viewingProduct.prix_achat || 0)) }}</span>
+            </div>
+            <div class="view-item">
+              <label>Valeur Stock (Vente):</label>
+              <span class="view-value">{{ formatCurrency((viewingProduct.quantite_stock || 0) * (viewingProduct.prix_vente || 0)) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-section" v-if="viewingProduct.date_expiration">
+          <h4 class="view-section-title">📅 Expiration</h4>
+          <div class="view-item">
+            <label>Date d'Expiration:</label>
+            <span class="view-value">{{ formatDate(viewingProduct.date_expiration) }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button @click="closeViewModal" class="btn-secondary">Fermer</button>
+        <button @click="() => { closeViewModal(); openEditModal(viewingProduct); }" class="btn-primary">Modifier</button>
+      </div>
     </div>
   </div>
 
@@ -656,6 +762,65 @@
     </div>
   </div>
 
+  <!-- Modal Import Excel -->
+  <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
+    <div class="modal-content import-modal" @click.stop>
+      <div class="modal-header">
+        <h3>📥 Importer des Produits depuis Excel</h3>
+        <button @click="closeImportModal" class="modal-close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="import-instructions">
+          <div class="instruction-card">
+            <div class="instruction-icon">📋</div>
+            <div class="instruction-content">
+              <h4>Format attendu</h4>
+              <p>Votre fichier Excel doit contenir les colonnes suivantes :</p>
+              <ul class="column-list">
+                <li><strong>Code Produit</strong> (ou Code)</li>
+                <li><strong>Nom</strong></li>
+                <li><strong>Prix Achat</strong> (ou prix_achat)</li>
+                <li><strong>Prix Vente</strong> (ou prix_vente)</li>
+                <li><strong>Stock</strong> (ou Quantité)</li>
+                <li><strong>Seuil Minimum</strong> (ou Seuil)</li>
+                <li><strong>Entrepôt</strong> (optionnel, défaut: Magasin)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="file-label">
+            <span class="file-label-icon">📁</span>
+            <span>Choisir un fichier Excel</span>
+          </label>
+          <input 
+            type="file" 
+            accept=".xlsx,.xls"
+            @change="handleFileSelect"
+            class="file-input"
+            id="excel-file-input"
+          />
+          <div v-if="importFile" class="file-selected">
+            <span class="file-icon">✅</span>
+            <span class="file-name">{{ importFile.name }}</span>
+            <span class="file-size">({{ formatFileSize(importFile.size) }})</span>
+          </div>
+          <div v-else class="file-placeholder">
+            <span>Aucun fichier sélectionné</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button @click="closeImportModal" class="btn-secondary">Annuler</button>
+        <button @click="importProducts" class="btn-primary" :disabled="!importFile || importing">
+          <span v-if="importing">⏳</span>
+          <span v-else>📥</span>
+          {{ importing ? 'Import en cours...' : 'Importer' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modale de confirmation -->
   <div v-if="confirmation.show" class="modal-overlay confirmation-overlay" @click="closeConfirmation">
     <div class="modal-content confirmation-modal" @click.stop>
@@ -681,6 +846,7 @@ import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
+import * as XLSX from 'xlsx'
 
 const router = useRouter()
 const { formatPrice: formatCurrency } = useCurrency()
@@ -690,13 +856,18 @@ const saving = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref(null)
 const showModal = ref(false)
+const showViewModal = ref(false)
 const showStockModal = ref(false)
 const showEntreeModal = ref(false)
 const showSortieModal = ref(false)
 const showHistoryModal = ref(false)
 const showAllMovementsModal = ref(false)
+const showImportModal = ref(false)
 const editingProduct = ref(null)
+const viewingProduct = ref(null)
 const stockProduct = ref(null)
+const importFile = ref(null)
+const importing = ref(false)
 const historyProduct = ref(null)
 const productHistory = ref([])
 const loadingHistory = ref(false)
@@ -903,7 +1074,129 @@ const markAllAlertesAsVue = async () => {
 const viewProduct = (productId) => {
   const product = products.value.find(p => p.id_produit === productId)
   if (product) {
-    openEditModal(product)
+    openViewModal(product)
+  }
+}
+
+// Ouvrir modal de visualisation (lecture seule)
+const openViewModal = (product) => {
+  viewingProduct.value = product
+  showViewModal.value = true
+}
+
+// Fermer modal de visualisation
+const closeViewModal = () => {
+  showViewModal.value = false
+  viewingProduct.value = null
+}
+
+// Ouvrir modal d'import
+const openImportModal = () => {
+  showImportModal.value = true
+  importFile.value = null
+}
+
+// Fermer modal d'import
+const closeImportModal = () => {
+  showImportModal.value = false
+  importFile.value = null
+}
+
+// Gérer la sélection de fichier
+const handleFileSelect = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    importFile.value = file
+  }
+}
+
+// Formater la taille du fichier
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+// Importer les produits depuis Excel
+const importProducts = async () => {
+  if (!importFile.value) return
+  
+  importing.value = true
+  try {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet)
+        
+        let successCount = 0
+        let errorCount = 0
+        const errors = []
+        
+        for (const row of jsonData) {
+          try {
+            // Mapper les colonnes (flexible)
+            const productData = {
+              code_produit: row['Code Produit'] || row['Code'] || row['code_produit'] || generateProductCode(row['Nom'] || row['nom'] || ''),
+              nom: row['Nom'] || row['nom'] || '',
+              prix_achat: parseFloat(row['Prix Achat'] || row['prix_achat'] || row['Prix Achat'] || 0),
+              prix_vente: parseFloat(row['Prix Vente'] || row['prix_vente'] || row['Prix Vente'] || 0),
+              quantite_stock: parseInt(row['Stock'] || row['stock'] || row['Quantité'] || 0),
+              seuil_minimum: parseInt(row['Seuil Minimum'] || row['seuil_minimum'] || row['Seuil'] || 0),
+              entrepot: row['Entrepôt'] || row['entrepot'] || row['Entrepot'] || 'Magasin',
+              actif: 1
+            }
+            
+            if (!productData.nom) {
+              errors.push(`Ligne ignorée: nom manquant`)
+              errorCount++
+              continue
+            }
+            
+            const response = await apiService.post('/api_produit.php', productData)
+            if (response.success) {
+              successCount++
+            } else {
+              errors.push(`${productData.nom}: ${response.message || 'Erreur'}`)
+              errorCount++
+            }
+          } catch (error) {
+            errors.push(`Erreur ligne: ${error.message}`)
+            errorCount++
+          }
+        }
+        
+        await loadProducts()
+        closeImportModal()
+        
+        if (errorCount > 0) {
+          showNotification('warning', 'Import partiel', 
+            `${successCount} produit(s) importé(s) avec succès. ${errorCount} erreur(s).`)
+        } else {
+          showNotification('success', 'Succès', `${successCount} produit(s) importé(s) avec succès`)
+        }
+        
+        await logJournal({
+          user: getJournalUser(),
+          action: 'Import produits Excel',
+          details: `${successCount} produit(s) importé(s)`
+        })
+      } catch (error) {
+        console.error('Erreur lors de l\'import:', error)
+        showNotification('error', 'Erreur', 'Erreur lors de l\'import du fichier Excel')
+      } finally {
+        importing.value = false
+      }
+    }
+    reader.readAsArrayBuffer(importFile.value)
+  } catch (error) {
+    console.error('Erreur lors de la lecture du fichier:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de la lecture du fichier')
+    importing.value = false
   }
 }
 
@@ -915,6 +1208,8 @@ const handleSearch = () => {
 // Ouvrir modal de création
 const openCreateModal = () => {
   editingProduct.value = null
+  // Vérifier si un entrepôt a été sélectionné depuis la page Entrepot
+  const selectedEntrepot = localStorage.getItem('selected_entrepot')
   formData.value = {
     code_produit: '',
     nom: '',
@@ -924,7 +1219,13 @@ const openCreateModal = () => {
     quantite_stock: 0,
     seuil_minimum: 0,
     date_expiration: '',
+    unite: 'unité',
+    entrepot: selectedEntrepot || 'Magasin',
     actif: 1
+  }
+  // Nettoyer le localStorage après utilisation
+  if (selectedEntrepot) {
+    localStorage.removeItem('selected_entrepot')
   }
   showModal.value = true
 }
@@ -2039,8 +2340,14 @@ onMounted(() => {
   width: 90%;
   max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content .modal-body {
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-header {
@@ -2054,6 +2361,20 @@ onMounted(() => {
 .modal-header h3 {
   margin: 0;
   color: #1a1a1a;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  margin-top: auto;
 }
 
 .modal-close {
@@ -2397,8 +2718,181 @@ onMounted(() => {
 }
 
 .btn-view {
-  background: #1a5f4a;
+  background: #3b82f6;
   color: white;
+}
+
+.btn-view:hover {
+  background: #2563eb;
+}
+
+/* View Modal Styles */
+.view-modal {
+  max-width: 700px;
+}
+
+.view-modal-body {
+  padding: 1.5rem;
+}
+
+.view-section {
+  margin-bottom: 2rem;
+}
+
+.view-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.view-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.view-item label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.view-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* Import Modal Styles */
+.import-modal {
+  max-width: 650px;
+}
+
+.import-instructions {
+  margin-bottom: 1.5rem;
+}
+
+.instruction-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 12px;
+  border: 1px solid #bae6fd;
+}
+
+.instruction-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.instruction-content h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.instruction-content p {
+  margin: 0 0 0.75rem 0;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.column-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.column-list li {
+  margin-bottom: 0.25rem;
+}
+
+.file-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.file-label-icon {
+  font-size: 1.25rem;
+}
+
+.file-input {
+  width: 100%;
+  padding: 1rem;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+  color: #6b7280;
+}
+
+.file-input:hover {
+  border-color: #1a5f4a;
+  background: #f3f4f6;
+  border-style: solid;
+}
+
+.file-input:focus {
+  outline: none;
+  border-color: #1a5f4a;
+  background: #fff;
+}
+
+.file-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: #d1fae5;
+  border-radius: 8px;
+  border: 1px solid #10b981;
+}
+
+.file-icon {
+  font-size: 1.25rem;
+}
+
+.file-name {
+  font-weight: 600;
+  color: #065f46;
+  flex: 1;
+}
+
+.file-size {
+  font-size: 0.875rem;
+  color: #047857;
+}
+
+.file-placeholder {
+  margin-top: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: #f3f4f6;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .btn-mark-vue {
