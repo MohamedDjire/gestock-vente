@@ -265,7 +265,7 @@
           </table>
         </div>
         <div class="modal-footer">
-          <button @click="goToProductsWithEntrepot(selectedEntrepot)" class="btn-secondary">➕ Ajouter un Produit</button>
+          <button @click="openAddProductModal(selectedEntrepot)" class="btn-secondary">➕ Ajouter un Produit</button>
           <div class="export-dropdown">
             <button @click="toggleExportMenu" class="btn-export-main">📥 Exporter</button>
             <div v-if="showExportMenu" class="export-menu">
@@ -331,6 +331,100 @@
         <div class="notification-title">{{ notification.title }}</div>
         <div class="notification-message">{{ notification.message }}</div>
         <button @click="closeNotification" class="notification-close">OK</button>
+      </div>
+    </div>
+
+    <!-- Modal Ajout de Produit -->
+    <div v-if="showProductModal" class="modal-overlay" @click.self="closeProductModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Nouveau Produit - {{ selectedEntrepotForProduct?.nom_entrepot }}</h3>
+          <button @click="closeProductModal" class="modal-close">×</button>
+        </div>
+        <form @submit.prevent="saveProduct" class="product-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Code Produit</label>
+              <input v-model="productFormData.code_produit" type="text" />
+              <small class="form-hint">Si vide, un code sera généré automatiquement</small>
+            </div>
+            <div class="form-group">
+              <label>Nom de produit (Libellé) *</label>
+              <input v-model="productFormData.nom" type="text" required placeholder="Nom du produit" />
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prix d'Achat *</label>
+              <input v-model.number="productFormData.prix_achat" type="number" step="0.01" required min="0" placeholder="0.00" />
+            </div>
+            <div class="form-group">
+              <label>Prix de Vente *</label>
+              <input v-model.number="productFormData.prix_vente" type="number" step="0.01" required min="0" placeholder="0.00" />
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="section-title">📦 Gestion du Stock</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Quantité en Stock *</label>
+                <input v-model.number="productFormData.quantite_stock" type="number" min="0" placeholder="0" required />
+                <small class="form-hint">Quantité actuellement disponible</small>
+              </div>
+              <div class="form-group">
+                <label>Unité</label>
+                <select v-model="productFormData.unite">
+                  <option value="unité">Unité</option>
+                  <option value="kg">Kg</option>
+                  <option value="g">g</option>
+                  <option value="l">Litre</option>
+                  <option value="ml">ml</option>
+                  <option value="m">m</option>
+                  <option value="cm">cm</option>
+                  <option value="paquet">Paquet</option>
+                  <option value="boîte">Boîte</option>
+                  <option value="carton">Carton</option>
+                </select>
+                <small class="form-hint">Sélectionnez l'unité</small>
+              </div>
+              <div class="form-group">
+                <label>Seuil Minimum d'Alerte *</label>
+                <input v-model.number="productFormData.seuil_minimum" type="number" min="0" placeholder="0" required />
+                <small class="form-hint">Alerte quand le stock atteint ce niveau</small>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date d'Expiration</label>
+              <input v-model="productFormData.date_expiration" type="date" />
+            </div>
+            <div class="form-group">
+              <label>Entrepôt</label>
+              <input v-model="productFormData.entrepot" type="text" readonly />
+              <small class="form-hint">Entrepôt sélectionné</small>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Statut</label>
+              <select v-model="productFormData.actif">
+                <option :value="1">Actif</option>
+                <option :value="0">Inactif</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" @click="closeProductModal" class="btn-cancel">Annuler</button>
+            <button type="submit" class="btn-save" :disabled="savingProduct">
+              {{ savingProduct ? 'Enregistrement...' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -441,11 +535,13 @@ import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
+import { useAuthStore } from '../stores/auth.js'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const { formatPrice: formatCurrency } = useCurrency()
 
 const entrepots = ref([])
@@ -473,6 +569,21 @@ const showExportModal = ref(false)
 const showExportMenu = ref(false)
 const exportEntrepot = ref(null)
 const exportType = ref('all')
+const showProductModal = ref(false)
+const selectedEntrepotForProduct = ref(null)
+const savingProduct = ref(false)
+const productFormData = ref({
+  code_produit: '',
+  nom: '',
+  prix_achat: 0,
+  prix_vente: 0,
+  quantite_stock: 0,
+  seuil_minimum: 0,
+  date_expiration: '',
+  unite: 'unité',
+  entrepot: '',
+  actif: 1
+})
 
 const formData = ref({
   nom_entrepot: '',
@@ -941,8 +1052,38 @@ const exportEntrepotPDF = async (entrepot) => {
     if (response.success) {
       const products = response.data || []
       const doc = new jsPDF()
-      doc.text(`Produits - ${entrepot.nom_entrepot}`, 14, 16)
-      
+
+      // Header chic : logo rond + nom entreprise + fond
+      doc.setFillColor(26, 95, 74)
+      doc.roundedRect(0, 0, 210, 30, 0, 0, 'F')
+      doc.setFillColor(255, 255, 255)
+      doc.circle(22, 15, 8, 'F')
+      doc.setTextColor(26, 95, 74)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text('PS', 18, 18)
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(15)
+      const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l\'entreprise'
+      doc.text(entrepriseNom, 210 - 14, 18, { align: 'right' })
+
+      // Titre centré
+      doc.setFontSize(16)
+      doc.setTextColor(30, 30, 30)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Produits - ${entrepot.nom_entrepot}`, 105, 32, { align: 'center' })
+
+      // Bloc statistiques
+      const total = products.length
+      const enStock = products.filter(p => p.quantite_stock > 0).length
+      const enRupture = products.filter(p => p.quantite_stock === 0).length
+      const enAlerte = products.filter(p => p.quantite_stock > 0 && p.quantite_stock <= p.seuil_minimum).length
+      doc.setFontSize(11)
+      doc.setTextColor(60, 60, 60)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Total : ${total}   |   En stock : ${enStock}   |   En rupture : ${enRupture}   |   En alerte : ${enAlerte}`, 105, 42, { align: 'center' })
+
+      // Tableau
       const rows = products.map(p => [
         p.code_produit,
         p.nom,
@@ -956,10 +1097,23 @@ const exportEntrepotPDF = async (entrepot) => {
       autoTable(doc, {
         head: [['Code', 'Nom', 'Prix Achat', 'Prix Vente', 'Stock', 'Valeur (Achat)', 'Valeur (Vente)']],
         body: rows,
-        startY: 22,
+        startY: 48,
         theme: 'grid',
-        styles: { fontSize: 9 }
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [26, 95, 74] },
+        margin: { left: 14, right: 14 }
       })
+
+      // Pied de page
+      const pageCount = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setFontSize(9)
+        doc.setTextColor(120, 120, 120)
+        doc.text('ProStock - Export PDF', 14, 290)
+        doc.text(`Page ${i} / ${pageCount}`, 200, 290, { align: 'right' })
+        doc.text(new Date().toLocaleDateString(), 105, 290, { align: 'center' })
+      }
       
       doc.save(`produits_${entrepot.nom_entrepot}.pdf`)
       showNotification('success', 'Succès', 'Export PDF réussi')
@@ -970,10 +1124,107 @@ const exportEntrepotPDF = async (entrepot) => {
   }
 }
 
-const goToProductsWithEntrepot = (entrepot) => {
-  // Stocker l'entrepôt sélectionné dans localStorage pour pré-remplir le formulaire
-  localStorage.setItem('selected_entrepot', entrepot.nom_entrepot)
-  router.push('/products')
+const openAddProductModal = (entrepot) => {
+  selectedEntrepotForProduct.value = entrepot
+  productFormData.value = {
+    code_produit: '',
+    nom: '',
+    prix_achat: 0,
+    prix_vente: 0,
+    quantite_stock: 0,
+    seuil_minimum: 0,
+    date_expiration: '',
+    unite: 'unité',
+    entrepot: entrepot.nom_entrepot,
+    actif: 1
+  }
+  showProductModal.value = true
+}
+
+const closeProductModal = () => {
+  showProductModal.value = false
+  selectedEntrepotForProduct.value = null
+  productFormData.value = {
+    code_produit: '',
+    nom: '',
+    prix_achat: 0,
+    prix_vente: 0,
+    quantite_stock: 0,
+    seuil_minimum: 0,
+    date_expiration: '',
+    unite: 'unité',
+    entrepot: '',
+    actif: 1
+  }
+}
+
+// Générer un code produit automatiquement
+const generateProductCode = (nom) => {
+  if (!nom) return 'PROD-' + Date.now()
+  // Prendre les 3 premières lettres du nom en majuscules
+  const prefix = nom.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '') || 'PROD'
+  // Ajouter un timestamp pour l'unicité
+  const timestamp = Date.now().toString().slice(-6)
+  return `${prefix}-${timestamp}`
+}
+
+const saveProduct = async () => {
+  // Validation : prix de vente doit être >= prix d'achat
+  if (productFormData.value.prix_vente < productFormData.value.prix_achat) {
+    showNotification('error', 'Erreur de validation', 'Le prix de vente doit être supérieur ou égal au prix d\'achat')
+    return
+  }
+
+  // S'assurer que tous les champs requis sont présents
+  if (!productFormData.value.nom || productFormData.value.nom.trim() === '') {
+    showNotification('error', 'Erreur de validation', 'Le nom du produit est obligatoire')
+    return
+  }
+
+  // Générer le code produit si vide
+  let codeProduit = productFormData.value.code_produit
+  if (!codeProduit || codeProduit.trim() === '') {
+    codeProduit = generateProductCode(productFormData.value.nom)
+  }
+
+  // Préparer les données pour l'API (enlever les champs non utilisés par l'API)
+  const dataToSave = {
+    code_produit: codeProduit,
+    nom: productFormData.value.nom.trim(),
+    id_categorie: null,
+    prix_achat: parseFloat(productFormData.value.prix_achat) || 0,
+    prix_vente: parseFloat(productFormData.value.prix_vente) || 0,
+    quantite_stock: parseInt(productFormData.value.quantite_stock) || 0,
+    seuil_minimum: parseInt(productFormData.value.seuil_minimum) || 0,
+    date_expiration: productFormData.value.date_expiration || null,
+    entrepot: productFormData.value.entrepot || 'Magasin',
+    actif: productFormData.value.actif ? 1 : 0
+  }
+
+  savingProduct.value = true
+  try {
+    const response = await apiService.post('/api_produit.php', dataToSave)
+    if (response.success) {
+      showNotification('success', 'Succès', 'Produit créé avec succès')
+      closeProductModal()
+      // Recharger les produits de l'entrepôt si le modal de détails est ouvert
+      if (selectedEntrepot.value && showDetailsModal.value) {
+        await viewEntrepot(selectedEntrepot.value)
+      }
+      await logJournal({
+        user: getJournalUser(),
+        action: 'Ajout produit',
+        details: `Produit: ${productFormData.value.nom}, Entrepôt: ${productFormData.value.entrepot}`
+      })
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors de la création du produit')
+    }
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de la création du produit')
+  } finally {
+    savingProduct.value = false
+  }
 }
 
 onMounted(() => {
@@ -1513,6 +1764,111 @@ onMounted(() => {
   max-width: 400px;
   width: 90%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* Product Form Styles */
+.product-form {
+  padding: 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group select {
+  padding: 0.75rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #1a5f4a;
+}
+
+.form-group input[readonly] {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.form-section {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin-bottom: 1rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancel {
+  padding: 0.75rem 1.5rem;
+  border: 1.5px solid #6b7280;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+}
+
+.btn-cancel:hover {
+  background: #f3f4f6;
+}
+
+.btn-save {
+  padding: 0.75rem 1.5rem;
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-save:hover {
+  background: #134e3a;
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .confirmation-title {

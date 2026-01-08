@@ -578,11 +578,12 @@
             </div>
             <div class="form-group">
               <label>Entrepôt</label>
-              <input 
-                v-model="formData.entrepot" 
-                type="text"
-                placeholder="Magasin"
-              />
+              <select v-model="formData.entrepot">
+                <option value="Magasin">Magasin</option>
+                <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot.nom_entrepot">
+                  {{ entrepot.nom_entrepot }}
+                </option>
+              </select>
               <small class="form-hint">Par défaut: Magasin</small>
             </div>
           </div>
@@ -918,6 +919,8 @@ const formData = ref({
   entrepot: 'Magasin',
   actif: 1
 })
+
+const entrepots = ref([])
 
 // Statistiques calculées
 const stats = computed(() => {
@@ -1728,8 +1731,30 @@ function getJournalUser() {
   return 'inconnu';
 }
 
+const loadEntrepots = async () => {
+  try {
+    const response = await apiService.get('/api_entrepot.php?action=all')
+    if (response && response.success) {
+      entrepots.value = response.data || []
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des entrepôts:', error)
+  }
+}
+
 onMounted(() => {
   loadProducts()
+  loadEntrepots()
+  
+  // Vérifier si on doit ouvrir le modal d'ajout de produit
+  const shouldOpenModal = localStorage.getItem('open_product_modal')
+  if (shouldOpenModal === 'true') {
+    localStorage.removeItem('open_product_modal')
+    // Attendre un peu pour que la page soit chargée
+    setTimeout(() => {
+      openCreateModal()
+    }, 300)
+  }
 })
 </script>
 
@@ -2340,12 +2365,20 @@ onMounted(() => {
   width: 90%;
   max-width: 600px;
   max-height: 90vh;
-  display: flex;
-  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
 }
 
-.modal-content .modal-body {
+/* Modals avec structure header/body/footer (comme import-modal) */
+.import-modal,
+.view-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.import-modal .modal-body,
+.view-modal .view-modal-body {
   overflow-y: auto;
   flex: 1;
 }
