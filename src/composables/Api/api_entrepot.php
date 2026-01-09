@@ -143,7 +143,7 @@ try {
                             COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) AS valeur_stock_achat,
                             COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) AS valeur_stock_vente
                         FROM stock_entrepot e
-                        LEFT JOIN stock_produit p ON p.entrepot = e.nom_entrepot AND p.id_entreprise = e.id_entreprise
+                        LEFT JOIN stock_produit p ON LOWER(TRIM(p.entrepot)) = LOWER(TRIM(e.nom_entrepot)) AND p.id_entreprise = e.id_entreprise
                         WHERE e.id_entreprise = :id_entreprise
                         GROUP BY e.id_entrepot
                         ORDER BY e.date_creation DESC
@@ -199,13 +199,13 @@ try {
                         NULL AS entrepot_destination
                     FROM stock_entree e
                     INNER JOIN stock_produit p ON e.id_produit = p.id_produit
-                    WHERE p.entrepot = :nom_entrepot 
+                    WHERE LOWER(TRIM(p.entrepot)) = LOWER(TRIM(:nom_entrepot)) 
                     AND p.id_entreprise = :id_entreprise
                     AND e.date_entree >= :date_debut
                     ORDER BY e.date_entree DESC
                 ");
                 $stmt->execute([
-                    'nom_entrepot' => $nomEntrepot,
+                    'nom_entrepot' => trim($nomEntrepot),
                     'id_entreprise' => $enterpriseId,
                     'date_debut' => $dateDebut
                 ]);
@@ -226,13 +226,13 @@ try {
                         s.entrepot_destination
                     FROM stock_sortie s
                     INNER JOIN stock_produit p ON s.id_produit = p.id_produit
-                    WHERE p.entrepot = :nom_entrepot 
+                    WHERE LOWER(TRIM(p.entrepot)) = LOWER(TRIM(:nom_entrepot)) 
                     AND p.id_entreprise = :id_entreprise
                     AND s.date_sortie >= :date_debut
                     ORDER BY s.date_sortie DESC
                 ");
                 $stmt->execute([
-                    'nom_entrepot' => $nomEntrepot,
+                    'nom_entrepot' => trim($nomEntrepot),
                     'id_entreprise' => $enterpriseId,
                     'date_debut' => $dateDebut
                 ]);
@@ -284,11 +284,12 @@ try {
                         (p.quantite_stock * p.prix_achat) AS valeur_stock_achat,
                         (p.quantite_stock * p.prix_vente) AS valeur_stock_vente
                     FROM stock_produit p
-                    WHERE p.entrepot = :nom_entrepot AND p.id_entreprise = :id_entreprise
+                    WHERE LOWER(TRIM(p.entrepot)) = LOWER(TRIM(:nom_entrepot)) 
+                    AND p.id_entreprise = :id_entreprise
                     ORDER BY p.nom ASC
                 ");
                 $stmt->execute([
-                    'nom_entrepot' => $entrepot['nom_entrepot'],
+                    'nom_entrepot' => trim($entrepot['nom_entrepot']),
                     'id_entreprise' => $enterpriseId
                 ]);
                 $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -493,8 +494,8 @@ try {
             }
             
             // Vérifier s'il y a des produits dans cet entrepôt
-            $stmt = $bdd->prepare("SELECT COUNT(*) as count FROM stock_produit WHERE entrepot = :nom AND id_entreprise = :id_entreprise");
-            $stmt->execute(['nom' => $entrepot['nom_entrepot'], 'id_entreprise' => $enterpriseId]);
+            $stmt = $bdd->prepare("SELECT COUNT(*) as count FROM stock_produit WHERE LOWER(TRIM(entrepot)) = LOWER(TRIM(:nom)) AND id_entreprise = :id_entreprise");
+            $stmt->execute(['nom' => trim($entrepot['nom_entrepot']), 'id_entreprise' => $enterpriseId]);
             $count = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
             
             if ($count > 0) {
