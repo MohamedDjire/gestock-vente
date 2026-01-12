@@ -1,7 +1,7 @@
 <template>
   <div class="main-layout">
     <Sidebar v-if="isAuthenticated" />
-    <div class="main-content">
+    <div class="main-content" :class="{ 'compact-sidebar': isVentesPage }">
       <div class="dashboard-wrapper">
         <div v-if="isAuthenticated" class="topbar-sticky">
           <Topbar />
@@ -26,16 +26,19 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useForfait } from '../composables/useForfait.js'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const { isExpired, checkForfait, loadFromStorage, forfaitStatus } = useForfait()
+
+const isVentesPage = computed(() => route.name === 'Ventes')
 
 // Computed pour déterminer l'état du forfait et les alertes
 const showForfaitAlert = computed(() => {
@@ -139,6 +142,12 @@ onUnmounted(() => {
   width: calc(100vw - 280px);
   display: flex;
   flex-direction: column;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+.main-content.compact-sidebar {
+  margin-left: 80px;
+  width: calc(100vw - 80px);
 }
 
 .dashboard-wrapper {

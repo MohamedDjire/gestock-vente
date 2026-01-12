@@ -55,11 +55,10 @@ const routes = [
     component: PointVente,
     meta: { requiresAuth: true }
   },
-  // Routes placeholder pour les fonctionnalités à venir
   {
     path: '/ventes',
     name: 'Ventes',
-    component: ComingSoon,
+    component: () => import('../pages/Ventes.vue'),
     meta: { requiresAuth: true }
   },
   {

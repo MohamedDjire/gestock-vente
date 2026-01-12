@@ -1,5 +1,5 @@
 <template>
-  <nav class="sidebar">
+  <nav class="sidebar" :class="{ 'sidebar-compact': $route.name === 'Ventes' }">
     <div class="logo">
       <span class="logo-icon">🌥️</span>
       <span class="logo-text">PROSTOCK</span>
@@ -165,6 +165,37 @@ function logout() {
   z-index: 10;
   flex-shrink: 0;
   justify-content: space-between;
+  transition: width 0.3s ease;
+}
+
+.sidebar.sidebar-compact {
+  width: 80px;
+  padding: 1rem 0.5rem;
+}
+
+.sidebar.sidebar-compact .logo-text {
+  display: none;
+}
+
+.sidebar.sidebar-compact .menu-link {
+  justify-content: center;
+  padding: 0.8em;
+  font-size: 0;
+}
+
+.sidebar.sidebar-compact .menu-link .icon {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.sidebar.sidebar-compact .upgrade-btn {
+  font-size: 0;
+  padding: 0.5em;
+}
+
+.sidebar.sidebar-compact .upgrade-btn::before {
+  content: '🚪';
+  font-size: 1.2rem;
 }
 .logo {
   display: flex;
