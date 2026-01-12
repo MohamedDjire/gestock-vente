@@ -163,9 +163,18 @@ function getAllUsers($bdd, $enterpriseId) {
         WHERE u.id_entreprise = :enterprise_id
         ORDER BY u.nom, u.prenom
     ");
-    
     $stmt->execute(['enterprise_id' => $enterpriseId]);
-    return $stmt->fetchAll();
+    $users = $stmt->fetchAll();
+    foreach ($users as &$user) {
+        // Lire les accès réels depuis les tables de liaison
+        $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+        $stmtE->execute(['id' => $user['id_utilisateur']]);
+        $user['permissions_entrepots'] = $stmtE->fetchAll(PDO::FETCH_COLUMN);
+        $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+        $stmtPV->execute(['id' => $user['id_utilisateur']]);
+        $user['permissions_points_vente'] = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+    }
+    return $users;
 }
 
 /**
@@ -204,6 +213,16 @@ function getUserById($bdd, $userId) {
         throw new Exception("Utilisateur non trouvé");
     }
     
+
+    // Récupérer les permissions JSON
+    $user['permissions_entrepots'] = json_decode($user['permissions_entrepots'] ?? '[]');
+    $user['permissions_points_vente'] = json_decode($user['permissions_points_vente'] ?? '[]');
+
+    // Récupérer l'accès comptabilité (champ booléen)
+    $stmtAcces = $bdd->prepare("SELECT acces_comptabilite FROM stock_utilisateur WHERE id_utilisateur = :id");
+    $stmtAcces->execute(['id' => $userId]);
+    $user['acces_comptabilite'] = (bool)($stmtAcces->fetchColumn());
+
     return $user;
 }
 
@@ -292,10 +311,12 @@ function createUser($bdd, $data) {
     $stmt = $bdd->prepare("
         INSERT INTO stock_utilisateur (
             id_entreprise, nom, prenom, username, email, telephone,
-            mot_de_passe, role, photo, statut, date_naissance, genre, fonction
+            mot_de_passe, role, photo, statut, date_naissance, genre, fonction,
+            permissions_entrepots, permissions_points_vente
         ) VALUES (
             :id_entreprise, :nom, :prenom, :username, :email, :telephone,
-            :mot_de_passe, :role, :photo, :statut, :date_naissance, :genre, :fonction
+            :mot_de_passe, :role, :photo, :statut, :date_naissance, :genre, :fonction,
+            :permissions_entrepots, :permissions_points_vente
         )
     ");
     
@@ -312,10 +333,33 @@ function createUser($bdd, $data) {
         'statut' => $data['statut'] ?? 'actif', // Par défaut: autorisé à se connecter
         'date_naissance' => $data['date_naissance'] ?? null,
         'genre' => $data['genre'] ?? null,
-        'fonction' => $data['fonction'] ?? null
+        'fonction' => $data['fonction'] ?? null,
+        'permissions_entrepots' => isset($data['permissions_entrepots']) ? json_encode($data['permissions_entrepots']) : null,
+        'permissions_points_vente' => isset($data['permissions_points_vente']) ? json_encode($data['permissions_points_vente']) : null
     ]);
     
     $userId = $bdd->lastInsertId();
+
+    // Permissions entrepôts
+    if (!empty($data['permissions_entrepots']) && is_array($data['permissions_entrepots'])) {
+        $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_entrepot (id_utilisateur, id_entrepot) VALUES (:id_utilisateur, :id_entrepot)");
+        foreach ($data['permissions_entrepots'] as $id_entrepot) {
+            $stmt->execute(['id_utilisateur' => $userId, 'id_entrepot' => $id_entrepot]);
+        }
+    }
+    // Permissions points de vente
+    if (!empty($data['permissions_points_vente']) && is_array($data['permissions_points_vente'])) {
+        $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_point_vente (id_utilisateur, id_point_vente) VALUES (:id_utilisateur, :id_point_vente)");
+        foreach ($data['permissions_points_vente'] as $id_pv) {
+            $stmt->execute(['id_utilisateur' => $userId, 'id_point_vente' => $id_pv]);
+        }
+    }
+    // Accès comptabilité
+    if (isset($data['acces_comptabilite'])) {
+        $stmt = $bdd->prepare("UPDATE stock_utilisateur SET acces_comptabilite = :acces WHERE id_utilisateur = :id");
+        $stmt->execute(['acces' => $data['acces_comptabilite'] ? 1 : 0, 'id' => $userId]);
+    }
+
     return getUserById($bdd, $userId);
 }
 
@@ -323,6 +367,22 @@ function createUser($bdd, $data) {
  * Mettre à jour un utilisateur
  */
 function updateUser($bdd, $userId, $data) {
+        // LOG: Afficher le contenu de $data pour debug
+        file_put_contents(__DIR__ . '/updateUser_debug.log',
+            date('Y-m-d H:i:s') . "\n" .
+            'userId: ' . $userId . "\n" .
+            'data: ' . print_r($data, true) . "\n\n",
+            FILE_APPEND
+        );
+        // Ajout des permissions dans l'UPDATE
+        if (isset($data['permissions_entrepots'])) {
+            $fields[] = "permissions_entrepots = :permissions_entrepots";
+            $params['permissions_entrepots'] = json_encode($data['permissions_entrepots']);
+        }
+        if (isset($data['permissions_points_vente'])) {
+            $fields[] = "permissions_points_vente = :permissions_points_vente";
+            $params['permissions_points_vente'] = json_encode($data['permissions_points_vente']);
+        }
     $fields = [];
     $params = ['id' => $userId];
     
@@ -369,7 +429,59 @@ function updateUser($bdd, $userId, $data) {
     $stmt = $bdd->prepare($sql);
     $stmt->execute($params);
     
-    return getUserById($bdd, $userId);
+    // Gérer les permissions d'accès
+    // 1. Entrepôts
+    file_put_contents(__DIR__ . '/updateUser_debug.log',
+        date('Y-m-d H:i:s') . " - permissions_entrepots: " . json_encode($data['permissions_entrepots'] ?? null) . "\n",
+        FILE_APPEND
+    );
+    if (isset($data['permissions_entrepots'])) {
+        // Toujours supprimer les accès existants si le champ est présent
+        $bdd->prepare("DELETE FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id")->execute(['id' => $userId]);
+        if (is_array($data['permissions_entrepots']) && count($data['permissions_entrepots']) > 0) {
+            $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_entrepot (id_utilisateur, id_entrepot) VALUES (:id_utilisateur, :id_entrepot)");
+            foreach ($data['permissions_entrepots'] as $id_entrepot) {
+                $stmt->execute(['id_utilisateur' => $userId, 'id_entrepot' => $id_entrepot]);
+            }
+        }
+    }
+    // 2. Points de vente
+    file_put_contents(__DIR__ . '/updateUser_debug.log',
+        date('Y-m-d H:i:s') . " - permissions_points_vente: " . json_encode($data['permissions_points_vente'] ?? null) . "\n",
+        FILE_APPEND
+    );
+    if (isset($data['permissions_points_vente'])) {
+        // Toujours supprimer les accès existants si le champ est présent
+        $bdd->prepare("DELETE FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id")->execute(['id' => $userId]);
+        if (is_array($data['permissions_points_vente']) && count($data['permissions_points_vente']) > 0) {
+            $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_point_vente (id_utilisateur, id_point_vente) VALUES (:id_utilisateur, :id_point_vente)");
+            foreach ($data['permissions_points_vente'] as $id_pv) {
+                $stmt->execute(['id_utilisateur' => $userId, 'id_point_vente' => $id_pv]);
+            }
+        }
+    }
+    // 3. Accès comptabilité
+    if (isset($data['acces_comptabilite'])) {
+        $stmt = $bdd->prepare("UPDATE stock_utilisateur SET acces_comptabilite = :acces WHERE id_utilisateur = :id");
+        $stmt->execute(['acces' => $data['acces_comptabilite'] ? 1 : 0, 'id' => $userId]);
+    }
+
+    // Préparer un debug info à retourner
+    $debug = [
+        'data_recu' => $data,
+        'permissions_entrepots_apres' => [],
+        'permissions_points_vente_apres' => []
+    ];
+    // Vérifier ce qui reste en base après update
+    $stmt = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+    $stmt->execute(['id' => $userId]);
+    $debug['permissions_entrepots_apres'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $stmt = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+    $stmt->execute(['id' => $userId]);
+    $debug['permissions_points_vente_apres'] = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $user = getUserById($bdd, $userId);
+    $user['debug'] = $debug;
+    return $user;
 }
 
 /**
@@ -429,14 +541,15 @@ function updateUserPassword($bdd, $userId, $oldPassword, $newPassword) {
 function deleteUser($bdd, $userId) {
     // Vérifier que l'utilisateur existe
     $user = getUserById($bdd, $userId);
-    
-    // Ne pas permettre la suppression de son propre compte
-    // (Cette vérification sera faite dans le code principal)
-    
+
+    // Supprimer les accès liés AVANT de supprimer l'utilisateur
+    $bdd->prepare("DELETE FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id")->execute(['id' => $userId]);
+    $bdd->prepare("DELETE FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id")->execute(['id' => $userId]);
+
     // Supprimer définitivement de la base de données
     $stmt = $bdd->prepare("DELETE FROM stock_utilisateur WHERE id_utilisateur = :id");
     $stmt->execute(['id' => $userId]);
-    
+
     return [
         'message' => 'Utilisateur supprimé définitivement de la base de données',
         'deleted_user' => [

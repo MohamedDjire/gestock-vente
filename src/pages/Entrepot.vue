@@ -516,13 +516,19 @@
     </div>
 
     <!-- Confirmations -->
-    <div v-if="confirmation.show" class="confirmation-overlay" @click.self="closeConfirmation">
-      <div class="confirmation-modal">
-        <div class="confirmation-title">{{ confirmation.title }}</div>
-        <div class="confirmation-message">{{ confirmation.message }}</div>
-        <div class="confirmation-actions">
-          <button @click="closeConfirmation" class="btn-secondary">Annuler</button>
-          <button @click="confirmAction" class="btn-primary">Confirmer</button>
+    <div v-if="confirmation.show" class="modal-overlay" @click.self="closeConfirmation">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
+          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
+          <h3 style="margin:0;flex:1;">{{ confirmation.title }}</h3>
+          <button @click="closeConfirmation" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p>{{ confirmation.message }}</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeConfirmation" class="btn-cancel">Annuler</button>
+          <button @click="confirmAction" class="btn-save" style="background:#dc2626;">Confirmer</button>
         </div>
       </div>
     </div>
@@ -619,6 +625,12 @@ const stats = computed(() => {
 
 const filteredEntrepots = computed(() => {
   let filtered = entrepots.value
+
+  // Filtrer selon les droits d'accès de l'utilisateur connecté
+  const user = authStore.user
+  if (user && Array.isArray(user.permissions_entrepots) && user.permissions_entrepots.length > 0) {
+    filtered = filtered.filter(e => user.permissions_entrepots.includes(e.id_entrepot))
+  }
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
@@ -1874,17 +1886,7 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.confirmation-title {
-  font-weight: 700;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-  color: #1a5f4a;
-}
-
-.confirmation-message {
-  margin-bottom: 1.5rem;
-  color: #6b7280;
-}
+/* ...existing code... */
 
 .confirmation-actions {
   display: flex;

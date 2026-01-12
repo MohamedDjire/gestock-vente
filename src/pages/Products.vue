@@ -958,9 +958,10 @@
   <!-- Modale de confirmation -->
   <div v-if="confirmation.show" class="modal-overlay confirmation-overlay" @click="closeConfirmation">
     <div class="modal-content confirmation-modal" @click.stop>
-      <div class="confirmation-header">
-        <span class="confirmation-icon">⚠️</span>
-        <h3>{{ confirmation.title }}</h3>
+      <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
+        <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
+        <h3 style="margin:0;flex:1;">{{ confirmation.title }}</h3>
+        <button @click="closeConfirmation" class="modal-close">×</button>
       </div>
       <div class="confirmation-body">
         <p>{{ confirmation.message }}</p>
@@ -3625,65 +3626,7 @@ onMounted(() => {
   animation: slideInRight 0.3s ease-out reverse;
 }
 
-/* Modales de confirmation */
-.confirmation-overlay {
-  z-index: 2000;
-}
-
-.confirmation-modal {
-  max-width: 450px;
-  padding: 0;
-}
-
-.confirmation-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fffbeb;
-  border-bottom-color: #f59e0b;
-}
-
-.confirmation-header h3 {
-  margin: 0;
-  flex: 1;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.confirmation-icon {
-  font-size: 2rem;
-  color: #f59e0b;
-}
-
-.confirmation-body {
-  padding: 1.5rem;
-}
-
-.confirmation-body p {
-  margin: 0;
-  color: #374151;
-  line-height: 1.6;
-}
-
-.confirmation-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
-}
-
-.confirmation-header {
-  background: #fffbeb;
-  border-bottom-color: #f59e0b;
-}
-
-.confirmation-icon {
-  color: #f59e0b;
-}
+/* ...existing code... */
 
 .btn-danger {
   background: #ef4444;

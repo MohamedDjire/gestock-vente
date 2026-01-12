@@ -147,6 +147,10 @@ try {
                         WHERE e.id_entreprise = :id_entreprise
                         GROUP BY e.id_entrepot
                         ORDER BY e.date_creation DESC
+                        SELECT id_entrepot, nom_entrepot
+                        FROM stock_entrepot
+                        WHERE id_entreprise = :id_entreprise AND actif = 1
+                        ORDER BY date_creation DESC
                     ");
                     $stmt->execute(['id_entreprise' => $enterpriseId]);
                     $entrepots = $stmt->fetchAll(PDO::FETCH_ASSOC);

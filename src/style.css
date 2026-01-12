@@ -1,3 +1,108 @@
+/* Style unifié pour la modale user-modal (section utilisateurs) */
+/* Correction : scroll uniquement sur le corps, footer toujours visible */
+.modal-content.user-modal {
+  background: #fff;
+  color: #222;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  max-width: 500px;
+  width: 95vw;
+  height: 90vh;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+}
+.modal-content.user-modal .modal-header {
+  padding: 1.2rem 1.5rem 0.5rem 1.5rem;
+  border-bottom: 1px solid #eee;
+}
+.modal-content.user-modal .modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+  max-height: 100%;
+  box-sizing: border-box;
+}
+.modal-content.user-modal .modal-footer,
+.modal-content.user-modal .modal-actions {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #eee;
+  flex-shrink: 0;
+  background: inherit;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  box-sizing: border-box;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: #222;
+  font-size: 1.5rem;
+  position: absolute;
+  top: 1rem;
+  right: 1.2rem;
+  cursor: pointer;
+}
+/* Style propre et unique pour la modale point-vente-modal (comme produit/stock) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-content.point-vente-modal {
+  background: #fff;
+  color: #222;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  max-width: 500px;
+  width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  position: relative;
+}
+.modal-content.point-vente-modal .modal-header {
+  padding: 1.2rem 1.5rem 0.5rem 1.5rem;
+  border-bottom: 1px solid #333;
+}
+.modal-content.point-vente-modal .modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.modal-content.point-vente-modal .modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #333;
+  flex-shrink: 0;
+  background: inherit;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  position: absolute;
+  top: 1rem;
+  right: 1.2rem;
+  cursor: pointer;
+}
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

@@ -16,12 +16,18 @@
       <button class="upgrade-btn" @click="showLogoutModal = true">Déconnexion</button>
     </div>
     <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
-      <div class="modal-logout">
-        <div class="modal-title">Déconnexion</div>
-        <div class="modal-message">Êtes-vous sûr de vouloir vous déconnecter&nbsp;?</div>
+      <div class="modal-content user-modal" style="max-width: 350px; min-width: 0; height: auto; min-height: 0;" @click.stop>
+        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
+          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
+          <h3 style="margin:0;flex:1;">Déconnexion</h3>
+          <button @click="showLogoutModal = false" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p>Êtes-vous sûr de vouloir vous déconnecter&nbsp;?</p>
+        </div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showLogoutModal = false">Annuler</button>
-          <button class="btn-primary" @click="logout">Se déconnecter</button>
+          <button class="btn-primary" style="background:#dc2626;" @click="logout">Se déconnecter</button>
         </div>
       </div>
     </div>

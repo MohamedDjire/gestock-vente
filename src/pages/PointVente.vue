@@ -428,11 +428,17 @@
     <!-- Confirmations -->
     <div v-if="confirmation.show" class="confirmation-overlay" @click.self="closeConfirmation">
       <div class="confirmation-modal">
-        <div class="confirmation-title">{{ confirmation.title }}</div>
-        <div class="confirmation-message">{{ confirmation.message }}</div>
+        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
+          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
+          <h3 style="margin:0;flex:1;">{{ confirmation.title }}</h3>
+          <button @click="closeConfirmation" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <p>{{ confirmation.message }}</p>
+        </div>
         <div class="confirmation-actions">
           <button @click="closeConfirmation" class="btn-secondary">Annuler</button>
-          <button @click="confirmAction" class="btn-primary">Confirmer</button>
+          <button @click="confirmAction" class="btn-primary" style="background:#dc2626;">Confirmer</button>
         </div>
       </div>
     </div>
@@ -523,6 +529,12 @@ const stats = computed(() => {
 const filteredPointsVente = computed(() => {
   let filtered = pointsVente.value
 
+  // Filtrer selon les droits d'accès de l'utilisateur connecté
+  const user = authStore.user
+  if (user && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
+    filtered = filtered.filter(pv => user.permissions_points_vente.includes(pv.id_point_vente))
+  }
+
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(pv => 
@@ -568,6 +580,7 @@ const loadPointsVente = async () => {
   loading.value = true
   try {
     const response = await apiService.get('/api_point_vente.php?action=all')
+    console.log('Réponse API points de vente:', response)
     if (response && response.success) {
       pointsVente.value = response.data || []
     } else {

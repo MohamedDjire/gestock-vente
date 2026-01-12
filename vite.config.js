@@ -15,12 +15,12 @@ export default defineConfig({
   // Proxy pour contourner CORS en développement (solution alternative)
   server: {
     proxy: {
-      '/api-stock': {
+      '/api_stock': {
         target: 'https://aliadjame.com',
         changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/api-stock/, '/api-stock')
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api_stock/, '/api_stock')
       }
     }
   }
-})
+});

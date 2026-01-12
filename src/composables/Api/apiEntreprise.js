@@ -1,4 +1,4 @@
-import apiClient from '../Api/apiClient'
+import apiClient from './apiClient'
 
 const ENDPOINT = '/api_entreprise.php'
 

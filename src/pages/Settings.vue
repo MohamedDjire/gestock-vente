@@ -159,7 +159,7 @@
 
     <!-- Modal Forfait -->
     <div v-if="showForfaitModal" class="modal-overlay" @click.self="closeForfaitModal">
-      <div class="modal-content">
+      <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>{{ editingForfait ? 'Modifier le Forfait' : 'Nouveau Forfait' }}</h3>
           <button @click="closeForfaitModal" class="modal-close">×</button>
@@ -182,16 +182,16 @@
             <textarea v-model="forfaitForm.description" placeholder="Description du forfait"></textarea>
           </div>
         </div>
-        <div class="modal-footer">
-          <button @click="closeForfaitModal" class="btn-secondary">Annuler</button>
-          <button @click="saveForfait" class="btn-primary">Enregistrer</button>
+        <div class="modal-actions">
+          <button @click="closeForfaitModal" class="btn-cancel">Annuler</button>
+          <button @click="saveForfait" class="btn-save">Enregistrer</button>
         </div>
       </div>
     </div>
 
     <!-- Modal Utilisateur -->
     <div v-if="showUserModal" class="modal-overlay" @click.self="closeUserModal">
-      <div class="modal-content">
+      <div class="modal-content user-modal" @click.stop>
         <div class="modal-header">
           <h3>{{ editingUser ? 'Modifier l\'Utilisateur' : 'Nouvel Utilisateur' }}</h3>
           <button @click="closeUserModal" class="modal-close">×</button>
@@ -233,9 +233,9 @@
             </select>
           </div>
         </div>
-        <div class="modal-footer">
-          <button @click="closeUserModal" class="btn-secondary">Annuler</button>
-          <button @click="saveUser" class="btn-primary">Enregistrer</button>
+        <div class="modal-actions">
+          <button @click="closeUserModal" class="btn-cancel">Annuler</button>
+          <button @click="saveUser" class="btn-save">Enregistrer</button>
         </div>
       </div>
     </div>
