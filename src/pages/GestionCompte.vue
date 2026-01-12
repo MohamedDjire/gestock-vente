@@ -819,8 +819,8 @@ onMounted(async () => {
 <style scoped>
 .gestion-compte-page {
   padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
 }
 
 .page-header {
@@ -876,6 +876,7 @@ onMounted(async () => {
 
 .tab-content {
   animation: fadeIn 0.3s;
+  width: 100%;
 }
 
 @keyframes fadeIn {
@@ -888,6 +889,7 @@ onMounted(async () => {
   border-radius: 16px;
   padding: 2rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  width: 100%;
 }
 
 .card-header {
@@ -1198,6 +1200,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
 }
 
 .connected-user-card {
@@ -1208,6 +1211,7 @@ onMounted(async () => {
   background: #f9fafb;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
+  width: 100%;
 }
 
 .user-avatar {
@@ -1295,6 +1299,7 @@ onMounted(async () => {
   display: flex;
   gap: 1rem;
   margin-bottom: 1.5rem;
+  width: 100%;
 }
 
 .search-input {
@@ -1315,11 +1320,13 @@ onMounted(async () => {
 
 .users-table-container {
   overflow-x: auto;
+  width: 100%;
 }
 
 .users-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 100%;
 }
 
 .users-table thead {
