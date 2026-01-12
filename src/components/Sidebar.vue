@@ -35,25 +35,41 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth.js'
 
 const $route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const showLogoutModal = ref(false)
 
-const menuItems = [
-  { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
-  { name: 'Produits & Stocks', route: '/products', icon: '📦' },
-  { name: 'Entrepôts', route: '/entrepot', icon: '🏭' },
-  { name: 'Points de Vente', route: '/point-vente', icon: '🏪' },
-  { name: 'Ventes', route: '/ventes', icon: '🛒' },
-  { name: 'Comptabilité', route: '/compta', icon: '💰' },
-  { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
-  { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
-  { name: 'Journal', route: '/journal', icon: '📝' },
-  { name: 'Paramètres', route: '/parametres', icon: '⚙️' }
-]
+const isAdmin = computed(() => {
+  const role = authStore.userRole?.toLowerCase()
+  return role === 'admin' || role === 'superadmin'
+})
+
+const menuItems = computed(() => {
+  const items = [
+    { name: 'Tableau de bord', route: '/dashboard', icon: '📊' },
+    { name: 'Produits & Stocks', route: '/products', icon: '📦' },
+    { name: 'Entrepôts', route: '/entrepot', icon: '🏭' },
+    { name: 'Points de Vente', route: '/point-vente', icon: '🏪' },
+    { name: 'Ventes', route: '/ventes', icon: '🛒' },
+    { name: 'Comptabilité', route: '/compta', icon: '💰' },
+    { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
+    { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
+    { name: 'Journal', route: '/journal', icon: '📝' },
+    { name: 'Paramètres', route: '/parametres', icon: '⚙️' }
+  ]
+  
+  // Ajouter le lien "Gestion du Compte" uniquement pour les admins
+  if (isAdmin.value) {
+    items.push({ name: 'Gestion du Compte', route: '/gestion-compte', icon: '👑' })
+  }
+  
+  return items
+})
 
 function logout() {
   localStorage.clear();

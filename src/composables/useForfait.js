@@ -132,13 +132,23 @@ export function useForfait() {
   })
 
   /**
-   * Obtient la couleur selon le temps restant
+   * Obtient la couleur selon le temps restant et l'état du forfait
    */
   const statusColor = computed(() => {
+    // Utiliser l'état du forfait si disponible
+    if (forfaitStatus.value?.etat) {
+      if (forfaitStatus.value.etat === 'bloque') return 'red'
+      if (forfaitStatus.value.etat === 'grace') return 'red'
+      if (forfaitStatus.value.etat === 'warning') return 'red'
+      if (forfaitStatus.value.etat === 'no_subscription') return 'red'
+      return 'black'
+    }
+    
+    // Fallback vers l'ancien système
     const jours = joursRestants.value
     
     if (jours === null || isExpired.value) return 'red'
-    if (jours <= 2) return 'red'
+    if (jours <= 5) return 'red' // Rouge à 5 jours ou moins
     if (jours <= 7) return 'orange'
     return 'black'
   })

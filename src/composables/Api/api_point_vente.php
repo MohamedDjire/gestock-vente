@@ -78,6 +78,12 @@ if (!file_exists($middlewareFile)) {
 
 require_once $middlewareFile;
 
+// Inclure check_forfait_limits pour vérifier les limites des forfaits
+$checkLimitsFile = __DIR__ . '/check_forfait_limits.php';
+if (file_exists($checkLimitsFile)) {
+    require_once $checkLimitsFile;
+}
+
 if (!function_exists('authenticateAndAuthorize')) {
     http_response_code(500);
     echo json_encode([
@@ -290,6 +296,23 @@ try {
                     'message' => 'Un point de vente avec ce nom existe déjà'
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
+            }
+            
+            // Vérifier les limites du forfait avant de créer le point de vente
+            if (function_exists('checkPointVenteLimit')) {
+                $limitCheck = checkPointVenteLimit($bdd, $enterpriseId);
+                if (!$limitCheck['allowed']) {
+                    http_response_code(403);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => $limitCheck['message'],
+                        'limit_info' => [
+                            'current' => $limitCheck['current'],
+                            'max' => $limitCheck['max']
+                        ]
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
             }
             
             $stmt = $bdd->prepare("

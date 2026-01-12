@@ -51,6 +51,12 @@ try {
 // Inclure middleware_auth pour utiliser generateJWT et authenticateAndAuthorize
 require_once __DIR__ . '/functions/middleware_auth.php';
 
+// Inclure check_forfait_limits pour vérifier les limites des forfaits
+$checkLimitsFile = __DIR__ . '/check_forfait_limits.php';
+if (file_exists($checkLimitsFile)) {
+    require_once $checkLimitsFile;
+}
+
 /**
  * Générer un token JWT sécurisé à partir des données utilisateur
  */
@@ -650,6 +656,25 @@ try {
                     
                     if (isset($data['password'])) {
                         $data['mot_de_passe'] = $data['password'];
+                    }
+                    
+                    // Vérifier les limites du forfait avant de créer l'utilisateur
+                    $enterpriseIdForCheck = $data['id_entreprise'] ?? $currentUser['enterprise_id'];
+                    
+                    // Si l'utilisateur essaie de créer un admin, vérifier si le forfait le permet
+                    $userRole = strtolower($data['role'] ?? 'Agent');
+                    if (($userRole === 'admin' || $userRole === 'superadmin') && function_exists('checkCanNommerAdmin')) {
+                        if (!checkCanNommerAdmin($bdd, $enterpriseIdForCheck)) {
+                            throw new Exception("Votre forfait ne permet pas de nommer un autre administrateur. Veuillez passer au forfait Enterprise.", 403);
+                        }
+                    }
+                    
+                    // Vérifier la limite d'utilisateurs (sauf pour les admins)
+                    if ($userRole !== 'admin' && $userRole !== 'superadmin' && function_exists('checkUserLimit')) {
+                        $limitCheck = checkUserLimit($bdd, $enterpriseIdForCheck);
+                        if (!$limitCheck['allowed']) {
+                            throw new Exception($limitCheck['message'], 403);
+                        }
                     }
                     
                     $resultat = createUser($bdd, $data);
