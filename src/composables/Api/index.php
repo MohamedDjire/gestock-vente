@@ -596,7 +596,27 @@ try {
         
         $user = loginUser($bdd, $data['email'], $data['password']);
         $token = generateAuthToken($user);
-        
+
+        // Journaliser la connexion
+        $journalData = [
+            'user' => $user['email'] ?? ($user['nom'] ?? 'inconnu'),
+            'action' => 'connexion',
+            'details' => 'Connexion réussie le ' . date('d/m/Y à H:i:s')
+        ];
+        // Appel interne à l'API journal
+        $journalUrl = __DIR__ . '/api_journal.php';
+        if (file_exists($journalUrl)) {
+            $opts = [
+                'http' => [
+                    'method'  => 'POST',
+                    'header'  => "Content-Type: application/json\r\n",
+                    'content' => json_encode($journalData)
+                ]
+            ];
+            $context  = stream_context_create($opts);
+            @file_get_contents($journalUrl, false, $context);
+        }
+
         $resultat = ['user' => $user, 'token' => $token];
     } else {
         // Pour toutes les autres actions, authentification requise

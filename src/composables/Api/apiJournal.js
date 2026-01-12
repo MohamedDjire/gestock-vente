@@ -3,17 +3,17 @@ import apiClient from './apiClient.js';
 
 export default {
   async getJournal() {
-    const response = await apiClient.get('/api_journal.php');
+    const response = await apiClient.get('/api_stock/api_journal.php');
     if (response.data && response.data.success) {
       return response.data.data || [];
     }
     throw new Error(response.data?.message || 'Erreur lors du chargement du journal');
   },
   async addJournalEntry(entry) {
-    const response = await apiClient.post('/api_journal.php', entry);
+    const response = await apiClient.post('/api_stock/api_journal.php', entry);
     if (response.data && response.data.success) {
       return response.data.data;
     }
-    throw new Error(response.data?.message || 'Erreur lors de l\'ajout de l\'entrée');
+    throw new Error(response.data?.message || 'Erreur lors de l\'ajout de l\'entre');
   }
 };
