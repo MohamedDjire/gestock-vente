@@ -447,6 +447,8 @@
 
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import { useAuthStore } from '../stores/auth'
+const authStore = useAuthStore()
 import { useRouter } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
@@ -527,11 +529,13 @@ const stats = computed(() => {
 })
 
 const filteredPointsVente = computed(() => {
+
   let filtered = pointsVente.value
 
-  // Filtrer selon les droits d'accès de l'utilisateur connecté
+  // Filtrer selon les droits d'accès de l'utilisateur connecté, sauf pour admin/superadmin
   const user = authStore.user
-  if (user && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
+  const isAdmin = user && ['admin', 'superadmin'].includes(String(user.user_role || user.role).toLowerCase());
+  if (!isAdmin && user && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
     filtered = filtered.filter(pv => user.permissions_points_vente.includes(pv.id_point_vente))
   }
 

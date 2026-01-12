@@ -112,8 +112,10 @@ try {
     switch ($method) {
         case 'GET':
             if ($action === 'all') {
-                // Récupérer tous les points de vente de l'entreprise avec leurs statistiques
-                $stmt = $bdd->prepare("
+                // Filtrage selon les droits d'accès de l'utilisateur
+                $isAdmin = isset($currentUser['user_role']) && in_array(strtolower($currentUser['user_role']), ['admin', 'superadmin']);
+                $params = [];
+                $sql = "
                     SELECT 
                         pv.*,
                         e.nom_entrepot,
@@ -127,18 +129,26 @@ try {
                     FROM stock_point_vente pv
                     LEFT JOIN stock_entrepot e ON pv.id_entrepot = e.id_entrepot
                     LEFT JOIN stock_vente v ON v.id_point_vente = pv.id_point_vente AND v.id_entreprise = pv.id_entreprise
-                    WHERE pv.id_entreprise = :id_entreprise
-                    GROUP BY pv.id_point_vente
-                    ORDER BY pv.date_creation DESC
-                ");
-                $stmt->execute(['id_entreprise' => $enterpriseId]);
+                    WHERE pv.id_entreprise = ?
+                ";
+                $params[] = $enterpriseId;
+                if (!$isAdmin && isset($currentUser['permissions_points_vente']) && is_array($currentUser['permissions_points_vente']) && count($currentUser['permissions_points_vente']) > 0) {
+                    $idsAutorises = array_map('intval', $currentUser['permissions_points_vente']);
+                    $in = implode(',', array_fill(0, count($idsAutorises), '?'));
+                    $sql .= " AND pv.id_point_vente IN ($in) ";
+                    foreach ($idsAutorises as $id) {
+                        $params[] = $id;
+                    }
+                }
+                $sql .= " GROUP BY pv.id_point_vente ORDER BY pv.date_creation DESC ";
+                $stmt = $bdd->prepare($sql);
+                $stmt->execute($params);
                 $pointsVente = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
                 echo json_encode([
                     'success' => true,
                     'data' => $pointsVente
                 ], JSON_UNESCAPED_UNICODE);
-                
+
             } elseif ($action === 'stats' && isset($_GET['id_point_vente'])) {
                 // Récupérer les statistiques détaillées d'un point de vente
                 $idPointVente = (int)$_GET['id_point_vente'];

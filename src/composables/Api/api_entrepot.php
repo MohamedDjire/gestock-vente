@@ -116,7 +116,6 @@ try {
                 try {
                     $testStmt = $bdd->query("SHOW TABLES LIKE 'stock_entrepot'");
                     $tableExists = $testStmt->fetch();
-                    
                     if (!$tableExists) {
                         echo json_encode([
                             'success' => true,
@@ -125,17 +124,18 @@ try {
                         exit;
                     }
                 } catch (Exception $e) {
-                    // En cas d'erreur, retourner un tableau vide
                     echo json_encode([
                         'success' => true,
                         'data' => []
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
-                
-                // Récupérer tous les entrepôts de l'entreprise
+
+
                 try {
-                    $stmt = $bdd->prepare("
+                    $isAdmin = isset($currentUser['user_role']) && in_array(strtolower($currentUser['user_role']), ['admin', 'superadmin']);
+                    $params = [];
+                    $sql = "
                         SELECT 
                             e.*,
                             COUNT(DISTINCT p.id_produit) AS nombre_produits,
@@ -144,22 +144,26 @@ try {
                             COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) AS valeur_stock_vente
                         FROM stock_entrepot e
                         LEFT JOIN stock_produit p ON LOWER(TRIM(p.entrepot)) = LOWER(TRIM(e.nom_entrepot)) AND p.id_entreprise = e.id_entreprise
-                        WHERE e.id_entreprise = :id_entreprise
-                        GROUP BY e.id_entrepot
-                        ORDER BY e.date_creation DESC
-                        SELECT id_entrepot, nom_entrepot
-                        FROM stock_entrepot
-                        WHERE id_entreprise = :id_entreprise AND actif = 1
-                        ORDER BY date_creation DESC
-                    ");
-                    $stmt->execute(['id_entreprise' => $enterpriseId]);
+                        WHERE e.id_entreprise = ?
+                    ";
+                    $params[] = $enterpriseId;
+                    if (!$isAdmin && isset($currentUser['permissions_entrepots']) && is_array($currentUser['permissions_entrepots']) && count($currentUser['permissions_entrepots']) > 0) {
+                        $idsAutorises = array_map('intval', $currentUser['permissions_entrepots']);
+                        $in = implode(',', array_fill(0, count($idsAutorises), '?'));
+                        $sql .= " AND e.id_entrepot IN ($in) ";
+                        foreach ($idsAutorises as $id) {
+                            $params[] = $id;
+                        }
+                    }
+                    $sql .= " GROUP BY e.id_entrepot ORDER BY e.date_creation DESC ";
+                    $stmt = $bdd->prepare($sql);
+                    $stmt->execute($params);
                     $entrepots = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 } catch (PDOException $e) {
-                    // Si erreur SQL (table n'existe pas, colonne manquante, etc.), retourner un tableau vide
                     error_log("Erreur SQL api_entrepot: " . $e->getMessage());
                     $entrepots = [];
                 }
-                
+
                 echo json_encode([
                     'success' => true,
                     'data' => $entrepots

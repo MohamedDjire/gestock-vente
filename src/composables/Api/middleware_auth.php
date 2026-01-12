@@ -149,6 +149,14 @@ function authenticateAndAuthorize($bdd, $enterpriseId = null) {
             throw new Exception("Accès non autorisé à cette entreprise", 403);
         }
     }
+    // Charger les permissions d'accès (entrepôts et points de vente)
+    $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+    $stmtE->execute(['id' => $user['id_utilisateur']]);
+    $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
+    $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+    $stmtPV->execute(['id' => $user['id_utilisateur']]);
+    $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+
     // Retourne un tableau structuré cohérent avec la page user
     return [
         'id' => $user['id_utilisateur'],
@@ -163,7 +171,9 @@ function authenticateAndAuthorize($bdd, $enterpriseId = null) {
         'prenom' => $user['prenom'],
         'statut' => $user['statut'],
         'entreprise_nom' => $user['nom_entreprise'],
-        'entreprise_sigle' => $user['sigle']
+        'entreprise_sigle' => $user['sigle'],
+        'permissions_entrepots' => $permissions_entrepots,
+        'permissions_points_vente' => $permissions_points_vente
     ];
 }
 
