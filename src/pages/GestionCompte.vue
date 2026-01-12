@@ -321,7 +321,8 @@
           <button class="modal-close" @click="closeUserModal">×</button>
         </div>
         <div class="modal-body">
-          <form @submit.prevent="saveUser" class="user-form">
+          <form @submit.prevent="onUserFormSubmit" class="user-form">
+            
             <div class="form-row">
               <div class="form-group">
                 <label>Nom *</label>
@@ -356,13 +357,38 @@
               <label>Téléphone</label>
               <input v-model="userForm.telephone" type="tel" />
             </div>
+            <!-- Permissions accès entrepôts/points de vente -->
+            <div class="form-group">
+              <AccessSelector
+                :items="entrepots"
+                v-model="userForm.permissions_entrepots"
+                label="entrepôts"
+              />
+            </div>
+            <div class="form-group">
+              <AccessSelector
+                :items="pointsVente"
+                v-model="userForm.permissions_points_vente"
+                label="points de vente"
+              />
+            </div>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" v-model="userForm.acces_comptabilite" />
+                Accès à la comptabilité
+              </label>
+            </div>
+            <div v-if="userForm.permissions_entrepots.length === 0 || userForm.permissions_points_vente.length === 0" class="form-warning" style="color:#c0392b;margin-bottom:1rem;">
+              Veuillez sélectionner au moins un entrepôt et un point de vente.
+            </div>
             <div class="modal-actions">
               <button type="button" class="btn-secondary" @click="closeUserModal">Annuler</button>
-              <button type="submit" class="btn-primary" :disabled="savingUser">
+              <button type="submit" class="btn-primary" :disabled="savingUser || userForm.permissions_entrepots.length === 0 || userForm.permissions_points_vente.length === 0">
                 {{ savingUser ? 'Enregistrement...' : 'Enregistrer' }}
               </button>
             </div>
           </form>
+       
         </div>
       </div>
     </div>
@@ -393,8 +419,37 @@
 import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useAuthStore } from '../stores/auth.js'
+import AccessSelector from '../components/AccessSelector.vue'
+import apiEntrepot from '../composables/api/api_entrepot.js'
+import apiPointVente from '../composables/api/api_point_vente.js'
+        // Permissions accès entrepôts/points de vente
+        const entrepots = ref([])
+        const pointsVente = ref([])
+        onMounted(async () => {
+          // ...chargements existants...
+          try {
+            const resEntrepots = await apiEntrepot.getAllEntrepots ? await apiEntrepot.getAllEntrepots() : await apiEntrepot.getAll()
+            const data = resEntrepots && Array.isArray(resEntrepots.data) ? resEntrepots.data : []
+            entrepots.value = data.map(e => ({ id: e.id_entrepot, nom: e.nom_entrepot }))
+          } catch {}
+          try {
+            const resPV = await apiPointVente.getAllPointsVente ? await apiPointVente.getAllPointsVente() : await apiPointVente.getAll()
+            const data = Array.isArray(resPV) ? resPV : []
+            pointsVente.value = data.map(pv => ({ id: pv.id_point_vente, nom: pv.nom_point_vente }))
+          } catch {}
+        })
 
 const authStore = useAuthStore()
+// Empêche la soumission automatique du formulaire utilisateur sauf par clic explicite
+function onUserFormSubmit(e) {
+  // Log pour debug
+  console.log('Tentative de soumission du formulaire utilisateur', e?.submitter?.type)
+  // Vérifie si le bouton submit a été explicitement cliqué
+  if (e && e.submitter && e.submitter.type === 'submit') {
+    saveUser()
+  }
+  // Sinon, ne rien faire (empêche la soumission par Entrée ou autre)
+}
 
 // Tabs
 const activeTab = ref('forfaits')
@@ -437,7 +492,10 @@ const userForm = ref({
   username: '',
   role: '',
   password: '',
-  telephone: ''
+  telephone: '',
+  permissions_entrepots: [],
+  permissions_points_vente: [],
+  acces_comptabilite: false
 })
 
 // Computed
@@ -632,7 +690,10 @@ const openAddUserModal = () => {
     username: '',
     role: '',
     password: '',
-    telephone: ''
+    telephone: '',
+    permissions_entrepots: [],
+    permissions_points_vente: [],
+    acces_comptabilite: false
   }
   showUserModal.value = true
 }
@@ -646,7 +707,10 @@ const editUser = (user) => {
     username: user.username || '',
     role: user.role || '',
     password: '',
-    telephone: user.telephone || ''
+    telephone: user.telephone || '',
+    permissions_entrepots: user.permissions_entrepots || [],
+    permissions_points_vente: user.permissions_points_vente || [],
+    acces_comptabilite: user.acces_comptabilite === true || user.acces_comptabilite === 1
   }
   showUserModal.value = true
 }

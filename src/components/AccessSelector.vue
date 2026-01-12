@@ -7,7 +7,7 @@
   >
     <div class="access-summary">
       Accès à {{ selected.length }} {{ label }}
-      <button class="btn-toggle" @click.stop="showList = !showList">
+      <button class="btn-toggle" type="button" @click.stop="showList = !showList">
         {{ showList ? 'Masquer' : 'Gérer les accès' }}
       </button>
     </div>

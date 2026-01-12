@@ -1,12 +1,61 @@
+
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import apiEntreprise from '../composables/api/apiEntreprise.js'
-import apiUtilisateur from '../composables/api/apiUtilisateur.js'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
-import { logJournal } from '../composables/useJournal'
-import AccessSelector from '../components/AccessSelector.vue'
+
+// --- Entrepôts et points de vente (mock, à remplacer par API si besoin) ---
+const entrepots = ref([])
+const pointsVente = ref([])
+// Charger les infos de l'entreprise au montage (exemple, à adapter selon l'API)
+onMounted(async () => {
+  try {
+    // Essayer de récupérer l'ID entreprise depuis le store ou le backend (à adapter selon votre logique)
+    let id = null
+    // Par exemple, récupérer depuis le store d'authentification si disponible
+    const authStore = useAuthStore()
+    if (authStore && authStore.user && authStore.user.id_entreprise) {
+      id = authStore.user.id_entreprise
+    }
+    if (id) {
+      const data = await apiEntreprise.getEntreprise(id)
+      if (data && data.id_entreprise) {
+        entreprise.value = {
+          nom: data.nom_entreprise || '',
+          adresse: data.adresse || '',
+          devise: data.devise || ''
+        }
+        entrepriseId.value = data.id_entreprise
+      } else {
+        entrepriseId.value = null
+      }
+    } else {
+      entrepriseId.value = null
+    }
+    // Charger entrepôts
+    try {
+      const entrepotList = await apiEntrepot.getAllEntrepots()
+      entrepots.value = Array.isArray(entrepotList) ? entrepotList : []
+    } catch {}
+    // Charger points de vente
+    try {
+      const pvList = await apiPointVente.getAllPointsVente()
+      pointsVente.value = Array.isArray(pvList) ? pvList : []
+    } catch {}
+  } catch (e) {
+    entrepriseError.value = 'Impossible de charger les infos de l\'entreprise'
+    entrepriseId.value = null
+  }
+})
+
+
+// --- Entreprise ---
+const entreprise = ref({ nom: '', adresse: '', devise: '' })
+const entrepriseId = ref(null)
+const entrepriseError = ref('')
+const loadingEntreprise = ref(false)
 
 const section = ref('entreprise')
 // --- Taxes demo ---
@@ -24,18 +73,17 @@ function openAddTaxModal() {
 function openEditTaxModal(tax) {
   editingTax.value = tax
   taxForm.value = { nom: tax.nom, taux: tax.taux }
-  showTaxModal.value = true
 }
 function closeTaxModal() {
   showTaxModal.value = false
-  editingTax.value = null
 }
 function saveTax() {
-  if (!taxForm.value.nom || !taxForm.value.taux) return
   if (editingTax.value) {
+    // Edition
     editingTax.value.nom = taxForm.value.nom
     editingTax.value.taux = taxForm.value.taux
   } else {
+    // Ajout
     taxes.value.push({
       id: Date.now(),
       nom: taxForm.value.nom,
@@ -47,126 +95,12 @@ function saveTax() {
 function deleteTax(tax) {
   taxes.value = taxes.value.filter(t => t.id !== tax.id)
 }
-const users = ref([])
-const userError = ref('')
-const showAddUser = ref(false)
-const editingUser = ref(null)
-const userForm = ref({
-  prenom: '',
-  nom: '',
-  email: '',
-  telephone: '',
-  role: 'utilisateur',
-  username: '',
-  mot_de_passe: '',
-  permissions_entrepots: [],
-  permissions_points_vente: [],
-  acces_comptabilite: false
-})
-const userFormError = ref('')
-const showDeleteUserModal = ref(false)
-const userToDelete = ref(null)
-
-const entrepots = ref([])
-const pointsVente = ref([])
-const entreprise = ref({ nom: '', adresse: '', devise: '' })
-const loadingEntreprise = ref(false)
-const entrepriseError = ref('')
-const authStore = useAuthStore()
-const entrepriseId = computed(() => authStore.enterpriseId)
-const currentUser = computed(() => authStore.user)
-
-const entrepotsVisibles = computed(() => {
-  if (!currentUser.value || !Array.isArray(currentUser.value.permissions_entrepots)) return entrepots.value
-  return entrepots.value.filter(e => currentUser.value.permissions_entrepots.includes(e.id_entrepot))
-})
-const pointsVenteVisibles = computed(() => {
-  if (!currentUser.value || !Array.isArray(currentUser.value.permissions_points_vente)) return pointsVente.value
-  return pointsVente.value.filter(pv => currentUser.value.permissions_points_vente.includes(pv.id_point_vente))
-})
-
-watch(section, (val) => {
-  if (val === 'utilisateurs') fetchUsers()
-})
-
-onMounted(() => {
-  fetchEntrepots()
-  fetchPointsVente()
-  if (section.value === 'utilisateurs') fetchUsers()
-  fetchEntreprise()
-})
-
-const loadingUsers = ref(false)
-
-async function fetchUsers() {
-  userError.value = ''
-  loadingUsers.value = true
-  try {
-    const res = await apiUtilisateur.getAll()
-    users.value = Array.isArray(res) ? res : []
-  } catch (e) {
-    userError.value = e.message || 'Erreur lors du chargement des utilisateurs'
-    users.value = []
-  }
-  loadingUsers.value = false
-}
-function closeUserModal() {
-  showAddUser.value = false
-  editingUser.value = null
-  userForm.value = {
-    prenom: '',
-    nom: '',
-    email: '',
-    telephone: '',
-    role: 'utilisateur',
-    username: '',
-    mot_de_passe: '',
-    permissions_entrepots: [],
-    permissions_points_vente: [],
-    acces_comptabilite: false
-  }
-  userFormError.value = ''
-}
-async function fetchEntrepots() {
-  try {
-    const res = await apiEntrepot.getAll()
-    entrepots.value = Array.isArray(res.data) ? res.data : []
-  } catch {}
-}
-async function fetchPointsVente() {
-  try {
-    const res = await apiPointVente.getAll()
-    pointsVente.value = Array.isArray(res) ? res : []
-  } catch {}
-}
-async function fetchEntreprise() {
-  if (!entrepriseId.value) {
-    entrepriseError.value = "ID d'entreprise introuvable"
-    return
-  }
-  loadingEntreprise.value = true
-  entrepriseError.value = ''
-  try {
-    const data = await apiEntreprise.getEntreprise(entrepriseId.value)
-    if (data && data.nom_entreprise) {
-      entreprise.value = {
-        nom: data.nom_entreprise,
-        adresse: data.adresse,
-        devise: data.devise
-      }
-    }
-  } catch (e) {
-    entrepriseError.value = e.message || 'Erreur lors du chargement'
-  } finally {
-    loadingEntreprise.value = false
-  }
-}
 function onLogoChange(e) {
   // Gestion du logo (à compléter)
 }
 async function saveEntreprise() {
   if (!entrepriseId.value) {
-    entrepriseError.value = "ID d'entreprise introuvable"
+    entrepriseError.value = "ID d'entreprise introuvable (initialisez l'entreprise avant de sauvegarder)"
     return
   }
   loadingEntreprise.value = true
@@ -185,6 +119,8 @@ async function saveEntreprise() {
     loadingEntreprise.value = false
   }
 }
+
+// TODO: Charger les infos de l'entreprise au montage si besoin
 function parseAccess(val) {
   // Toujours retourner un tableau d'ID purs (number ou string)
   if (Array.isArray(val)) {
@@ -206,90 +142,13 @@ function parseAccess(val) {
   return [];
 }
 
-function editUser(user) {
-  editingUser.value = { ...user }
-  showAddUser.value = true
-  userForm.value = {
-    prenom: user.prenom,
-    nom: user.nom,
-    email: user.email,
-    telephone: user.telephone,
-    role: user.role,
-    username: user.username,
-    mot_de_passe: '',
-    permissions_entrepots: parseAccess(user.permissions_entrepots),
-    permissions_points_vente: parseAccess(user.permissions_points_vente),
-    acces_comptabilite: !!user.acces_comptabilite
-  }
-}
-function openDeleteUserModal(user) {
-  userToDelete.value = user
-  showDeleteUserModal.value = true
-}
-function closeDeleteUserModal() {
-  showDeleteUserModal.value = false
-  userToDelete.value = null
-}
-async function confirmDeleteUser() {
-  if (!userToDelete.value) return
-  try {
-    await apiUtilisateur.delete(userToDelete.value.id_utilisateur)
-    logJournal({ user: getJournalUser(), action: 'Suppression utilisateur', details: `Utilisateur ${userToDelete.value.prenom} ${userToDelete.value.nom} supprimé.` })
-    await fetchUsers()
-    closeDeleteUserModal()
-  } catch (e) {
-    userError.value = e.message || 'Erreur lors de la suppression'
-  }
-}
-function getJournalUser() {
-  const userStr = localStorage.getItem('prostock_user');
-  if (userStr) {
-    try {
-      const user = JSON.parse(userStr);
-      return user.nom || user.email || 'inconnu';
-    } catch {
-      return 'inconnu';
-    }
-  }
-  return 'inconnu';
-}
-async function submitUserForm() {
-  userFormError.value = ''
-  try {
-    const payload = {
-      prenom: userForm.value.prenom,
-      nom: userForm.value.nom,
-      email: userForm.value.email,
-      telephone: userForm.value.telephone,
-      role: userForm.value.role,
-      username: userForm.value.username,
-      permissions_entrepots: userForm.value.permissions_entrepots,
-      permissions_points_vente: userForm.value.permissions_points_vente,
-      acces_comptabilite: userForm.value.acces_comptabilite,
-      id_entreprise: entrepriseId.value
-    }
-    // N'envoyer le mot de passe que s'il est renseigné lors de la modification
-    if (!editingUser.value || (userForm.value.mot_de_passe && userForm.value.mot_de_passe.length > 0)) {
-      payload.mot_de_passe = userForm.value.mot_de_passe
-    }
-    if (editingUser.value) {
-      await apiUtilisateur.update(editingUser.value.id_utilisateur, payload)
-    } else {
-      await apiUtilisateur.create(payload)
-    }
-    await fetchUsers()
-    closeUserModal()
-  } catch (e) {
-    userFormError.value = e.message || 'Erreur lors de la sauvegarde de l\'utilisateur'
-  }
-}
 </script>
 <template>
   <div class="settings-page">
     <aside class="settings-sidebar">
       <ul>
         <li :class="{active: section==='entreprise'}" @click="section='entreprise'">Entreprise</li>
-        <li :class="{active: section==='utilisateurs'}" @click="section='utilisateurs'">Utilisateurs</li>
+        <!-- <li :class="{active: section==='utilisateurs'}" @click="section='utilisateurs'">Utilisateurs</li> -->
         <li :class="{active: section==='taxes'}" @click="section='taxes'">Taxes</li>
         <li :class="{active: section==='categories'}" @click="section='categories'">Catégories produits</li>
         <li :class="{active: section==='notifications'}" @click="section='notifications'">Notifications</li>
@@ -301,6 +160,7 @@ async function submitUserForm() {
         <template v-if="section==='entreprise'">
           <h2>Paramètres de l'entreprise</h2>
           <form class="settings-form">
+            <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
             <div class="form-group">
               <label>Nom de l'entreprise</label>
               <input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" />
@@ -317,155 +177,12 @@ async function submitUserForm() {
               <label>Devise</label>
               <input type="text" v-model="entreprise.devise" placeholder="Devise (ex: XOF, EUR)" />
             </div>
-            <button class="btn-primary" @click.prevent="saveEntreprise">Enregistrer</button>
+            <button class="btn-primary" @click.prevent="saveEntreprise" :disabled="!entrepriseId">Enregistrer</button>
+            <button v-if="!entrepriseId" class="btn-secondary" style="margin-top:0.5rem;" @click.prevent="createEntreprise">Créer l'entreprise</button>
           </form>
+        
         </template>
-        <template v-else-if="section==='utilisateurs'">
-          <h2>Gestion des utilisateurs</h2>
-          <button class="btn-primary" style="margin-bottom:1rem;" @click="showAddUser = true">Ajouter un utilisateur</button>
-          <div v-if="loadingUsers" class="form-error">Chargement des utilisateurs...</div>
-          <div v-if="userError" class="form-error">{{ userError }}</div>
-          <div v-if="!loadingUsers && users.length === 0 && !userError" class="form-error">Aucun utilisateur trouvé.</div>
-          <div v-if="!loadingUsers && users.length > 0" class="table-container">
-            <table class="users-table">
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Email</th>
-                  <th>Rôle</th>
-                  <th class="actions-column">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="user in users" :key="user.id_utilisateur">
-                  <td>{{ user.prenom }} {{ user.nom }}</td>
-                  <td>{{ user.email }}</td>
-                  <td>{{ user.role }}</td>
-                  <td class="actions-column">
-                    <button @click="editUser(user)" class="btn-icon" title="Modifier" aria-label="Modifier">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                      </svg>
-                    </button>
-                    <button @click="openDeleteUserModal(user)" class="btn-icon btn-danger" title="Supprimer" aria-label="Supprimer">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <!-- Modal ajout/modif utilisateur -->
-          <!-- Modal suppression utilisateur harmonisée -->
-          <div v-if="showDeleteUserModal" class="modal-overlay" @click.self="closeDeleteUserModal">
-            <div class="modal-content" @click.stop>
-              <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-                <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-                <h3 style="margin:0;flex:1;">Confirmer la suppression</h3>
-                <button @click="closeDeleteUserModal" class="modal-close">×</button>
-              </div>
-              <div class="modal-body">
-                <p>Êtes-vous sûr de vouloir supprimer l'utilisateur <b>{{ userToDelete?.prenom }} {{ userToDelete?.nom }}</b> ?</p>
-                <p style="color:#dc2626;font-weight:600;">Cette action est irréversible.</p>
-              </div>
-              <div class="modal-actions">
-                <button @click="closeDeleteUserModal" class="btn-cancel">Annuler</button>
-                <button @click="confirmDeleteUser" class="btn-save" style="background:#dc2626;">Supprimer</button>
-              </div>
-            </div>
-          </div>
-          <!-- Modal ajout/modif utilisateur harmonisée -->
-          <div v-if="showAddUser || editingUser" class="modal-overlay" @click.self="closeUserModal">
-            <div class="modal-content user-modal" @click.stop>
-              <div class="modal-header">
-                <h3>{{ editingUser ? 'Modifier' : 'Ajouter' }} un utilisateur</h3>
-                <button @click="closeUserModal" class="modal-close">×</button>
-              </div>
-              <div class="modal-body">
-                <form @submit.prevent="submitUserForm" class="user-form">
-                  <div v-if="userFormError" class="form-error">{{ userFormError }}</div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Prénom</label>
-                      <input v-model="userForm.prenom" required />
-                    </div>
-                    <div class="form-group">
-                      <label>Nom</label>
-                      <input v-model="userForm.nom" required />
-                    </div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Email</label>
-                      <input v-model="userForm.email" type="email" required />
-                    </div>
-                    <div class="form-group">
-                      <label>Téléphone</label>
-                      <input v-model="userForm.telephone" type="tel" />
-                    </div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Rôle</label>
-                      <select v-model="userForm.role" required>
-                        <option value="admin">Administrateur</option>
-                        <option value="utilisateur">Utilisateur</option>
-                      </select>
-                    </div>
-                    <div class="form-group">
-                      <label>Nom d'utilisateur</label>
-                      <input v-model="userForm.username" required />
-                    </div>
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label>Mot de passe</label>
-                      <input v-model="userForm.mot_de_passe" type="password" required />
-                    </div>
-                  </div>
-                  <div class="form-section">
-                    <h4 class="section-title">Accès & Permissions</h4>
-                    <div>
-                      <div class="access-block">
-                        <label class="access-label">Sélectionner les entrepôts :</label>
-                        <AccessSelector
-                          :items="Array.isArray(entrepots) ? entrepots.map(e => ({id: e.id_entrepot, nom: e.nom_entrepot})) : []"
-                          v-model="userForm.permissions_entrepots"
-                          label="entrepôts"
-                        />
-                        <div v-if="entrepots.length === 0" class="form-error">Aucun entrepôt disponible.</div>
-                      </div>
-                      <div class="access-block">
-                        <label class="access-label">Sélectionner les points de vente :</label>
-                        <AccessSelector
-                          :items="Array.isArray(pointsVente) ? pointsVente.map(pv => ({id: pv.id_point_vente, nom: pv.nom_point_vente})) : []"
-                          v-model="userForm.permissions_points_vente"
-                          label="points de vente"
-                        />
-                        <div v-if="pointsVente.length === 0" class="form-error">Aucun point de vente disponible.</div>
-                      </div>
-                    </div>
-                    <div class="form-group">
-                      <label>
-                        <input type="checkbox" v-model="userForm.acces_comptabilite" />
-                        Accès à la comptabilité
-                      </label>
-                    </div>
-                  </div>
-                  <div class="modal-actions">
-                    <button type="button" @click="closeUserModal" class="btn-cancel">Annuler</button>
-                    <button type="submit" class="btn-save" style="margin-left: 0.5rem;">Valider</button>
-                  </div>
-                </form>
-              </div>
-              <div class="modal-footer"></div>
-            </div>
-          </div>
-        </template>
+        <!-- Section utilisateurs supprimée, gestion déplacée dans GestionCompte.vue -->
         <template v-else-if="section==='taxes'">
           <h2>Gestion des taxes</h2>
           <button class="btn-primary" style="margin-bottom:1rem;" @click="openAddTaxModal">Ajouter une taxe</button>

@@ -12,7 +12,7 @@
       </div>
     </div>
     <div class="table-container">
-/* Fin de la section précédente, suppression de l'accolade en trop */
+
       <table class="fournisseurs-table">
         <thead>
           <tr>
@@ -59,7 +59,7 @@
       </table>
     </div>
     <!-- Formulaire d'ajout/modification (modale harmonisée) -->
-/* accolade supprimée, erreur de syntaxe corrigée */
+
     <div v-if="showAddForm || editingFournisseur" class="modal-overlay" @click.self="closeForm">
       <div class="modal-content user-modal" @click.stop>
         <div class="modal-header">
