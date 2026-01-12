@@ -5,14 +5,39 @@
       <div v-if="loading && !forfaitStatus" class="forfait-expiration forfait-loading">
         <span>Chargement du forfait...</span>
       </div>
-      <div v-else-if="forfaitStatus" class="forfait-expiration" :class="forfaitStatusColor">
+      <div v-else-if="forfaitStatus" class="forfait-expiration" :class="getForfaitStatusClass">
         <template v-if="forfaitStatus.date_fin">
-          <span class="forfait-label">Forfait expire le:</span>
-          <span class="forfait-date">{{ formatDateExpiration }}</span>
-          <span v-if="joursRestants !== null && joursRestants > 0" class="forfait-jours">
-            ({{ joursRestants }} jour{{ joursRestants > 1 ? 's' : '' }} restant{{ joursRestants > 1 ? 's' : '' }})
-          </span>
-          <span v-else-if="isExpired" class="forfait-expired">⚠️ Expiré</span>
+          <!-- État bloqué (après période de grâce) -->
+          <template v-if="forfaitStatus.etat === 'bloque' || forfaitStatus.bloque">
+            <span class="forfait-alert-icon">🚫</span>
+            <span class="forfait-label">Forfait expiré - Accès bloqué</span>
+            <button @click="goToRenewal" class="forfait-renew-btn">Renouveler maintenant</button>
+          </template>
+          
+          <!-- État période de grâce -->
+          <template v-else-if="forfaitStatus.etat === 'grace' || forfaitStatus.en_grace">
+            <span class="forfait-alert-icon">⏰</span>
+            <span class="forfait-label">Période de grâce:</span>
+            <span class="forfait-date">{{ forfaitStatus.jours_grace_restants }} jour{{ forfaitStatus.jours_grace_restants > 1 ? 's' : '' }} restant{{ forfaitStatus.jours_grace_restants > 1 ? 's' : '' }}</span>
+            <button @click="goToRenewal" class="forfait-renew-btn urgent">Renouveler maintenant</button>
+          </template>
+          
+          <!-- État warning (5 jours ou moins) -->
+          <template v-else-if="forfaitStatus.etat === 'warning' || forfaitStatus.warning">
+            <span class="forfait-alert-icon">⚠️</span>
+            <span class="forfait-label">Attention:</span>
+            <span class="forfait-date">{{ joursRestants }} jour{{ joursRestants > 1 ? 's' : '' }} restant{{ joursRestants > 1 ? 's' : '' }}</span>
+            <button @click="goToRenewal" class="forfait-renew-btn">Renouveler</button>
+          </template>
+          
+          <!-- État actif normal -->
+          <template v-else>
+            <span class="forfait-label">Forfait expire le:</span>
+            <span class="forfait-date">{{ formatDateExpiration }}</span>
+            <span v-if="joursRestants !== null && joursRestants > 0" class="forfait-jours">
+              ({{ joursRestants }} jour{{ joursRestants > 1 ? 's' : '' }} restant{{ joursRestants > 1 ? 's' : '' }})
+            </span>
+          </template>
         </template>
         <template v-else>
           <span class="forfait-label">⚠️ Aucun forfait actif</span>
@@ -151,6 +176,29 @@ function logout() {
   router.push('/login').then(() => {
     window.location.reload();
   });
+}
+
+const getForfaitStatusClass = computed(() => {
+  if (!forfaitStatus.value) return 'forfait-loading'
+  
+  if (forfaitStatus.value.etat === 'bloque' || forfaitStatus.value.bloque) {
+    return 'forfait-bloque'
+  }
+  if (forfaitStatus.value.etat === 'grace' || forfaitStatus.value.en_grace) {
+    return 'forfait-grace'
+  }
+  if (forfaitStatus.value.etat === 'warning' || forfaitStatus.value.warning) {
+    return 'forfait-warning'
+  }
+  if (forfaitStatus.value.etat === 'no_subscription' || forfaitStatus.value.no_subscription) {
+    return 'forfait-no-subscription'
+  }
+  
+  return forfaitStatusColor.value || 'black'
+})
+
+const goToRenewal = () => {
+  router.push('/gestion-compte?tab=forfaits')
 }
 
 onMounted(() => {
@@ -419,6 +467,98 @@ watch(() => currencyStore.currency, (newCurrency) => {
 .forfait-expiration.red {
   color: #991b1b;
   background: #fee2e2;
+}
+
+.forfait-expiration.forfait-warning {
+  color: #991b1b;
+  background: #fee2e2;
+  border: 2px solid #dc2626;
+  animation: pulse-warning 2s infinite;
+}
+
+.forfait-expiration.forfait-grace {
+  color: #991b1b;
+  background: #fee2e2;
+  border: 2px solid #dc2626;
+  animation: pulse-urgent 1s infinite;
+}
+
+.forfait-expiration.forfait-bloque {
+  color: #fff;
+  background: #dc2626;
+  border: 2px solid #991b1b;
+  animation: pulse-blocked 1s infinite;
+}
+
+.forfait-alert-icon {
+  font-size: 1.2rem;
+}
+
+.forfait-renew-btn {
+  margin-left: 0.5rem;
+  padding: 0.3rem 0.8rem;
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.forfait-renew-btn:hover {
+  background: #145040;
+  transform: scale(1.05);
+}
+
+.forfait-renew-btn.urgent {
+  background: #dc2626;
+  animation: pulse-button 1s infinite;
+}
+
+.forfait-renew-btn.urgent:hover {
+  background: #b91c1c;
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0);
+  }
+}
+
+@keyframes pulse-urgent {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes pulse-blocked {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulse-button {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .forfait-label {

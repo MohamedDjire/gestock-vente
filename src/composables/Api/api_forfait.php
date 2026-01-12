@@ -188,54 +188,119 @@ try {
     switch ($method) {
         case 'GET':
             if ($action === 'status') {
-                // Récupérer le statut de l'abonnement de l'entreprise
+                // Utiliser la nouvelle fonction getForfaitStatus pour obtenir l'état détaillé
+                if (function_exists('getForfaitStatus')) {
+                    $status = getForfaitStatus($bdd, $enterpriseId);
+                    
+                    // Récupérer les détails de l'abonnement et du forfait
+                    $stmt = $bdd->prepare("
+                        SELECT a.*, f.nom_forfait, f.prix, f.duree_jours, f.description
+                        FROM stock_abonnement a
+                        LEFT JOIN stock_forfait f ON a.id_forfait = f.id_forfait
+                        WHERE a.id_entreprise = :id_entreprise
+                        ORDER BY a.date_fin DESC
+                        LIMIT 1
+                    ");
+                    $stmt->execute(['id_entreprise' => $enterpriseId]);
+                    $abonnement = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$abonnement) {
+                        echo json_encode([
+                            'success' => true,
+                            'data' => [
+                                'etat' => 'no_subscription',
+                                'actif' => false,
+                                'date_fin' => null,
+                                'forfait' => null,
+                                'expire' => true,
+                                'no_subscription' => true,
+                                'jours_restants' => null,
+                                'message' => 'Aucun forfait actif'
+                            ]
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                    
+                    // Calculer la date de fin de période de grâce
+                    $dateFin = new DateTime($abonnement['date_fin']);
+                    $now = new DateTime();
+                    $dateGraceFin = clone $dateFin;
+                    $dateGraceFin->modify('+2 days');
+                    
+                    $responseData = [
+                        'id_abonnement' => $abonnement['id_abonnement'],
+                        'id_forfait' => $abonnement['id_forfait'],
+                        'nom' => $abonnement['nom_forfait'],
+                        'prix' => $abonnement['prix'],
+                        'duree_jours' => $abonnement['duree_jours'],
+                        'description' => $abonnement['description'] ?? '',
+                        'date_debut' => $abonnement['date_debut'],
+                        'date_fin' => $abonnement['date_fin'],
+                        'statut' => $abonnement['statut'],
+                        'etat' => $status['etat'],
+                        'actif' => $status['actif'],
+                        'jours_restants' => $status['jours_restants'] ?? 0,
+                        'jours_grace_restants' => $status['jours_grace_restants'] ?? null,
+                        'message' => $status['message'],
+                        'expire' => $status['etat'] === 'bloque' || $status['etat'] === 'grace',
+                        'no_subscription' => $status['etat'] === 'no_subscription',
+                        'en_grace' => $status['etat'] === 'grace',
+                        'bloque' => $status['etat'] === 'bloque',
+                        'warning' => $status['etat'] === 'warning'
+                    ];
+                    
+                    echo json_encode([
+                        'success' => true,
+                        'data' => $responseData
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                
+                // Fallback vers l'ancien système si la fonction n'existe pas
                 $abonnement = checkAndUpdateAbonnement($bdd, $enterpriseId);
                 
-            if (!$abonnement) {
-                // Vérifier s'il y a un abonnement expiré ou aucun abonnement
-                $stmt = $bdd->prepare("
-                    SELECT a.*, f.nom_forfait, f.prix, f.duree_jours
-                    FROM stock_abonnement a
-                    LEFT JOIN stock_forfait f ON a.id_forfait = f.id_forfait
-                    WHERE a.id_entreprise = :id_entreprise
-                    ORDER BY a.date_fin DESC
-                    LIMIT 1
-                ");
-                $stmt->execute(['id_entreprise' => $enterpriseId]);
-                $lastAbonnement = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                // Si aucun abonnement n'existe du tout
-                if (!$lastAbonnement) {
+                if (!$abonnement) {
+                    $stmt = $bdd->prepare("
+                        SELECT a.*, f.nom_forfait, f.prix, f.duree_jours
+                        FROM stock_abonnement a
+                        LEFT JOIN stock_forfait f ON a.id_forfait = f.id_forfait
+                        WHERE a.id_entreprise = :id_entreprise
+                        ORDER BY a.date_fin DESC
+                        LIMIT 1
+                    ");
+                    $stmt->execute(['id_entreprise' => $enterpriseId]);
+                    $lastAbonnement = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$lastAbonnement) {
+                        echo json_encode([
+                            'success' => true,
+                            'data' => [
+                                'actif' => false,
+                                'date_fin' => null,
+                                'forfait' => null,
+                                'expire' => true,
+                                'no_subscription' => true
+                            ]
+                        ], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                    
                     echo json_encode([
                         'success' => true,
                         'data' => [
                             'actif' => false,
-                            'date_fin' => null,
-                            'forfait' => null,
+                            'date_fin' => $lastAbonnement['date_fin'] ?? null,
+                            'forfait' => $lastAbonnement ? [
+                                'nom' => $lastAbonnement['nom_forfait'],
+                                'prix' => $lastAbonnement['prix']
+                            ] : null,
                             'expire' => true,
-                            'no_subscription' => true
+                            'no_subscription' => false
                         ]
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
                 
-                echo json_encode([
-                    'success' => true,
-                    'data' => [
-                        'actif' => false,
-                        'date_fin' => $lastAbonnement['date_fin'] ?? null,
-                        'forfait' => $lastAbonnement ? [
-                            'nom' => $lastAbonnement['nom_forfait'],
-                            'prix' => $lastAbonnement['prix']
-                        ] : null,
-                        'expire' => true,
-                        'no_subscription' => false
-                    ]
-                ], JSON_UNESCAPED_UNICODE);
-                exit;
-            }
-                
-                // Récupérer les détails du forfait
                 $stmt = $bdd->prepare("
                     SELECT nom_forfait, prix, duree_jours, description
                     FROM stock_forfait
@@ -244,7 +309,6 @@ try {
                 $stmt->execute(['id_forfait' => $abonnement['id_forfait']]);
                 $forfait = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                // Calculer les jours restants
                 $dateFin = new DateTime($abonnement['date_fin']);
                 $now = new DateTime();
                 $joursRestants = $now->diff($dateFin)->days;

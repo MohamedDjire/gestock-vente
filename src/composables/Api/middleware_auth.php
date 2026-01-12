@@ -210,6 +210,7 @@ function verifyJWT($token, $secret) {
  * Vérifie si l'entreprise a un forfait actif
  * Cette fonction doit être appelée pour toutes les actions sauf la connexion
  * Retourne true si actif, false si pas d'abonnement, et lance une exception si expiré
+ * Gère les périodes de grâce (2 jours après expiration)
  */
 function checkForfaitActif($bdd, $enterpriseId) {
     try {
@@ -222,12 +223,31 @@ function checkForfaitActif($bdd, $enterpriseId) {
             return true;
         }
         
-        // Vérifier s'il y a un abonnement actif
+        // Inclure check_forfait.php si disponible pour utiliser les nouvelles fonctions
+        $checkForfaitFile = __DIR__ . '/check_forfait.php';
+        if (file_exists($checkForfaitFile)) {
+            require_once $checkForfaitFile;
+            
+            // Utiliser la nouvelle fonction qui gère les périodes de grâce
+            if (function_exists('checkForfaitActifWithGrace')) {
+                // Note: on ne permet pas la période de grâce pour les actions normales
+                // Seule la connexion et la page de gestion du compte sont autorisées
+                try {
+                    $result = checkForfaitActifWithGrace($bdd, $enterpriseId, false);
+                    return true;
+                } catch (Exception $e) {
+                    throw $e;
+                }
+            }
+        }
+        
+        // Fallback vers l'ancien système si la nouvelle fonction n'existe pas
+        // Vérifier s'il y a un abonnement actif ou expiré récemment
         $stmt = $bdd->prepare("
             SELECT id_abonnement, date_fin, statut 
             FROM stock_abonnement 
             WHERE id_entreprise = :id_entreprise 
-            AND statut = 'actif'
+            AND (statut = 'actif' OR statut = 'expire')
             ORDER BY date_fin DESC 
             LIMIT 1
         ");
@@ -243,16 +263,29 @@ function checkForfaitActif($bdd, $enterpriseId) {
         $dateFin = new DateTime($abonnement['date_fin']);
         $now = new DateTime();
         
-        if ($dateFin < $now) {
+        // Calculer la date de fin de période de grâce (2 jours après expiration)
+        $dateGraceFin = clone $dateFin;
+        $dateGraceFin->modify('+2 days');
+        
+        // Si le forfait est expiré depuis plus de 2 jours, bloquer complètement
+        if ($now > $dateGraceFin) {
             // Mettre à jour le statut
-            $updateStmt = $bdd->prepare("
-                UPDATE stock_abonnement 
-                SET statut = 'expire' 
-                WHERE id_abonnement = :id_abonnement
-            ");
-            $updateStmt->execute(['id_abonnement' => $abonnement['id_abonnement']]);
+            if ($abonnement['statut'] !== 'expire') {
+                $updateStmt = $bdd->prepare("
+                    UPDATE stock_abonnement 
+                    SET statut = 'expire' 
+                    WHERE id_abonnement = :id_abonnement
+                ");
+                $updateStmt->execute(['id_abonnement' => $abonnement['id_abonnement']]);
+            }
             
-            throw new Exception("Votre forfait a expiré. Veuillez renouveler votre abonnement pour continuer.", 403);
+            throw new Exception("Votre forfait a expiré et la période de grâce est terminée. Veuillez renouveler votre abonnement immédiatement pour continuer.", 403);
+        }
+        
+        // Si le forfait est expiré mais dans la période de grâce, bloquer les actions
+        if ($dateFin < $now && $now <= $dateGraceFin) {
+            $joursGraceRestants = $dateGraceFin->diff($now)->days + 1;
+            throw new Exception("Votre forfait a expiré. Vous avez encore {$joursGraceRestants} jour(s) pour renouveler votre abonnement avant que toutes les fonctionnalités soient bloquées.", 403);
         }
         
         return true;

@@ -12,6 +12,7 @@ import PointVente from '../pages/PointVente.vue'
 import Journal from '../pages/Journal.vue'
 import Fournisseurs from '../pages/Fournisseurs.vue'
 import Settings from '../pages/Settings.vue'
+import GestionCompte from '../pages/GestionCompte.vue'
 
 const routes = [
   {
@@ -114,6 +115,12 @@ const routes = [
     name: 'Fournisseurs',
     component: Fournisseurs,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/gestion-compte',
+    name: 'GestionCompte',
+    component: GestionCompte,
+    meta: { requiresAuth: true, requiresAdmin: true }
   }
 ]
 
@@ -141,6 +148,15 @@ router.beforeEach((to, from, next) => {
   // Si la route nécessite l'authentification et que l'utilisateur n'est pas connecté
   else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login' });
+  }
+  // Si la route nécessite les droits admin et que l'utilisateur n'est pas admin
+  else if (to.meta.requiresAdmin && authStore.isAuthenticated) {
+    const userRole = authStore.userRole?.toLowerCase();
+    if (userRole !== 'admin' && userRole !== 'superadmin') {
+      next({ name: 'Dashboard' });
+    } else {
+      next();
+    }
   } else {
     next();
   }

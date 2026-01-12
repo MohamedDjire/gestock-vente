@@ -6,17 +6,17 @@
         <div v-if="isAuthenticated" class="topbar-sticky">
           <Topbar />
         </div>
-        <!-- Alerte forfait expiré -->
-        <div v-if="forfaitExpired" class="forfait-alert">
+        <!-- Alerte forfait selon l'état -->
+        <div v-if="showForfaitAlert" class="forfait-alert" :class="alertClass">
           <div class="forfait-alert-content">
-            <span class="forfait-alert-icon">⚠️</span>
-            <span class="forfait-alert-message">
-              Votre forfait a expiré. Veuillez renouveler votre abonnement pour continuer à utiliser l'application.
-            </span>
-            <button @click="goToForfait" class="forfait-alert-btn">Renouveler</button>
+            <span class="forfait-alert-icon">{{ alertIcon }}</span>
+            <span class="forfait-alert-message" v-html="alertMessage"></span>
+            <button @click="goToForfait" class="forfait-alert-btn" :class="{ 'urgent': isUrgent }">
+              {{ alertButtonText }}
+            </button>
           </div>
         </div>
-        <div class="page-content" :class="{ 'blocked': forfaitExpired }">
+        <div class="page-content" :class="{ 'blocked': isBlocked }">
           <slot />
         </div>
       </div>
@@ -36,39 +36,85 @@ const router = useRouter()
 const authStore = useAuthStore()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const { isExpired, checkForfait, loadFromStorage, forfaitStatus } = useForfait()
-const forfaitExpired = ref(false)
 
-const checkForfaitStatus = () => {
-  loadFromStorage()
-  const status = localStorage.getItem('forfait_status')
-  if (status) {
-    try {
-      const parsed = JSON.parse(status)
-      // Ne bloquer que si le forfait est expiré ET qu'il n'est pas en "no_subscription"
-      // (no_subscription signifie qu'il n'y a pas encore d'abonnement, on ne bloque pas dans ce cas)
-      forfaitExpired.value = (parsed.expire === true || parsed.actif === false) && !parsed.no_subscription
-    } catch (e) {
-      console.error('Erreur lors de la vérification du forfait:', e)
-    }
+// Computed pour déterminer l'état du forfait et les alertes
+const showForfaitAlert = computed(() => {
+  if (!forfaitStatus.value) return false
+  const etat = forfaitStatus.value.etat
+  return etat === 'warning' || etat === 'grace' || etat === 'bloque'
+})
+
+const isBlocked = computed(() => {
+  if (!forfaitStatus.value) return false
+  return forfaitStatus.value.etat === 'bloque' || forfaitStatus.value.bloque === true
+})
+
+const isUrgent = computed(() => {
+  if (!forfaitStatus.value) return false
+  return forfaitStatus.value.etat === 'grace' || forfaitStatus.value.en_grace === true
+})
+
+const alertClass = computed(() => {
+  if (!forfaitStatus.value) return ''
+  const etat = forfaitStatus.value.etat
+  if (etat === 'bloque') return 'forfait-alert-blocked'
+  if (etat === 'grace') return 'forfait-alert-grace'
+  if (etat === 'warning') return 'forfait-alert-warning'
+  return ''
+})
+
+const alertIcon = computed(() => {
+  if (!forfaitStatus.value) return '⚠️'
+  const etat = forfaitStatus.value.etat
+  if (etat === 'bloque') return '🚫'
+  if (etat === 'grace') return '⏰'
+  if (etat === 'warning') return '⚠️'
+  return '⚠️'
+})
+
+const alertMessage = computed(() => {
+  if (!forfaitStatus.value) return ''
+  const etat = forfaitStatus.value.etat
+  
+  if (etat === 'bloque') {
+    return '<strong>Votre forfait a expiré et toutes les fonctionnalités sont bloquées.</strong> Veuillez renouveler votre abonnement immédiatement pour continuer à utiliser l\'application.'
   }
-}
+  
+  if (etat === 'grace') {
+    const jours = forfaitStatus.value.jours_grace_restants || 0
+    return `<strong>Votre forfait a expiré !</strong> Il vous reste <strong>${jours} jour${jours > 1 ? 's' : ''}</strong> pour renouveler votre abonnement avant que toutes les fonctionnalités soient bloquées.`
+  }
+  
+  if (etat === 'warning') {
+    const jours = forfaitStatus.value.jours_restants || 0
+    return `<strong>Attention :</strong> Votre forfait expire dans <strong>${jours} jour${jours > 1 ? 's' : ''}</strong>. Veuillez renouveler votre abonnement pour éviter l'interruption de service.`
+  }
+  
+  return ''
+})
+
+const alertButtonText = computed(() => {
+  if (!forfaitStatus.value) return 'Renouveler'
+  const etat = forfaitStatus.value.etat
+  if (etat === 'bloque' || etat === 'grace') return 'Renouveler maintenant'
+  return 'Renouveler'
+})
 
 const goToForfait = () => {
   // Rediriger vers la page de gestion des forfaits
-  router.push('/settings')
+  router.push('/gestion-compte?tab=forfaits')
 }
 
 onMounted(() => {
   // Ne vérifier le forfait que si l'utilisateur est authentifié
   if (authStore.isAuthenticated) {
-    checkForfaitStatus()
     checkForfait()
     
     // Écouter les événements de changement de forfait
-    window.addEventListener('forfait-expired', checkForfaitStatus)
+    window.addEventListener('forfait-expired', checkForfait)
     window.addEventListener('storage', (e) => {
       if (e.key === 'forfait_status') {
-        checkForfaitStatus()
+        loadFromStorage()
       }
     })
   }
@@ -178,6 +224,120 @@ onUnmounted(() => {
 
 .forfait-alert-btn:hover {
   background: #b91c1c;
+}
+
+.forfait-alert-btn.urgent {
+  background: #dc2626;
+  animation: pulse-button 1s infinite;
+}
+
+.forfait-alert-btn.urgent:hover {
+  background: #b91c1c;
+}
+
+.forfait-alert-warning {
+  background: #fee2e2;
+  border-left-color: #dc2626;
+}
+
+.forfait-alert-grace {
+  background: #fee2e2;
+  border-left-color: #dc2626;
+  animation: pulse-alert 2s infinite;
+}
+
+.forfait-alert-blocked {
+  background: #dc2626;
+  border-left-color: #991b1b;
+  color: white;
+}
+
+.forfait-alert-blocked .forfait-alert-message {
+  color: white;
+}
+
+.forfait-alert-blocked .forfait-alert-btn {
+  background: white;
+  color: #dc2626;
+}
+
+.forfait-alert-blocked .forfait-alert-btn:hover {
+  background: #f3f4f6;
+}
+
+@keyframes pulse-alert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes pulse-button {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.forfait-alert-btn.urgent {
+  background: #dc2626;
+  animation: pulse-button 1s infinite;
+}
+
+.forfait-alert-btn.urgent:hover {
+  background: #b91c1c;
+}
+
+.forfait-alert-warning {
+  background: #fee2e2;
+  border-left-color: #dc2626;
+}
+
+.forfait-alert-grace {
+  background: #fee2e2;
+  border-left-color: #dc2626;
+  animation: pulse-alert 2s infinite;
+}
+
+.forfait-alert-blocked {
+  background: #dc2626;
+  border-left-color: #991b1b;
+  color: white;
+}
+
+.forfait-alert-blocked .forfait-alert-message {
+  color: white;
+}
+
+.forfait-alert-blocked .forfait-alert-btn {
+  background: white;
+  color: #dc2626;
+}
+
+.forfait-alert-blocked .forfait-alert-btn:hover {
+  background: #f3f4f6;
+}
+
+@keyframes pulse-alert {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes pulse-button {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .page-content.blocked {
