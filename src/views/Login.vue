@@ -125,6 +125,9 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
+import { logJournal } from '../composables/useJournal.js'
+
+
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -135,11 +138,17 @@ const formData = ref({
   password: ''
 })
 
+
+
 const handleLogin = async () => {
-  
   const result = await login(formData.value.email, formData.value.password)
-  
   if (result.success) {
+    // Journaliser la connexion
+    await logJournal({
+      user: result.user?.email || formData.value.email,
+      action: 'Connexion',
+      details: 'Connexion réussie'
+    })
     // Rediriger vers le dashboard après connexion réussie
     router.push({ name: 'Dashboard' })
   } else {

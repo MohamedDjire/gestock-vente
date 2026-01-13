@@ -124,7 +124,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('forfait-expired', checkForfaitStatus)
+  window.removeEventListener('forfait-expired', checkForfait)
 })
 </script>
 

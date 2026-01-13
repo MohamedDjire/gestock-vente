@@ -71,7 +71,21 @@ const menuItems = computed(() => {
   return items
 })
 
-function logout() {
+import { logJournal } from '../composables/useJournal.js'
+
+async function logout() {
+  // Récupérer l'utilisateur avant suppression
+  const userStr = localStorage.getItem('prostock_user')
+  let userEmail = ''
+  try {
+    if (userStr) userEmail = JSON.parse(userStr)?.email || ''
+  } catch {}
+  // Journaliser la déconnexion
+  await logJournal({
+    user: userEmail,
+    action: 'Déconnexion',
+    details: 'Déconnexion manuelle'
+  })
   localStorage.clear();
   showLogoutModal.value = false;
   router.push('/login').then(() => {
