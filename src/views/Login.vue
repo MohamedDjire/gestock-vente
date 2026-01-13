@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { logJournal } from '../composables/useJournal.js'
@@ -151,6 +151,22 @@ const handleLogin = async () => {
     })
     // Rediriger vers le dashboard après connexion réussie
     router.push({ name: 'Dashboard' })
+    // Attendre que Vue ait terminé toutes les mises à jour réactives
+    await nextTick()
+    
+    // Attendre un peu pour s'assurer que le store est complètement mis à jour
+    await new Promise(resolve => setTimeout(resolve, 200))
+    
+    // Vérifier que l'utilisateur est bien authentifié avant de rediriger
+    if (authStore.isAuthenticated) {
+      // Utiliser window.location pour forcer un rechargement complet
+      // Cela garantit que toutes les données sont à jour
+      window.location.href = '/dashboard'
+    } else {
+      // Si l'authentification n'est pas détectée, forcer quand même la redirection
+      // Le guard de navigation redirigera vers login si nécessaire
+      window.location.href = '/dashboard'
+    }
   } else {
     console.error('❌ Échec de la connexion:', result.error)
   }

@@ -5,20 +5,23 @@
  */
 
 // Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
-header('Content-Type: application/json');
+// Désactiver l'affichage des erreurs pour éviter qu'elles polluent la réponse JSON
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+
+// Headers CORS - DOIT être défini avant toute sortie
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
+header('Access-Control-Allow-Credentials: true');
+header('Content-Type: application/json; charset=utf-8');
 
 // Répondre immédiatement aux requêtes OPTIONS (préflight)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
@@ -197,20 +200,9 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
             
             $idVente = $bdd->lastInsertId();
             
-            // Déduire le stock
-            $updateStmt = $bdd->prepare("
-                UPDATE stock_produit 
-                SET quantite_stock = quantite_stock - :quantite,
-                    date_modification = NOW()
-                WHERE id_produit = :id_produit AND id_entreprise = :id_entreprise
-            ");
-            $updateStmt->execute([
-                'quantite' => $quantite,
-                'id_produit' => $idProduit,
-                'id_entreprise' => $enterpriseId
-            ]);
-            
             // Créer une sortie de stock
+            // NOTE: Le trigger 'trg_after_sortie_stock' déduira automatiquement le stock
+            // Ne pas déduire manuellement pour éviter la double déduction
             $sortieStmt = $bdd->prepare("
                 INSERT INTO stock_sortie (
                     id_produit, quantite, motif, id_user, id_entreprise, type_sortie
@@ -242,50 +234,170 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
         
         // Enregistrer dans le journal
         try {
+            // Récupérer le nom complet de l'utilisateur
             $userName = 'Utilisateur';
             if ($currentUser) {
-                $userName = $currentUser['nom'] ?? $currentUser['prenom'] ?? $currentUser['email'] ?? 'Utilisateur';
+                $nom = trim(($currentUser['nom'] ?? '') . ' ' . ($currentUser['prenom'] ?? ''));
+                $userName = !empty($nom) ? $nom : ($currentUser['email'] ?? 'Utilisateur');
             } else {
                 // Récupérer le nom de l'utilisateur depuis la base
                 $stmtUser = $bdd->prepare("SELECT nom, prenom, email FROM stock_utilisateur WHERE id_utilisateur = :id");
                 $stmtUser->execute(['id' => $userId]);
                 $userData = $stmtUser->fetch(PDO::FETCH_ASSOC);
                 if ($userData) {
-                    $userName = $userData['nom'] ?? $userData['prenom'] ?? $userData['email'] ?? 'Utilisateur';
+                    $nom = trim(($userData['nom'] ?? '') . ' ' . ($userData['prenom'] ?? ''));
+                    $userName = !empty($nom) ? $nom : ($userData['email'] ?? 'Utilisateur');
                 }
             }
-            $pointVenteName = '';
+            
+            // Récupérer le nom du point de vente
+            $pointVenteName = 'Point de vente inconnu';
             $stmtPv = $bdd->prepare("SELECT nom_point_vente FROM stock_point_vente WHERE id_point_vente = :id");
             $stmtPv->execute(['id' => $idPointVente]);
             $pvData = $stmtPv->fetch(PDO::FETCH_ASSOC);
-            if ($pvData) {
+            if ($pvData && !empty($pvData['nom_point_vente'])) {
                 $pointVenteName = $pvData['nom_point_vente'];
             }
             
+            // Créer une liste détaillée des produits vendus
+            $produitsList = [];
+            foreach ($ventesCreees as $vente) {
+                $produitsList[] = sprintf(
+                    "%s (x%d)",
+                    $vente['produit_nom'] ?? 'Produit',
+                    $vente['quantite'] ?? 0
+                );
+            }
+            
+            // Format cohérent avec les autres actions du journal
             $details = sprintf(
-                "Vente de %d produit(s) au point de vente '%s'. Total: %.2f FCFA%s",
-                count($ventesCreees),
+                "Point de vente: %s | Produits: %s | Total: %s FCFA%s",
                 $pointVenteName,
-                $montantTotalFinal,
-                $remise > 0 ? sprintf(" (Remise: %.2f FCFA)", $remise) : ""
+                implode(', ', array_slice($produitsList, 0, 5)) . (count($produitsList) > 5 ? sprintf(' et %d autre(s)', count($produitsList) - 5) : ''),
+                number_format($montantTotalFinal, 0, ',', ' '),
+                $remise > 0 ? sprintf(" | Remise: %s FCFA", number_format($remise, 0, ',', ' ')) : ""
             );
             
-            // Vérifier si la table stock_journal existe
-            $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_journal'");
-            if ($checkTable->rowCount() > 0) {
-                $journalStmt = $bdd->prepare("
-                    INSERT INTO stock_journal (date, user, action, details, id_entreprise)
-                    VALUES (NOW(), :user, 'Vente', :details, :id_entreprise)
-                ");
-                $journalStmt->execute([
-                    'user' => $userName,
-                    'details' => $details,
-                    'id_entreprise' => $enterpriseId
-                ]);
+            // Vérifier si la table stock_journal existe (essayer plusieurs noms possibles)
+            $tableNames = ['stock_journal', 'journal'];
+            $tableExists = false;
+            $tableName = null;
+            
+            foreach ($tableNames as $table) {
+                $checkTable = $bdd->query("SHOW TABLES LIKE '{$table}'");
+                if ($checkTable->rowCount() > 0) {
+                    $tableExists = true;
+                    $tableName = $table;
+                    break;
+                }
+            }
+            
+            if ($tableExists) {
+                // Vérifier si la colonne id_entreprise existe
+                $checkColumn = $bdd->query("SHOW COLUMNS FROM `{$tableName}` LIKE 'id_entreprise'");
+                $hasEnterpriseColumn = $checkColumn->rowCount() > 0;
+                
+                if ($hasEnterpriseColumn) {
+                    // Insérer avec id_entreprise
+                    $journalStmt = $bdd->prepare("
+                        INSERT INTO `{$tableName}` (date, user, action, details, id_entreprise)
+                        VALUES (NOW(), :user, 'Vente', :details, :id_entreprise)
+                    ");
+                    $result = $journalStmt->execute([
+                        'user' => $userName,
+                        'details' => $details,
+                        'id_entreprise' => $enterpriseId
+                    ]);
+                    if (!$result) {
+                        error_log("Erreur SQL lors de l'insertion dans le journal: " . implode(', ', $journalStmt->errorInfo()));
+                    }
+                } else {
+                    // Fallback : insérer sans id_entreprise (pour compatibilité)
+                    $journalStmt = $bdd->prepare("
+                        INSERT INTO `{$tableName}` (date, user, action, details)
+                        VALUES (NOW(), :user, 'Vente', :details)
+                    ");
+                    $result = $journalStmt->execute([
+                        'user' => $userName,
+                        'details' => $details
+                    ]);
+                    if (!$result) {
+                        error_log("Erreur SQL lors de l'insertion dans le journal: " . implode(', ', $journalStmt->errorInfo()));
+                    }
+                }
+            } else {
+                error_log("Table stock_journal ou journal n'existe pas");
             }
         } catch (Exception $e) {
             // Ne pas faire échouer la vente si l'enregistrement du journal échoue
             error_log("Erreur lors de l'enregistrement dans le journal: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+        }
+        
+        // Enregistrer le reçu automatiquement
+        try {
+            // S'assurer que pointVenteName est défini (utiliser celui du journal si disponible)
+            if (empty($pointVenteName)) {
+                $stmtPv2 = $bdd->prepare("SELECT nom_point_vente FROM stock_point_vente WHERE id_point_vente = :id");
+                $stmtPv2->execute(['id' => $idPointVente]);
+                $pvData2 = $stmtPv2->fetch(PDO::FETCH_ASSOC);
+                $pointVenteName = $pvData2 && !empty($pvData2['nom_point_vente']) ? $pvData2['nom_point_vente'] : 'Point de vente inconnu';
+            }
+            
+            // Préparer les données du reçu
+            $receiptProducts = [];
+            foreach ($ventesCreees as $vente) {
+                $receiptProducts[] = [
+                    'nom' => $vente['produit_nom'] ?? 'Produit',
+                    'code' => $vente['code_produit'] ?? '',
+                    'quantite' => $vente['quantite'] ?? 0,
+                    'prix_unitaire' => $vente['prix_unitaire'] ?? 0,
+                    'sous_total' => $vente['montant_total'] ?? 0
+                ];
+            }
+            
+            $receiptData = [
+                'id_vente' => $ventesCreees[0]['id_vente'] ?? null,
+                'date' => date('Y-m-d H:i:s'),
+                'point_vente' => $pointVenteName,
+                'produits' => $receiptProducts,
+                'nombre_articles' => count($ventesCreees),
+                'sous_total' => $montantTotal,
+                'remise' => $remise,
+                'total' => $montantTotalFinal
+            ];
+            
+            // Vérifier si la table stock_receipt existe
+            $checkReceiptTable = $bdd->query("SHOW TABLES LIKE 'stock_receipt'");
+            if ($checkReceiptTable->rowCount() > 0) {
+                $receiptStmt = $bdd->prepare("
+                    INSERT INTO stock_receipt (
+                        id_vente, id_point_vente, id_entreprise, id_user,
+                        date_vente, point_vente_nom, nombre_articles,
+                        sous_total, remise, total, produits_json, receipt_data
+                    ) VALUES (
+                        :id_vente, :id_point_vente, :id_entreprise, :id_user,
+                        NOW(), :point_vente_nom, :nombre_articles,
+                        :sous_total, :remise, :total, :produits_json, :receipt_data
+                    )
+                ");
+                $receiptStmt->execute([
+                    'id_vente' => $ventesCreees[0]['id_vente'] ?? null,
+                    'id_point_vente' => $idPointVente,
+                    'id_entreprise' => $enterpriseId,
+                    'id_user' => $userId,
+                    'point_vente_nom' => $pointVenteName,
+                    'nombre_articles' => count($ventesCreees),
+                    'sous_total' => $montantTotal,
+                    'remise' => $remise,
+                    'total' => $montantTotalFinal,
+                    'produits_json' => json_encode($receiptProducts, JSON_UNESCAPED_UNICODE),
+                    'receipt_data' => json_encode($receiptData, JSON_UNESCAPED_UNICODE)
+                ]);
+            }
+        } catch (Exception $e) {
+            // Ne pas faire échouer la vente si l'enregistrement du reçu échoue
+            error_log("Erreur lors de l'enregistrement du reçu: " . $e->getMessage());
         }
         
         $bdd->commit();
@@ -394,11 +506,18 @@ try {
     ], JSON_UNESCAPED_UNICODE);
     
 } catch (Exception $e) {
+    // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
+    header('Content-Type: application/json; charset=utf-8');
+    
     http_response_code($e->getCode() ?: 400);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),
         'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 

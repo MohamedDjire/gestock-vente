@@ -66,15 +66,6 @@
           </div>
         </div>
         
-        <!-- Total toujours visible en bas -->
-        <div class="cart-total-sticky" v-if="cart.length > 0">
-          <div class="total-display">
-            <div class="total-label">Total à payer</div>
-            <div class="total-amount">{{ formatPrice(total) }}</div>
-            <div class="total-items">{{ totalItems }} article(s)</div>
-          </div>
-        </div>
-        
         <div class="cart-footer" v-if="cart.length > 0">
           <div class="cart-summary">
             <div class="summary-row">
@@ -548,7 +539,7 @@ const showReceiptModal = ref(false)
 
 const processSale = async () => {
   if (cart.value.length === 0) {
-    alert('Le panier est vide')
+    // Pas d'alerte, juste retourner silencieusement
     return
   }
   
@@ -576,10 +567,19 @@ const processSale = async () => {
     const response = await apiService.post('/api_vente.php', saleData)
     
     if (response.success) {
-      // Créer le reçu
+      // Récupérer l'ID de la vente depuis la réponse
+      const idVente = response.data?.id_vente || response.data?.ventes?.[0]?.id_vente || Date.now()
+      
+      // Créer le reçu avec toutes les informations
       lastSaleReceipt.value = {
-        id_vente: response.data.id_vente || Date.now(),
-        date: new Date().toLocaleString('fr-FR'),
+        id_vente: idVente,
+        date: new Date().toLocaleString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
         point_vente: selectedPointVente.value.nom_point_vente,
         produits: cart.value.map(item => ({
           nom: item.nom,
@@ -594,21 +594,26 @@ const processSale = async () => {
         total: total.value
       }
       
-      // Afficher le reçu
-      showReceiptModal.value = true
+      // Vider le panier automatiquement après vente réussie (sans confirmation)
+      cart.value = []
+      discount.value = 0
+      discountValue.value = 0
+      discountType.value = 'fixed'
       
-      // Vider le panier
-      const oldCart = [...cart.value]
-      clearCart()
+      // Afficher le reçu (pas d'alerte de succès, le reçu suffit)
+      showReceiptModal.value = true
       
       // Recharger les produits pour mettre à jour les stocks
       await loadProducts()
+      
+      // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
     } else {
-      alert('Erreur lors de l\'enregistrement de la vente: ' + (response.message || 'Erreur inconnue'))
+      // Erreur silencieuse, juste dans la console
+      console.error('Erreur lors de l\'enregistrement de la vente:', response.message || 'Erreur inconnue')
     }
   } catch (error) {
+    // Erreur silencieuse, juste dans la console
     console.error('Erreur lors de la vente:', error)
-    alert('Erreur lors de l\'enregistrement de la vente: ' + (error.message || 'Erreur inconnue'))
   } finally {
     processingSale.value = false
   }
@@ -620,7 +625,206 @@ const closeReceipt = () => {
 }
 
 const printReceipt = () => {
-  window.print()
+  // Créer une nouvelle fenêtre pour l'impression du reçu uniquement
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    // Pas d'alerte, juste retourner silencieusement
+    console.warn('Impossible d\'ouvrir la fenêtre d\'impression. Veuillez autoriser les popups.')
+    return
+  }
+  
+  // Récupérer le contenu HTML du reçu
+  const receiptElement = document.querySelector('.receipt-modal')
+  if (!receiptElement) {
+    // Pas d'alerte, juste retourner silencieusement
+    console.warn('Reçu non trouvé')
+    return
+  }
+  
+  // Cloner l'élément pour ne pas modifier l'original
+  const receiptClone = receiptElement.cloneNode(true)
+  
+  // Supprimer les boutons d'action dans le clone
+  const actions = receiptClone.querySelector('.receipt-actions')
+  if (actions) {
+    actions.remove()
+  }
+  
+  // Créer le HTML complet pour l'impression
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Reçu de Vente #${lastSaleReceipt.value.id_vente}</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          background: white;
+        }
+        .receipt-modal {
+          background: white;
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 0;
+        }
+        .receipt-header {
+          background: linear-gradient(135deg, #1a5f4a 0%, #145040 100%);
+          color: white;
+          padding: 1.5rem;
+          border-radius: 16px 16px 0 0;
+        }
+        .receipt-header h2 {
+          margin: 0;
+          font-size: 1.5rem;
+          font-weight: 700;
+        }
+        .receipt-body {
+          padding: 2rem;
+        }
+        .receipt-info {
+          margin-bottom: 2rem;
+          padding-bottom: 1.5rem;
+          border-bottom: 2px solid #e5e7eb;
+        }
+        .receipt-line {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 0.75rem;
+          font-size: 0.95rem;
+        }
+        .receipt-line .label {
+          color: #6b7280;
+          font-weight: 600;
+        }
+        .receipt-line .value {
+          color: #111827;
+          font-weight: 600;
+        }
+        .receipt-products {
+          margin-bottom: 2rem;
+        }
+        .receipt-table-header {
+          display: grid;
+          grid-template-columns: 2fr 1fr 1fr 1fr;
+          gap: 1rem;
+          padding: 1rem;
+          background: #f9fafb;
+          border-radius: 8px;
+          font-weight: 700;
+          color: #374151;
+          font-size: 0.9rem;
+          margin-bottom: 0.5rem;
+        }
+        .receipt-table-row {
+          display: grid;
+          grid-template-columns: 2fr 1fr 1fr 1fr;
+          gap: 1rem;
+          padding: 1rem;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .receipt-table-row:last-child {
+          border-bottom: none;
+        }
+        .col-name {
+          display: flex;
+          flex-direction: column;
+        }
+        .product-name {
+          font-weight: 600;
+          color: #111827;
+          margin-bottom: 0.25rem;
+        }
+        .product-code {
+          font-size: 0.85rem;
+          color: #6b7280;
+        }
+        .col-qty, .col-price, .col-total {
+          text-align: right;
+          font-weight: 600;
+          color: #111827;
+        }
+        .receipt-totals {
+          background: #f9fafb;
+          padding: 1.5rem;
+          border-radius: 8px;
+          margin-bottom: 2rem;
+        }
+        .receipt-total-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 0.75rem;
+          font-size: 1rem;
+        }
+        .receipt-total-row:last-child {
+          margin-bottom: 0;
+        }
+        .receipt-total-row.final {
+          margin-top: 1rem;
+          padding-top: 1rem;
+          border-top: 2px solid #e5e7eb;
+          font-size: 1.3rem;
+        }
+        .receipt-total-row.final .label {
+          font-weight: 700;
+          color: #111827;
+        }
+        .receipt-total-row.final .value {
+          font-weight: 700;
+          color: #1a5f4a;
+          font-size: 1.5rem;
+        }
+        .receipt-total-row .value.discount {
+          color: #dc2626;
+        }
+        .receipt-footer {
+          text-align: center;
+          padding-top: 1.5rem;
+          border-top: 2px solid #e5e7eb;
+        }
+        .receipt-footer p {
+          margin: 0.5rem 0;
+          color: #6b7280;
+        }
+        .receipt-note {
+          font-size: 0.85rem;
+          color: #9ca3af;
+          font-style: italic;
+        }
+        @media print {
+          body {
+            padding: 0;
+          }
+          .receipt-modal {
+            box-shadow: none;
+            max-width: 100%;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      ${receiptClone.outerHTML}
+    </body>
+    </html>
+  `
+  
+  printWindow.document.write(htmlContent)
+  printWindow.document.close()
+  
+  // Attendre que le contenu soit chargé avant d'imprimer
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.print()
+      // Fermer la fenêtre après impression (optionnel)
+      // printWindow.close()
+    }, 250)
+  }
 }
 
 // Initialisation
@@ -844,40 +1048,6 @@ onMounted(async () => {
   text-align: center;
   font-size: 1rem;
   font-weight: 600;
-}
-
-.cart-total-sticky {
-  position: sticky;
-  bottom: 0;
-  background: linear-gradient(135deg, #1a5f4a 0%, #145040 100%);
-  color: white;
-  padding: 1.25rem 1.5rem;
-  border-top: 3px solid #ffe082;
-  box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
-  z-index: 10;
-}
-
-.total-display {
-  text-align: center;
-}
-
-.total-label {
-  font-size: 0.9rem;
-  opacity: 0.9;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
-
-.total-amount {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.total-items {
-  font-size: 0.85rem;
-  opacity: 0.8;
 }
 
 .cart-footer {
@@ -1457,9 +1627,23 @@ onMounted(async () => {
 }
 
 @media print {
+  /* Masquer tout sauf le reçu lors de l'impression */
+  body * {
+    visibility: hidden;
+  }
+  
+  .receipt-overlay,
+  .receipt-overlay * {
+    visibility: visible;
+  }
+  
   .receipt-overlay {
-    position: static;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
     background: white;
+    z-index: 9999;
   }
   
   .receipt-header .receipt-actions {
@@ -1469,6 +1653,12 @@ onMounted(async () => {
   .receipt-modal {
     box-shadow: none;
     max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+  
+  .receipt-header {
+    border-radius: 0;
   }
 }
 
