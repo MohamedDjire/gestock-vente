@@ -125,42 +125,31 @@
 </template>
 
 <script setup>
-import { useStorage } from '../composables/storage/useStorage'
 import { useCurrencyStore } from '../stores/currency'
 import { useAuthStore } from '../stores/auth.js'
 import { useForfait } from '../composables/useForfait.js'
 import { ref, onMounted, provide, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { uploadPhoto } from '../config/cloudinary'
-      // Upload de la photo utilisateur
-      const onAvatarChange = async (e) => {
-        const file = e.target.files[0]
-        if (!file) return
-        try {
-          const result = await uploadPhoto(file)
-          if (result.success && (result.data.secure_url || result.data.url)) {
-            // Mettre à jour la photo dans l'objet user et le localStorage
-            const photoUrl = result.data.secure_url || result.data.url;
-            user.value = { ...user.value, photo: photoUrl };
-            // Mettre à jour le localStorage (clé prostock_user si Pinia, sinon user)
-            let userStorage = {};
-            if (localStorage.getItem('prostock_user')) {
-              userStorage = JSON.parse(localStorage.getItem('prostock_user'));
-              userStorage.photo = photoUrl;
-              localStorage.setItem('prostock_user', JSON.stringify(userStorage));
-            } else {
-              userStorage = JSON.parse(localStorage.getItem('user') || '{}');
-              userStorage.photo = photoUrl;
-              localStorage.setItem('user', JSON.stringify(userStorage));
-            }
-          }
-        } catch (err) {
-          alert('Erreur lors de l\'upload de la photo : ' + err.message)
-        }
-      }
 
-const { getUser } = useStorage()
-const user = ref(null)
+const authStore = useAuthStore()
+const onAvatarChange = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  try {
+    const result = await uploadPhoto(file)
+    if (result.success && (result.data.secure_url || result.data.url)) {
+      const photoUrl = result.data.secure_url || result.data.url;
+      // Mettre à jour la photo dans le store Pinia et localStorage
+      const updatedUser = { ...authStore.user, photo: photoUrl };
+      authStore.setAuthData(authStore.token, updatedUser);
+    }
+  } catch (err) {
+    alert('Erreur lors de l\'upload de la photo : ' + err.message)
+  }
+}
+
+const user = computed(() => authStore.user)
 const currencyStore = useCurrencyStore()
 const showProfileMenu = ref(false)
 const showLogoutModal = ref(false)
@@ -234,9 +223,7 @@ const goToRenewal = () => {
 }
 
 onMounted(() => {
-  user.value = getUser()
   currencyCode.value = currencyStore.currency || 'XOF'
-  const authStore = useAuthStore()
   if (authStore.isAuthenticated) {
     loadFromStorage()
     startAutoCheck()
