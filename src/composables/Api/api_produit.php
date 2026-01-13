@@ -104,9 +104,10 @@ try {
 
 /**
  * Récupérer tous les produits d'une entreprise
+ * @param int|null $idPointVente Si fourni, ne retourne que les produits disponibles dans ce point de vente
  */
-function getAllProducts($bdd, $enterpriseId) {
-    $stmt = $bdd->prepare("
+function getAllProducts($bdd, $enterpriseId, $idPointVente = null) {
+    $sql = "
         SELECT 
             p.id_produit,
             p.code_produit,
@@ -131,9 +132,41 @@ function getAllProducts($bdd, $enterpriseId) {
             END AS statut_stock
         FROM stock_produit p
         WHERE p.id_entreprise = :enterprise_id
-        ORDER BY p.date_creation DESC
-    ");
-    $stmt->execute(['enterprise_id' => $enterpriseId]);
+    ";
+    
+    $params = ['enterprise_id' => $enterpriseId];
+    
+    // Filtrer par point de vente si fourni
+    if ($idPointVente !== null) {
+        // Vérifier si la table de liaison existe
+        $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_produit_point_vente'");
+        if ($checkTable->rowCount() > 0) {
+            // Utiliser la table de liaison
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM stock_produit_point_vente ppv
+                WHERE ppv.id_produit = p.id_produit
+                AND ppv.id_point_vente = :id_point_vente
+                AND ppv.id_entreprise = :enterprise_id
+                AND ppv.actif = 1
+            )";
+            $params['id_point_vente'] = (int)$idPointVente;
+        } else {
+            // Fallback : utiliser l'entrepôt du point de vente
+            $sql .= " AND EXISTS (
+                SELECT 1 FROM stock_point_vente pv
+                INNER JOIN stock_entrepot e ON e.id_entrepot = pv.id_entrepot
+                WHERE pv.id_point_vente = :id_point_vente
+                AND pv.id_entreprise = :enterprise_id
+                AND (p.entrepot IS NULL OR LOWER(TRIM(p.entrepot)) = LOWER(TRIM(e.nom_entrepot)))
+            )";
+            $params['id_point_vente'] = (int)$idPointVente;
+        }
+    }
+    
+    $sql .= " ORDER BY p.date_creation DESC";
+    
+    $stmt = $bdd->prepare($sql);
+    $stmt->execute($params);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -344,7 +377,9 @@ try {
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'GET':
             if ($action === 'all') {
-                $resultat = getAllProducts($bdd, $enterpriseId);
+                // Récupérer le paramètre id_point_vente si fourni
+                $idPointVente = isset($_GET['id_point_vente']) ? (int)$_GET['id_point_vente'] : null;
+                $resultat = getAllProducts($bdd, $enterpriseId, $idPointVente);
             } elseif ($action === 'single' && $id !== null) {
                 $resultat = getProductById($bdd, $id, $enterpriseId);
             } elseif ($action === 'search' && $query !== null) {
