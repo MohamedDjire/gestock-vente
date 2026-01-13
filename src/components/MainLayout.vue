@@ -109,10 +109,10 @@ const goToForfait = () => {
 }
 
 onMounted(() => {
-  // Ne vérifier le forfait que si l'utilisateur est authentifié
+  // Rafraîchir l'utilisateur depuis l'API pour synchroniser la photo et les infos
   if (authStore.isAuthenticated) {
+    authStore.refreshUserFromApi()
     checkForfait()
-    
     // Écouter les événements de changement de forfait
     window.addEventListener('forfait-expired', checkForfait)
     window.addEventListener('storage', (e) => {

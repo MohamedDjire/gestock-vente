@@ -8,6 +8,21 @@ import router from '../router'
  * Gère le token, les données utilisateur et vérifie l'expiration automatiquement
  */
 export const useAuthStore = defineStore('auth', () => {
+    /**
+     * Rafraîchir l'utilisateur depuis l'API (pour synchroniser la photo et autres infos)
+     */
+    async function refreshUserFromApi() {
+      if (!user.value?.id_utilisateur && !user.value?.id) return
+      try {
+        const id = user.value.id_utilisateur || user.value.id
+        const response = await apiService.get(`/index.php?action=single&id=${id}`)
+        if (response.success && response.data) {
+          setAuthData(token.value, response.data)
+        }
+      } catch (e) {
+        console.error('Erreur lors du rafraîchissement utilisateur:', e)
+      }
+    }
   // =====================================================
   // ÉTAT (STATE)
   // =====================================================
@@ -312,6 +327,7 @@ export const useAuthStore = defineStore('auth', () => {
     checkTokenExpiration,
     initFromStorage,
     isTokenExpired
+    ,refreshUserFromApi
   }
 })
 
