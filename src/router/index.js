@@ -61,18 +61,14 @@ const routes = [
     component: () => import('../pages/Ventes.vue'),
     meta: { requiresAuth: true }
   },
+  
   {
     path: '/factures',
     name: 'Factures',
     component: ComingSoon,
     meta: { requiresAuth: true }
   },
-  {
-    path: '/compta',
-    name: 'Compta',
-    component: ComingSoon,
-    meta: { requiresAuth: true }
-  },
+
   {
     path: '/contacts',
     name: 'Contacts',
@@ -120,6 +116,12 @@ const routes = [
     name: 'GestionCompte',
     component: GestionCompte,
     meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/comptabilite',
+    name: 'Comptabilite',
+    component: () => import('../pages/Comptabilite.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

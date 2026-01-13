@@ -50,7 +50,12 @@
             <td class="action-cell">
               <span class="action-badge" :class="getActionClass(entry.action)">{{ entry.action || 'Action' }}</span>
             </td>
-            <td class="details-cell">{{ entry.details || '—' }}</td>
+            <td class="details-cell">
+              <span class="details-text">{{ entry.details || '—' }}</span>
+              <button class="btn-view" @click="openDetails(entry)" title="Voir détails">
+                <span class="icon-view">👁️</span>
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -61,11 +66,63 @@
       <span>Page {{ page }} / {{ pageCount }}</span>
       <button @click="page++" :disabled="page === pageCount">Suivant</button>
     </div>
+    <!-- Modal for details -->
+    <div v-if="showDetailsModal" class="modal-overlay" @click.self="closeDetails">
+      <div class="modal-content view-modal">
+        <div class="modal-header" style="display:flex;align-items:center;gap:1rem;">
+          <h3 style="margin:0;flex:1;display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-size:1.3rem;">📋</span>
+            Détail du Mouvement
+          </h3>
+          <button @click="closeDetails" class="modal-close">×</button>
+        </div>
+        <div class="modal-body" style="width:100%;">
+          <!-- Bloc Informations Générales -->
+          <div class="modal-section">
+            <div class="section-title">
+              <span style="font-size:1.1rem;">🧑‍💼</span>
+              <span>Informations Générales</span>
+            </div>
+            <div class="section-content grid-2-cols">
+              <div>
+                <span class="details-label">Date :</span>
+                <span class="details-value">{{ formatJournalDate(selectedEntry?.date) }}</span>
+              </div>
+              <div>
+                <span class="details-label">Utilisateur :</span>
+                <span class="details-value">{{ selectedEntry?.user }}</span>
+              </div>
+              <div>
+                <span class="details-label">Action :</span>
+                <span class="details-value">
+                  <span class="action-badge" :class="getActionClass(selectedEntry?.action)">{{ selectedEntry?.action }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <!-- Bloc Détails -->
+          <div class="modal-section">
+            <div class="section-title">
+              <span style="font-size:1.1rem;">📝</span>
+              <span>Détails</span>
+            </div>
+            <div class="section-content">
+              <div class="details-value details-value-long" style="background:#f8fafc;border-radius:8px;padding:1rem 1.2rem;border:1px solid #e2e8f0;">
+                {{ selectedEntry?.details }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" @click="closeDetails">Fermer</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
-<script setup>
 
+<script setup>
 import { ref, computed, onMounted } from 'vue'
 import apiJournal from '../composables/api/apiJournal';
 import * as XLSX from 'xlsx';
@@ -81,6 +138,18 @@ const dateFrom = ref('');
 const dateTo = ref('');
 const authStore = useAuthStore()
 const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise'
+
+const showDetailsModal = ref(false)
+const selectedEntry = ref(null)
+
+function openDetails(entry) {
+  selectedEntry.value = entry
+  showDetailsModal.value = true
+}
+function closeDetails() {
+  showDetailsModal.value = false
+  selectedEntry.value = null
+}
 
 const filteredJournalEntries = computed(() => {
   let entries = journalEntries.value;
@@ -312,62 +381,65 @@ function exportPDF() {
 .table-container {
   flex: 1;
   overflow: auto;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  border: none;
   background: #fff;
   min-height: 0;
-  
+  box-shadow: 0 4px 24px 0 rgba(26, 95, 74, 0.08);
+  margin-bottom: 2rem;
 }
 
 .journal-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: #fff;
   table-layout: fixed;
+  border-radius: 18px;
+  overflow: hidden;
 }
 
-.journal-table thead {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+.journal-table thead tr {
+  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+  border-radius: 18px 18px 0 0;
 }
 
 .journal-table th {
-  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-  padding: 0.75rem 0.875rem;
+  padding: 1rem 0.875rem;
   text-align: left;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1a202c;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 2px solid #e2e8f0;
-  white-space: nowrap;
+  background: none;
+}
+.journal-table th:first-child {
+  border-top-left-radius: 18px;
+}
+.journal-table th:last-child {
+  border-top-right-radius: 18px;
 }
 
-.journal-table th:nth-child(1) { width: 15%; }
-.journal-table th:nth-child(2) { width: 25%; }
-.journal-table th:nth-child(3) { width: 20%; }
-.journal-table th:nth-child(4) { width: 40%; }
-
 .journal-table td {
-  padding: 0.75rem 0.875rem;
-  font-size: 0.8125rem;
+  padding: 1rem 0.875rem;
+  font-size: 0.95rem;
   color: #334155;
   border-bottom: 1px solid #f1f5f9;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: #fff;
+  transition: background 0.18s;
 }
 
 .data-row {
-  transition: all 0.2s ease;
+  transition: background 0.18s;
 }
-
-.data-row:hover {
+.data-row:nth-child(even) td {
   background: #f8fafc;
 }
-
+.data-row:hover td {
+  background: #e0e7ef;
+}
 .data-row:last-child td {
   border-bottom: none;
 }
@@ -448,9 +520,19 @@ function exportPDF() {
 
 .details-cell {
   color: #64748b;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+.details-cell span.details-text {
+  display: inline-block;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .empty-state {
@@ -548,6 +630,123 @@ function exportPDF() {
   background: #e2e8f0;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+.btn-view {
+  margin-left: 0.5rem;
+  background: #f3f4f6;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s;
+  box-shadow: 0 1px 2px #0001;
+}
+.btn-view:hover {
+  background: #e0e7ef;
+}
+.icon-view {
+  font-size: 1.15rem;
+  color: #2563eb;
+  pointer-events: none;
+}
+
+/* Styles de la modale */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 2.2rem 2.5rem;
+  min-width: 340px;
+  max-width: 98vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  animation: modalIn 0.18s cubic-bezier(.4,2,.6,1) both;
+}
+.modal-content h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a202c;
+  margin: 0 0 1rem 0;
+}
+
+.details-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem 0;
+  width: 100%;
+}
+
+.details-list li {
+  font-size: 0.875rem;
+  color: #334155;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.details-list li:last-child {
+  border-bottom: none;
+}
+
+.btn-primary {
+  background-color: #1a5f4a;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+  max-width: 120px;
+  align-self: flex-end;
+}
+
+/* Ajout dans <style scoped> */
+.details-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.details-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.2rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.7rem;
+}
+.details-row:last-child {
+  border-bottom: none;
+}
+.details-label {
+  min-width: 110px;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 1rem;
+}
+.details-value {
+  color: #1a202c;
+  font-size: 1rem;
+  word-break: break-word;
+  flex: 1;
+}
+.details-value-long {
+  white-space: pre-line;
 }
 </style>
 

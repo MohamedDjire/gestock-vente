@@ -70,7 +70,7 @@ const menuItems = computed(() => {
     { name: 'Entrepôts', route: '/entrepot', icon: '🏭' },
     { name: 'Points de Vente', route: '/point-vente', icon: '🏪' },
     { name: 'Ventes', route: '/ventes', icon: '🛒' },
-    { name: 'Comptabilité', route: '/compta', icon: '💰' },
+    { name: 'Comptabilité', route: '/comptabilite', icon: '💰' },
     { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
     { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
     { name: 'Journal', route: '/journal', icon: '📝' },

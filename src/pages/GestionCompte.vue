@@ -1,4 +1,11 @@
+
 <template>
+    <!-- Snackbar notification -->
+    <transition name="fade">
+      <div v-if="showSnackbar" :class="['snackbar', snackbarType]">
+        {{ snackbarMessage }}
+      </div>
+    </transition>
   <div class="gestion-compte-page">
     <div class="page-header">
       <h1>Gestion du Compte</h1>
@@ -322,6 +329,13 @@
         </div>
         <div class="modal-body">
           <form @submit.prevent="onUserFormSubmit" class="user-form">
+                        <div class="form-group">
+                          <label>Photo</label>
+                          <input type="file" accept="image/*" @change="onPhotoChange" />
+                          <div v-if="uploadingPhoto" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
+                          <div v-if="userForm.photo" style="margin-top:0.5em;"><img :src="userForm.photo" alt="Photo utilisateur" style="max-width:80px;border-radius:8px;" /></div>
+                          <div v-if="photoError" style="color:#dc2626;font-size:0.95em;">{{ photoError }}</div>
+                        </div>
             
             <div class="form-row">
               <div class="form-group">
@@ -416,12 +430,49 @@
 </template>
 
 <script setup>
+// --- Notification Snackbar ---
 import { ref, computed, onMounted } from 'vue'
+const showSnackbar = ref(false)
+const snackbarMessage = ref('')
+const snackbarType = ref('success') // success | error
+function triggerSnackbar(message, type = 'success') {
+  snackbarMessage.value = message
+  snackbarType.value = type
+  showSnackbar.value = true
+  setTimeout(() => { showSnackbar.value = false }, 3000)
+}
+// ...existing code...
 import { apiService } from '../composables/Api/apiService.js'
 import { useAuthStore } from '../stores/auth.js'
 import AccessSelector from '../components/AccessSelector.vue'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
+import { uploadPhoto } from '../config/cloudinary'
+            const uploadingPhoto = ref(false)
+            const photoError = ref('')
+            async function onPhotoChange(e) {
+              const file = e.target.files[0]
+              if (!file) return
+              uploadingPhoto.value = true
+              photoError.value = ''
+              try {
+                const result = await uploadPhoto(file)
+                // DEBUG : Afficher tout le résultat Cloudinary
+                console.log('Résultat Cloudinary complet :', result);
+                if (result.success && (result.data.url || result.data.secure_url)) {
+                  userForm.value.photo = result.data.secure_url || result.data.url;
+                  // DEBUG : Afficher la valeur de userForm.value.photo après upload
+                  console.log('Photo Cloudinary enregistrée dans userForm.value.photo :', userForm.value.photo);
+                } else {
+                  photoError.value = result.message || 'Erreur lors de l\'upload.'
+                }
+              } catch (err) {
+                photoError.value = err.message
+              } finally {
+                uploadingPhoto.value = false
+              }
+            }
+            
         // Permissions accès entrepôts/points de vente
         const entrepots = ref([])
         const pointsVente = ref([])
@@ -691,6 +742,7 @@ const openAddUserModal = () => {
     role: '',
     password: '',
     telephone: '',
+    photo: '',
     permissions_entrepots: [],
     permissions_points_vente: [],
     acces_comptabilite: false
@@ -708,6 +760,7 @@ const editUser = (user) => {
     role: user.role || '',
     password: '',
     telephone: user.telephone || '',
+    photo: user.photo || '',
     permissions_entrepots: user.permissions_entrepots || [],
     permissions_points_vente: user.permissions_points_vente || [],
     acces_comptabilite: user.acces_comptabilite === true || user.acces_comptabilite === 1
@@ -725,83 +778,73 @@ const saveUser = async () => {
   try {
     if (editingUser.value) {
       // Mise à jour
-      const updateData = { ...userForm.value }
+      let updateData = { ...userForm.value };
+      if (!updateData.photo || updateData.photo === '') {
+        updateData.photo = editingUser.value.photo || '';
+      }
+      // DEBUG : Afficher la valeur de photo envoyée
+      console.log('Photo envoyée au backend :', updateData.photo);
       if (!updateData.password) {
         delete updateData.password
       }
       const response = await apiService.put(`/index.php?action=update&id=${editingUser.value.id_utilisateur}`, updateData)
       if (response.success) {
-        alert('Utilisateur modifié avec succès !')
+        // Si l'utilisateur modifié est l'utilisateur courant, mettre à jour le store et le localStorage
+        const updatedUser = response.data;
+        if (
+          updatedUser &&
+          authStore.user &&
+          (updatedUser.id_utilisateur === authStore.user.id_utilisateur || updatedUser.id === authStore.user.id)
+        ) {
+          authStore.user = { ...authStore.user, ...updatedUser };
+          localStorage.setItem('prostock_user', JSON.stringify(authStore.user));
+        }
+        triggerSnackbar('Utilisateur modifié avec succès !', 'success')
         await loadUsers()
         closeUserModal()
       } else {
-        alert('Erreur lors de la modification')
+        triggerSnackbar('Erreur lors de la modification', 'error')
       }
     } else {
       // Création
-      const response = await apiService.post('/index.php?action=create', {
+      const payload = {
         ...userForm.value,
         mot_de_passe: userForm.value.password
-      })
+      };
+      const response = await apiService.post('/index.php?action=create', payload)
       if (response.success) {
-        alert('Utilisateur créé avec succès !')
+        triggerSnackbar('Utilisateur créé avec succès !', 'success')
         await loadUsers()
         closeUserModal()
       } else {
-        alert('Erreur lors de la création')
+        triggerSnackbar('Erreur lors de la création', 'error')
       }
     }
   } catch (error) {
     console.error('Erreur lors de la sauvegarde:', error)
-    alert('Erreur lors de la sauvegarde de l\'utilisateur')
+    triggerSnackbar('Erreur lors de la sauvegarde de l\'utilisateur', 'error')
   } finally {
     savingUser.value = false
   }
 }
 
-const toggleUserStatus = async (user) => {
-  if (!confirm(`Voulez-vous vraiment ${user.statut === 'actif' ? 'désactiver' : 'activer'} cet utilisateur ?`)) return
-  
-  try {
-    const newStatus = user.statut === 'actif' ? 'inactif' : 'actif'
-    const response = await apiService.put(`/index.php?action=status&id=${user.id_utilisateur}`, {
-      status: newStatus
-    })
-    if (response.success) {
-      await loadUsers()
-      await loadConnectedUsers()
-    } else {
-      alert('Erreur lors de la modification du statut')
-    }
-  } catch (error) {
-    console.error('Erreur lors du changement de statut:', error)
-    alert('Erreur lors du changement de statut')
-  }
-}
-
-const confirmDeleteUser = (user) => {
-  userToDelete.value = user
-  showDeleteModal.value = true
-}
-
+// Correction de la fonction deleteUser (qui était mal placée)
 const deleteUser = async () => {
-  if (!userToDelete.value) return
-  
   deletingUser.value = true
   try {
     const response = await apiService.delete(`/index.php?action=delete&id=${userToDelete.value.id_utilisateur}`)
     if (response.success) {
-      alert('Utilisateur supprimé avec succès !')
+      triggerSnackbar('Utilisateur supprimé avec succès !', 'success')
       await loadUsers()
       await loadConnectedUsers()
       showDeleteModal.value = false
       userToDelete.value = null
     } else {
-      alert('Erreur lors de la suppression')
+      triggerSnackbar('Erreur lors de la suppression', 'error')
     }
   } catch (error) {
     console.error('Erreur lors de la suppression:', error)
-    alert('Erreur lors de la suppression de l\'utilisateur')
+    triggerSnackbar('Erreur lors de la suppression de l\'utilisateur', 'error')
   } finally {
     deletingUser.value = false
   }

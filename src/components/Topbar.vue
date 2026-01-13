@@ -93,12 +93,17 @@
       </div>
       <span class="notif-icon">🔔</span>
       <div class="profile" @click="showProfileMenu = !showProfileMenu">
-        <img :src="user?.avatar || 'https://randomuser.me/api/portraits/women/44.jpg'" alt="profile" />
+        <img :src="user?.photo || user?.avatar || 'https://randomuser.me/api/portraits/women/44.jpg'" alt="profile" />
         <span class="profile-name">{{ user?.nom || 'Danielle Campbell' }}</span>
         <div v-if="showProfileMenu" class="profile-menu">
+          <label class="profile-menu-btn" style="cursor:pointer;">
+            <input type="file" accept="image/*" @change="onAvatarChange" style="display:none;" />
+            Changer la photo
+          </label>
           <button class="profile-menu-btn" @click="showLogoutModal = true">Déconnexion</button>
         </div>
       </div>
+      
       <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
         <div class="modal-content user-modal" style="max-width: 350px; min-width: 0; height: auto; min-height: 0;" @click.stop>
           <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
@@ -126,6 +131,33 @@ import { useAuthStore } from '../stores/auth.js'
 import { useForfait } from '../composables/useForfait.js'
 import { ref, onMounted, provide, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { uploadPhoto } from '../config/cloudinary'
+      // Upload de la photo utilisateur
+      const onAvatarChange = async (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+        try {
+          const result = await uploadPhoto(file)
+          if (result.success && (result.data.secure_url || result.data.url)) {
+            // Mettre à jour la photo dans l'objet user et le localStorage
+            const photoUrl = result.data.secure_url || result.data.url;
+            user.value = { ...user.value, photo: photoUrl };
+            // Mettre à jour le localStorage (clé prostock_user si Pinia, sinon user)
+            let userStorage = {};
+            if (localStorage.getItem('prostock_user')) {
+              userStorage = JSON.parse(localStorage.getItem('prostock_user'));
+              userStorage.photo = photoUrl;
+              localStorage.setItem('prostock_user', JSON.stringify(userStorage));
+            } else {
+              userStorage = JSON.parse(localStorage.getItem('user') || '{}');
+              userStorage.photo = photoUrl;
+              localStorage.setItem('user', JSON.stringify(userStorage));
+            }
+          }
+        } catch (err) {
+          alert('Erreur lors de l\'upload de la photo : ' + err.message)
+        }
+      }
 
 const { getUser } = useStorage()
 const user = ref(null)
@@ -222,7 +254,9 @@ watch(() => currencyStore.currency, (newCurrency) => {
 })
 </script>
 
-/* Modale de déconnexion identique à la Sidebar */
+
+<style scoped>
+  /* Modale de déconnexion identique à la Sidebar */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -324,7 +358,6 @@ watch(() => currencyStore.currency, (newCurrency) => {
   background: #145040;
 }
 
-<style scoped>
 /* Topbar moderne, fond blanc, arrondi, avatar, notification, recherche */
 .topbar {
   display: flex;

@@ -1,3 +1,4 @@
+
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content user-modal" @click.stop>
@@ -7,6 +8,13 @@
       </div>
       <div class="modal-body">
         <form @submit.prevent="handleSubmit" class="user-form" id="add-user-form">
+                  <div class="form-group">
+                    <label>Photo</label>
+                    <input type="file" accept="image/*" @change="onPhotoChange" />
+                    <div v-if="uploadingPhoto" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
+                    <div v-if="photoUrl" style="margin-top:0.5em;"><img :src="photoUrl" alt="Photo utilisateur" style="max-width:80px;border-radius:8px;" /></div>
+                    <div v-if="photoError" style="color:#dc2626;font-size:0.95em;">{{ photoError }}</div>
+                  </div>
           <div class="form-group">
             <label>Nom *</label>
             <input v-model="user.nom" placeholder="Nom *" required />
@@ -79,6 +87,28 @@ import { ref, reactive, onMounted } from 'vue'
 import AccessSelector from './AccessSelector.vue'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
+import { uploadPhoto } from '../config/cloudinary'
+const photoUrl = ref('')
+const uploadingPhoto = ref(false)
+const photoError = ref('')
+async function onPhotoChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  uploadingPhoto.value = true
+  photoError.value = ''
+  try {
+    const result = await uploadPhoto(file)
+    if (result.success && result.data.url) {
+      photoUrl.value = result.data.url
+    } else {
+      photoError.value = result.message || 'Erreur lors de l\'upload.'
+    }
+  } catch (err) {
+    photoError.value = err.message
+  } finally {
+    uploadingPhoto.value = false
+  }
+}
 
 const emit = defineEmits(['close', 'save'])
 
@@ -117,7 +147,7 @@ const permissions = [
 ]
 
 function handleSubmit() {
-  emit('save', { ...user })
+  emit('save', { ...user, photo: photoUrl.value })
 }
 </script>
 
