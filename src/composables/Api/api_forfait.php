@@ -4,13 +4,18 @@
  * Endpoint: /api-stock/api_forfait.php
  */
 
-// Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
-header('Content-Type: application/json');
+// Désactiver l'affichage des erreurs pour éviter qu'elles polluent la réponse JSON
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
+
+// Headers CORS - DOIT être défini avant toute sortie
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
+header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Max-Age: 86400');
-
+header('Content-Type: application/json; charset=utf-8');
 
 // Initialiser l'action dès le début pour éviter les warnings
 $action = $_GET['action'] ?? '';
@@ -20,10 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit(0);
 }
-
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
@@ -234,8 +235,8 @@ try {
                         'prix' => $abonnement['prix'],
                         'duree_jours' => $abonnement['duree_jours'],
                         'description' => $abonnement['description'] ?? '',
-                        'date_debut' => $abonnement['date_debut'],
-                        'date_fin' => $abonnement['date_fin'],
+                        'date_debut' => isset($abonnement['date_debut']) ? $abonnement['date_debut'] : null,
+                        'date_fin' => isset($abonnement['date_fin']) ? $abonnement['date_fin'] : null,
                         'statut' => $abonnement['statut'],
                         'etat' => $status['etat'],
                         'actif' => $status['actif'],
@@ -325,8 +326,8 @@ try {
                         'prix' => $forfait['prix'],
                         'duree_jours' => $forfait['duree_jours'],
                         'description' => $forfait['description'] ?? '',
-                        'date_debut' => $abonnement['date_debut'],
-                        'date_fin' => $abonnement['date_fin'],
+                        'date_debut' => isset($abonnement['date_debut']) ? $abonnement['date_debut'] : null,
+                        'date_fin' => isset($abonnement['date_fin']) ? $abonnement['date_fin'] : null,
                         'statut' => $abonnement['statut'],
                         'actif' => true,
                         'jours_restants' => $joursRestants,
@@ -440,10 +441,17 @@ try {
     }
     
 } catch (Exception $e) {
+    // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
+    header('Content-Type: application/json; charset=utf-8');
+    
     http_response_code(500);
     echo json_encode([
         'success' => false,
         'message' => 'Erreur serveur',
         'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
+    exit;
 }

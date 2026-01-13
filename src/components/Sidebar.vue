@@ -6,14 +6,28 @@
     </div>
     <ul class="menu">
       <li v-for="item in menuItems" :key="item.route">
-        <router-link :to="item.route" class="menu-link" active-class="active-link" exact-active-class="active-link">
+        <router-link 
+          :to="item.route" 
+          class="menu-link" 
+          active-class="active-link" 
+          exact-active-class="active-link"
+          :title="item.name"
+        >
           <span class="icon" v-if="item.icon">{{ item.icon }}</span>
-          {{ item.name }}
+          <span class="menu-text">{{ item.name }}</span>
+          <span class="tooltip" v-if="$route.name === 'Ventes'">{{ item.name }}</span>
         </router-link>
       </li>
     </ul>
     <div class="upgrade-box">
-      <button class="upgrade-btn" @click="showLogoutModal = true">Déconnexion</button>
+      <button 
+        class="upgrade-btn" 
+        @click="showLogoutModal = true"
+        :title="$route.name === 'Ventes' ? 'Déconnexion' : ''"
+      >
+        <span class="upgrade-btn-text">Déconnexion</span>
+        <span class="tooltip" v-if="$route.name === 'Ventes'">Déconnexion</span>
+      </button>
     </div>
     <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
       <div class="modal-content user-modal" style="max-width: 350px; min-width: 0; height: auto; min-height: 0;" @click.stop>
@@ -180,7 +194,11 @@ function logout() {
 .sidebar.sidebar-compact .menu-link {
   justify-content: center;
   padding: 0.8em;
-  font-size: 0;
+  position: relative;
+}
+
+.sidebar.sidebar-compact .menu-link .menu-text {
+  display: none;
 }
 
 .sidebar.sidebar-compact .menu-link .icon {
@@ -188,14 +206,83 @@ function logout() {
   margin: 0;
 }
 
+.sidebar.sidebar-compact .menu-link .tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  background: #111827;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.sidebar.sidebar-compact .menu-link .tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #111827;
+}
+
+.sidebar.sidebar-compact .menu-link:hover .tooltip {
+  opacity: 1;
+}
+
 .sidebar.sidebar-compact .upgrade-btn {
-  font-size: 0;
+  position: relative;
   padding: 0.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar.sidebar-compact .upgrade-btn-text {
+  display: none;
 }
 
 .sidebar.sidebar-compact .upgrade-btn::before {
   content: '🚪';
   font-size: 1.2rem;
+}
+
+.sidebar.sidebar-compact .upgrade-btn .tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  background: #111827;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.sidebar.sidebar-compact .upgrade-btn .tooltip::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: #111827;
+}
+
+.sidebar.sidebar-compact .upgrade-btn:hover .tooltip {
+  opacity: 1;
 }
 .logo {
   display: flex;
@@ -232,6 +319,7 @@ function logout() {
   padding: 0.8em 1.2em;
   border-radius: 12px;
   transition: background 0.18s, color 0.18s;
+  position: relative;
 }
 .menu-link:hover {
   background: #218c6a;

@@ -40,17 +40,17 @@
             </td>
           </tr>
           <tr v-else v-for="(entry, index) in paginatedJournalEntries" :key="index" class="data-row">
-            <td class="date-cell">{{ entry.date }}</td>
+            <td class="date-cell">{{ formatJournalDate(entry.date) }}</td>
             <td class="user-cell">
               <div class="user-badge">
-                <span class="user-avatar">{{ entry.user?.charAt(0)?.toUpperCase() }}</span>
-                {{ entry.user }}
+                <span class="user-avatar">{{ entry.user?.charAt(0)?.toUpperCase() || 'U' }}</span>
+                {{ entry.user || 'Utilisateur' }}
               </div>
             </td>
             <td class="action-cell">
-              <span class="action-badge">{{ entry.action }}</span>
+              <span class="action-badge" :class="getActionClass(entry.action)">{{ entry.action || 'Action' }}</span>
             </td>
-            <td class="details-cell">{{ entry.details }}</td>
+            <td class="details-cell">{{ entry.details || '—' }}</td>
           </tr>
         </tbody>
       </table>
@@ -124,6 +124,41 @@ const fetchJournal = async () => {
 };
 
 onMounted(fetchJournal);
+
+// Fonction pour formater la date du journal
+function formatJournalDate(dateString) {
+  if (!dateString) return '—';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return dateString;
+  }
+}
+
+// Fonction pour obtenir la classe CSS selon le type d'action
+function getActionClass(action) {
+  if (!action) return '';
+  const actionLower = action.toLowerCase();
+  if (actionLower.includes('vente')) {
+    return 'action-vente';
+  } else if (actionLower.includes('entrée') || actionLower.includes('entree')) {
+    return 'action-entree';
+  } else if (actionLower.includes('modification') || actionLower.includes('modif')) {
+    return 'action-modification';
+  } else if (actionLower.includes('suppression') || actionLower.includes('supprim')) {
+    return 'action-suppression';
+  } else if (actionLower.includes('ajout') || actionLower.includes('création') || actionLower.includes('creation')) {
+    return 'action-ajout';
+  }
+  return '';
+}
 
 function exportExcel() {
   const data = filteredJournalEntries.value.map(e => ({
@@ -379,6 +414,36 @@ function exportPDF() {
   color: #2563eb;
   border: 1px solid #bfdbfe;
   white-space: nowrap;
+}
+
+.action-badge.action-vente {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #86efac;
+}
+
+.action-badge.action-entree {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+
+.action-badge.action-modification {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.action-badge.action-suppression {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.action-badge.action-ajout {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
 }
 
 .details-cell {
