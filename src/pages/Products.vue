@@ -600,6 +600,31 @@
             </div>
           </div>
 
+          <!-- Section Image du Produit -->
+          <div class="form-section">
+            <h4 class="section-title">📷 Image du Produit</h4>
+            <div class="form-group">
+              <label>Image du Produit</label>
+              <input 
+                type="file" 
+                accept="image/*" 
+                @change="onProductImageChange"
+                class="file-input"
+              />
+              <div v-if="uploadingImage" style="color:#218c6a;font-size:0.95em;margin-top:0.5em;">
+                Envoi en cours...
+              </div>
+              <div v-if="formData.image" style="margin-top:1em;">
+                <img :src="formData.image" alt="Image du produit" style="max-width:200px;max-height:200px;border-radius:8px;border:2px solid #e5e7eb;" />
+                <button type="button" @click="formData.image = null" style="display:block;margin-top:0.5em;padding:0.25rem 0.5rem;background:#dc2626;color:white;border:none;border-radius:4px;cursor:pointer;">
+                  Supprimer l'image
+                </button>
+              </div>
+              <div v-if="imageError" style="color:#dc2626;font-size:0.95em;margin-top:0.5em;">{{ imageError }}</div>
+              <small class="form-hint">L'image aide les utilisateurs à identifier rapidement le produit</small>
+            </div>
+          </div>
+
           <div v-if="formData.prix_achat && formData.prix_vente" class="marge-preview" :class="getPriceValidationClass()">
             <strong>Marge bénéficiaire: </strong>
             <span :class="getMargeClass(formData.prix_vente - formData.prix_achat)">
@@ -982,6 +1007,7 @@ import StatCard from '../components/StatCard.vue'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
 import * as XLSX from 'xlsx'
+import { uploadPhoto } from '../config/cloudinary'
 
 const router = useRouter()
 const { formatPrice: formatCurrency } = useCurrency()
@@ -1015,6 +1041,8 @@ const stockAdjustment = ref({
   type: 'set',
   quantity: 0
 })
+const uploadingImage = ref(false)
+const imageError = ref('')
 
 // États pour les notifications et confirmations
 const notification = ref({
@@ -1054,7 +1082,8 @@ const formData = ref({
   date_expiration: '',
   unite: 'unité',
   entrepot: 'Magasin',
-  actif: 1
+  actif: 1,
+  image: null
 })
 
 const entrepots = ref([])
@@ -1240,6 +1269,28 @@ const markAllAlertesAsVue = async () => {
     })
     const errorMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Erreur lors du marquage des alertes'
     showNotification('error', 'Erreur', errorMsg)
+  }
+}
+
+// Upload d'image de produit
+const onProductImageChange = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  
+  uploadingImage.value = true
+  imageError.value = ''
+  
+  try {
+    const result = await uploadPhoto(file, null, formData.value.nom || 'Produit')
+    if (result.success && (result.data.url || result.data.secure_url)) {
+      formData.value.image = result.data.secure_url || result.data.url
+    } else {
+      imageError.value = result.message || 'Erreur lors de l\'upload.'
+    }
+  } catch (err) {
+    imageError.value = err.message || 'Erreur lors de l\'upload de l\'image'
+  } finally {
+    uploadingImage.value = false
   }
 }
 
@@ -1608,8 +1659,10 @@ const openCreateModal = () => {
     date_expiration: '',
     unite: 'unité',
     entrepot: selectedEntrepot || 'Magasin',
-    actif: 1
+    actif: 1,
+    image: null
   }
+  imageError.value = ''
   // Nettoyer le localStorage après utilisation
   if (selectedEntrepot) {
     localStorage.removeItem('selected_entrepot')
@@ -1631,8 +1684,10 @@ const openEditModal = (product) => {
     date_expiration: product.date_expiration || '',
     unite: product.unite || 'unité',
     entrepot: product.entrepot || 'Magasin',
-    actif: product.actif ? 1 : 0
+    actif: product.actif ? 1 : 0,
+    image: product.image || null
   }
+  imageError.value = ''
   showModal.value = true
 }
 
@@ -1640,6 +1695,7 @@ const openEditModal = (product) => {
 const closeModal = () => {
   showModal.value = false
   editingProduct.value = null
+  imageError.value = ''
 }
 
 // Générer un code produit automatiquement

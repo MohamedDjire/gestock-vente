@@ -151,7 +151,13 @@
             <div class="product-badge warning" v-else-if="product.quantite_stock <= product.seuil_minimum">Stock faible</div>
             
             <div class="product-image">
-              <span class="product-icon">📦</span>
+              <img 
+                v-if="product.image" 
+                :src="product.image" 
+                :alt="product.nom"
+                class="product-image-img"
+              />
+              <span v-else class="product-icon">📦</span>
             </div>
             
             <div class="product-info">
@@ -1327,12 +1333,23 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 80px;
+  height: 120px;
   margin-bottom: 0.75rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.product-image-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .product-icon {
   font-size: 3rem;
+  color: #9ca3af;
 }
 
 .product-info {

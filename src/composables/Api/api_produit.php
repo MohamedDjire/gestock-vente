@@ -122,6 +122,7 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null) {
             p.date_modification,
             p.actif,
             p.id_entreprise,
+            p.image,
             COALESCE(p.entrepot, 'Magasin') AS entrepot,
             (p.prix_vente - p.prix_achat) AS marge_beneficiaire,
             ((p.prix_vente - p.prix_achat) * p.quantite_stock) AS valeur_stock,
@@ -251,10 +252,10 @@ function createProduct($bdd, $data, $enterpriseId) {
     $stmt = $bdd->prepare("
         INSERT INTO stock_produit (
             code_produit, nom, id_categorie, prix_achat, prix_vente,
-            quantite_stock, seuil_minimum, date_expiration, entrepot, actif, id_entreprise
+            quantite_stock, seuil_minimum, date_expiration, entrepot, actif, id_entreprise, image
         ) VALUES (
             :code_produit, :nom, :id_categorie, :prix_achat, :prix_vente,
-            :quantite_stock, :seuil_minimum, :date_expiration, :entrepot, :actif, :id_entreprise
+            :quantite_stock, :seuil_minimum, :date_expiration, :entrepot, :actif, :id_entreprise, :image
         )
     ");
     
@@ -269,7 +270,8 @@ function createProduct($bdd, $data, $enterpriseId) {
         'date_expiration' => !empty($data['date_expiration']) ? $data['date_expiration'] : null,
         'entrepot' => $data['entrepot'] ?? 'Magasin',
         'actif' => isset($data['actif']) ? (int)$data['actif'] : 1,
-        'id_entreprise' => $enterpriseId
+        'id_entreprise' => $enterpriseId,
+        'image' => $data['image'] ?? null
     ]);
     
     $productId = $bdd->lastInsertId();
@@ -304,7 +306,7 @@ function updateProduct($bdd, $productId, $data, $enterpriseId) {
     $params = ['id' => $productId, 'enterprise_id' => $enterpriseId];
     
     $allowedFields = ['code_produit', 'nom', 'id_categorie', 'prix_achat', 'prix_vente', 
-                     'quantite_stock', 'seuil_minimum', 'date_expiration', 'entrepot', 'actif'];
+                     'quantite_stock', 'seuil_minimum', 'date_expiration', 'entrepot', 'actif', 'image'];
     
     foreach ($allowedFields as $field) {
         if (isset($data[$field])) {
