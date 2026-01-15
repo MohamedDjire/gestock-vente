@@ -1,93 +1,216 @@
+
 <template>
-  <div class="compta-offset">
-    <!-- Résumé -->
-    <div class="compta-header">
-      <h1 class="compta-title">Comptabilité</h1>
-      <p class="compta-subtitle">Suivi complet des mouvements financiers</p>
-      <div class="compta-summary">
-        <div class="summary-card">
-          <span class="summary-icon">💰</span>
-          <div>
-            <div class="summary-label">Solde actuel</div>
-            <div class="summary-value">{{ formatCurrency(soldeActuel) }}</div>
-          </div>
-        </div>
-        <div class="summary-card">
-          <span class="summary-icon">📈</span>
-          <div>
-            <div class="summary-label">Total entrées</div>
-            <div class="summary-value">{{ formatCurrency(totalEntrees) }}</div>
-          </div>
-        </div>
-        <div class="summary-card">
-          <span class="summary-icon">📉</span>
-          <div>
-            <div class="summary-label">Total sorties</div>
-            <div class="summary-value">{{ formatCurrency(totalSorties) }}</div>
-          </div>
-        </div>
+  <div class="page-main compta-page">
+    <div class="page-card compta-card">
+      <div class="page-header compta-header-flex compta-header-actions">
+        <h1 class="page-title compta-title">Comptabilité</h1>
+        <button @click="openAddModal()" class="btn-primary compta-add-btn">➕ Ajouter un mouvement</button>
       </div>
-      <!-- Filtres -->
-      <div class="compta-filters">
-        <input v-model="search" type="text" placeholder="Rechercher (utilisateur, type, détails)" class="compta-search-input" />
-        <input v-model="dateFrom" type="date" class="compta-date-input" />
-        <input v-model="dateTo" type="date" class="compta-date-input" />
-        <select v-model="typeFilter" class="compta-type-input">
+      <div class="compta-statcards-row">
+        <StatCard icon="💰" :title="'Solde actuel'" :value="formatCurrency(soldeActuel)" />
+        <StatCard icon="📈" :title="'Total entrées'" :value="formatCurrency(totalEntrees)" />
+        <StatCard icon="📉" :title="'Total sorties'" :value="formatCurrency(totalSorties)" />
+      </div>
+      <div class="compta-filter-box">
+        <input v-model="search" type="text" placeholder="Rechercher (utilisateur, type, détails, référence, commentaire)" class="filter-input" />
+        <div class="datepicker-wrapper">
+          <VueDatePicker
+            v-model="dateRange"
+            range
+            :format="'yyyy-MM-dd'"
+            placeholder="Filtrer par date"
+            :input-class="'filter-input datepicker-input'"
+            :clearable="true"
+            :editable="false"
+          />
+        </div>
+        <select v-model="typeFilter" class="filter-input">
           <option value="">Tous types</option>
           <option value="Entrée">Entrée</option>
           <option value="Sortie">Sortie</option>
         </select>
+        <select v-model="categorieFilter" class="filter-input">
+          <option value="">Toutes catégories</option>
+          <option value="Vente">Vente</option>
+          <option value="Achat">Achat</option>
+          <option value="Salaire">Salaire</option>
+          <option value="Frais">Frais</option>
+          <option value="Autre">Autre</option>
+        </select>
+        <select v-model="statutFilter" class="filter-input">
+          <option value="">Tous statuts</option>
+          <option value="validé">Validé</option>
+          <option value="en attente">En attente</option>
+          <option value="rejeté">Rejeté</option>
+        </select>
+        <select v-model="moyenPaiementFilter" class="filter-input">
+          <option value="">Tous paiements</option>
+          <option value="Espèces">Espèces</option>
+          <option value="Virement">Virement</option>
+          <option value="Carte">Carte</option>
+          <option value="Chèque">Chèque</option>
+          <option value="Autre">Autre</option>
+        </select>
         <button @click="exportExcel" class="btn-primary btn-excel">Exporter Excel</button>
         <button @click="exportPDF" class="btn-primary btn-pdf">Exporter PDF</button>
       </div>
+      <div class="table-container compta-table-container">
+        <table class="main-table compta-main-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Catégorie</th>
+              <th>Montant</th>
+              <th>Utilisateur</th>
+              <th>Moyen paiement</th>
+              <th>Statut</th>
+              <th>Référence</th>
+              <th>Pièce jointe</th>
+              <th>Commentaire</th>
+              <th>Validateur</th>
+              <th>Date validation</th>
+              <th>Détails</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="14" class="empty-state">Chargement...</td>
+            </tr>
+            <tr v-else-if="error">
+              <td colspan="14" class="empty-state error-state">{{ error }}</td>
+            </tr>
+            <tr v-else-if="filteredComptaEntries.length === 0">
+              <td colspan="14" class="empty-state">Aucun mouvement trouvé</td>
+            </tr>
+            <tr v-else v-for="(entry, index) in paginatedComptaEntries" :key="index" class="data-row">
+              <td class="date-cell">{{ formatComptaDate(entry.date) }}</td>
+              <td><span class="type-badge" :class="getTypeClass(entry.type)">{{ entry.type }}</span></td>
+              <td>{{ entry.categorie }}</td>
+              <td class="montant-cell">{{ formatCurrency(entry.montant) }}</td>
+              <td class="user-cell">{{ entry.user }}</td>
+              <td>{{ entry.moyen_paiement }}</td>
+              <td>{{ entry.statut }}</td>
+              <td>{{ entry.reference }}</td>
+              <td>
+                <a v-if="entry.piece_jointe" :href="entry.piece_jointe" target="_blank">📎 Voir</a>
+                <span v-else>—</span>
+              </td>
+              <td>{{ entry.commentaire }}</td>
+              <td>{{ entry.utilisateur_validateur }}</td>
+              <td>{{ formatComptaDate(entry.date_validation) }}</td>
+              <td class="details-cell">
+                <span class="details-text">{{ entry.details }}</span>
+              </td>
+              <td class="actions-cell">
+                <button class="btn-action view" @click="openDetails(entry)" title="Voir détails"><span class="icon-view">👁️</span></button>
+                <button class="btn-action edit" @click="openAddModal(entry)">✏️</button>
+                <button class="btn-action delete" @click="askDeleteEntry(entry)">🗑️</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" v-if="pageCount > 1">
+        <button @click="page--" :disabled="page === 1" class="btn-secondary">Précédent</button>
+        <span>Page {{ page }} / {{ pageCount }}</span>
+        <button @click="page++" :disabled="page === pageCount" class="btn-secondary">Suivant</button>
+      </div>
     </div>
-    <!-- Tableau -->
-    <div class="table-container">
-      <table class="compta-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Montant</th>
-            <th>Utilisateur</th>
-            <th>Détails</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="empty-state">Chargement...</td>
-          </tr>
-          <tr v-else-if="error">
-            <td colspan="6" class="empty-state error-state">{{ error }}</td>
-          </tr>
-          <tr v-else-if="filteredComptaEntries.length === 0">
-            <td colspan="6" class="empty-state">Aucun mouvement trouvé</td>
-          </tr>
-          <tr v-else v-for="(entry, index) in paginatedComptaEntries" :key="index" class="data-row">
-            <td class="date-cell">{{ formatComptaDate(entry.date) }}</td>
-            <td>
-              <span class="type-badge" :class="getTypeClass(entry.type)">{{ entry.type }}</span>
-            </td>
-            <td class="montant-cell">{{ formatCurrency(entry.montant) }}</td>
-            <td class="user-cell">{{ entry.user }}</td>
-            <td class="details-cell">
-              <span class="details-text">{{ entry.details }}</span>
-              <button class="btn-view" @click="openDetails(entry)" title="Voir détails"><span class="icon-view">👁️</span></button>
-            </td>
-            <td class="actions-cell">
-              <button class="btn-action edit" @click="editEntry(entry)">✏️</button>
-              <button class="btn-action delete" @click="deleteEntry(entry)">🗑️</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <!-- Pagination -->
-    <div class="pagination" v-if="pageCount > 1">
-      <button @click="page--" :disabled="page === 1">Précédent</button>
-      <span>Page {{ page }} / {{ pageCount }}</span>
-      <button @click="page++" :disabled="page === pageCount">Suivant</button>
+    <!-- Modale ajout/édition harmonisée -->
+    <div v-if="showAddModal" class="modal-overlay" @click.self="closeAddModal">
+      <div class="modal-content">
+        <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <h3>{{ editingEntry === null ? 'Ajouter un mouvement' : 'Modifier le mouvement' }}</h3>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button class="modal-close" @click="closeAddModal">×</button>
+          </div>
+        </div>
+        <form @submit.prevent="submitAddEdit" class="user-form">
+          <div class="grid-2-cols">
+            <div class="form-group">
+              <label>Date *</label>
+              <input v-model="formEntry.date" type="datetime-local" required />
+            </div>
+            <div class="form-group">
+              <label>Type *</label>
+              <select v-model="formEntry.type" required>
+                <option value="">Sélectionner</option>
+                <option value="Entrée">Entrée</option>
+                <option value="Sortie">Sortie</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Catégorie</label>
+              <select v-model="formEntry.categorie">
+                <option value="">Sélectionner</option>
+                <option value="Vente">Vente</option>
+                <option value="Achat">Achat</option>
+                <option value="Salaire">Salaire</option>
+                <option value="Frais">Frais</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Montant *</label>
+              <input v-model.number="formEntry.montant" type="number" required min="0" />
+            </div>
+            <div class="form-group">
+              <label>Utilisateur *</label>
+              <input v-model="formEntry.user" type="text" required />
+            </div>
+            <div class="form-group">
+              <label>Moyen paiement</label>
+              <select v-model="formEntry.moyen_paiement">
+                <option value="">Sélectionner</option>
+                <option value="Espèces">Espèces</option>
+                <option value="Virement">Virement</option>
+                <option value="Carte">Carte</option>
+                <option value="Chèque">Chèque</option>
+                <option value="Autre">Autre</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Statut</label>
+              <select v-model="formEntry.statut">
+                <option value="en attente">En attente</option>
+                <option value="validé">Validé</option>
+                <option value="rejeté">Rejeté</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Référence</label>
+              <input v-model="formEntry.reference" type="text" />
+            </div>
+            <div class="form-group">
+              <label>Pièce jointe</label>
+              <input type="file" @change="onFileChange" />
+              <span v-if="formEntry.piece_jointe"><a :href="formEntry.piece_jointe" target="_blank">📎 Voir</a></span>
+            </div>
+            <div class="form-group">
+              <label>Commentaire</label>
+              <textarea v-model="formEntry.commentaire"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Validateur</label>
+              <input v-model="formEntry.utilisateur_validateur" type="text" />
+            </div>
+            <div class="form-group">
+              <label>Date validation</label>
+              <input v-model="formEntry.date_validation" type="datetime-local" />
+            </div>
+            <div class="form-group" style="grid-column:1/3;">
+              <label>Détails</label>
+              <textarea v-model="formEntry.details"></textarea>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" @click="closeAddModal">Annuler</button>
+            <button type="submit" class="btn-primary">{{ editingEntry === null ? 'Ajouter' : 'Enregistrer' }}</button>
+          </div>
+        </form>
+      </div>
     </div>
     <!-- Modale détail -->
     <div v-if="showDetailsModal" class="modal-overlay" @click.self="closeDetails">
@@ -137,9 +260,42 @@
               </div>
             </div>
           </div>
+          <div class="modal-section">
+            <div class="section-title">
+              <span style="font-size:1.1rem;">🧾</span>
+              <span>Champs avancés</span>
+            </div>
+            <div class="section-content grid-2-cols">
+              <div><span class="details-label">Catégorie :</span> <span class="details-value">{{ selectedEntry?.categorie }}</span></div>
+              <div><span class="details-label">Moyen paiement :</span> <span class="details-value">{{ selectedEntry?.moyen_paiement }}</span></div>
+              <div><span class="details-label">Statut :</span> <span class="details-value">{{ selectedEntry?.statut }}</span></div>
+              <div><span class="details-label">Référence :</span> <span class="details-value">{{ selectedEntry?.reference }}</span></div>
+              <div><span class="details-label">Pièce jointe :</span> <span class="details-value"><a v-if="selectedEntry?.piece_jointe" :href="selectedEntry.piece_jointe" target="_blank">📎 Voir</a><span v-else>—</span></span></div>
+              <div><span class="details-label">Commentaire :</span> <span class="details-value">{{ selectedEntry?.commentaire }}</span></div>
+              <div><span class="details-label">Validateur :</span> <span class="details-value">{{ selectedEntry?.utilisateur_validateur }}</span></div>
+              <div><span class="details-label">Date validation :</span> <span class="details-value">{{ formatComptaDate(selectedEntry?.date_validation) }}</span></div>
+            </div>
+          </div>
         </div>
         <div class="modal-actions">
           <button class="btn-primary" @click="closeDetails">Fermer</button>
+        </div>
+      </div>
+    </div>
+    <!-- Modale de confirmation de suppression -->
+    <div v-if="showDeleteModal" class="modal-overlay" @click.self="cancelDeleteEntry">
+      <div class="modal-content user-modal" style="max-width:350px;min-width:0;height:auto;min-height:0;" @click.stop>
+        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
+          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
+          <h3 style="margin:0;flex:1;">Confirmer la suppression</h3>
+          <button class="modal-close" @click="cancelDeleteEntry">×</button>
+        </div>
+        <div class="modal-body">
+          <p>Voulez-vous vraiment supprimer ce mouvement&nbsp;?</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="cancelDeleteEntry">Annuler</button>
+          <button class="btn-primary btn-delete" @click="confirmDeleteEntry">Supprimer</button>
         </div>
       </div>
     </div>
@@ -147,26 +303,48 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker';
+import '@vuepic/vue-datepicker/dist/main.css';
+import { useCurrency } from '../composables/useCurrency.js'
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useAuthStore } from '../stores/auth.js'
+import { apiService } from '../composables/api/apiService.js'
+import StatCard from '../components/StatCard.vue'
 
-// Données fictives pour démo
-const comptaEntries = ref([
-  { date: '2026-01-13T09:00:00', type: 'Entrée', montant: 50000, user: 'Mariam', details: 'Vente de produits' },
-  { date: '2026-01-13T10:00:00', type: 'Sortie', montant: 12000, user: 'Mariam', details: 'Achat de fournitures' },
-  { date: '2026-01-12T15:30:00', type: 'Entrée', montant: 30000, user: 'Admin', details: 'Paiement client' },
-  { date: '2026-01-11T11:00:00', type: 'Sortie', montant: 8000, user: 'Admin', details: 'Frais de transport' },
-]);
-const loading = ref(false);
-const error = ref(null);
-const search = ref('');
-const dateFrom = ref('');
-const dateTo = ref('');
-const typeFilter = ref('');
-const showDetailsModal = ref(false);
-const selectedEntry = ref(null);
+const comptaEntries = ref([]);
+const authStore = useAuthStore();
+const { formatPrice: formatCurrency } = useCurrency();
+const hasComptaAccess = computed(() => authStore.user?.acces_comptabilite === true || authStore.user?.acces_comptabilite === 1);
+
+const showSnackbar = ref(false)
+const snackbarMessage = ref('')
+const snackbarType = ref('success')
+function triggerSnackbar(message, type = 'success') {
+  snackbarMessage.value = message
+  snackbarType.value = type
+  showSnackbar.value = true
+  setTimeout(() => { showSnackbar.value = false }, 3000)
+}
+
+onMounted(async () => {
+  if (!hasComptaAccess.value) return;
+  loading.value = true;
+  try {
+    const response = await apiService.get(`/api_comptabilite.php?action=all&id_entreprise=${authStore.user?.id_entreprise}`);
+    if (response.success && Array.isArray(response.data)) {
+      comptaEntries.value = response.data;
+    } else {
+      error.value = response.message || 'Erreur lors du chargement.';
+    }
+  } catch (e) {
+    error.value = e.message || 'Erreur lors du chargement.';
+  } finally {
+    loading.value = false;
+  }
+});
 
 function openDetails(entry) {
   selectedEntry.value = entry;
@@ -176,13 +354,237 @@ function closeDetails() {
   showDetailsModal.value = false;
   selectedEntry.value = null;
 }
-function editEntry(entry) {
-  alert('Fonctionnalité édition à implémenter');
+function askEditEntry(entry) {
+  entryToEdit.value = entry;
+  editDetails.value = entry.details;
+  showEditModal.value = true;
 }
-function deleteEntry(entry) {
-  if (confirm('Supprimer ce mouvement ?')) {
-    const idx = comptaEntries.value.indexOf(entry);
-    if (idx !== -1) comptaEntries.value.splice(idx, 1);
+function confirmEditEntry() {
+  if (!entryToEdit.value) return;
+  loading.value = true;
+  apiService.put(`/api_comptabilite.php?action=update&id=${entryToEdit.value.id_compta}`, { ...entryToEdit.value, details: editDetails.value })
+    .then(res => {
+      if (res.success) {
+        entryToEdit.value.details = editDetails.value;
+        triggerSnackbar('Mouvement modifié !', 'success');
+      } else {
+        triggerSnackbar('Erreur lors de la modification', 'error');
+      }
+    })
+    .catch(() => triggerSnackbar('Erreur lors de la modification', 'error'))
+    .finally(() => {
+      loading.value = false;
+      showEditModal.value = false;
+      entryToEdit.value = null;
+      editDetails.value = '';
+    });
+}
+function cancelEditEntry() {
+  showEditModal.value = false;
+  entryToEdit.value = null;
+  editDetails.value = '';
+}
+function askDeleteEntry(entry) {
+  entryToDelete.value = entry;
+  showDeleteModal.value = true;
+}
+function confirmDeleteEntry() {
+  if (!entryToDelete.value) return;
+  loading.value = true;
+  apiService.delete(`/api_comptabilite.php?action=delete&id=${entryToDelete.value.id_compta}`)
+    .then(res => {
+      if (res.success) {
+        const idx = comptaEntries.value.indexOf(entryToDelete.value);
+        if (idx !== -1) comptaEntries.value.splice(idx, 1);
+        triggerSnackbar('Mouvement supprimé !', 'success');
+      } else {
+        triggerSnackbar('Erreur lors de la suppression', 'error');
+      }
+    })
+    .catch(() => triggerSnackbar('Erreur lors de la suppression', 'error'))
+    .finally(() => {
+      loading.value = false;
+      showDeleteModal.value = false;
+      entryToDelete.value = null;
+    });
+}
+function cancelDeleteEntry() {
+  showDeleteModal.value = false;
+  entryToDelete.value = null;
+}
+async function addEntry(entry) {
+  loading.value = true;
+  try {
+    const response = await apiService.post('/api_comptabilite.php?action=create', entry);
+    if (response.success) {
+      comptaEntries.value.unshift(entry);
+      triggerSnackbar('Mouvement ajouté !', 'success');
+    } else {
+      triggerSnackbar('Erreur lors de l\'ajout', 'error');
+    }
+  } catch (e) {
+    triggerSnackbar('Erreur lors de l\'ajout', 'error');
+  } finally {
+    loading.value = false;
+  }
+}
+
+const loading = ref(false);
+const error = ref(null);
+const search = ref('');
+const dateFrom = ref('');
+const dateTo = ref('');
+const dateFromInput = ref(null);
+const dateToInput = ref(null);
+const dateRange = ref([null, null]);
+
+watch(dateRange, ([from, to]) => {
+  dateFrom.value = from ? from.toISOString().slice(0, 10) : '';
+  dateTo.value = to ? to.toISOString().slice(0, 10) : '';
+});
+
+function openDateRangePicker() {
+  dateFromInput.value && dateFromInput.value.click();
+}
+function onDateFromChange() {
+  if (dateToInput.value) {
+    setTimeout(() => dateToInput.value.click(), 100);
+  }
+}
+function onDateToChange() {
+  // rien à faire, la valeur est déjà liée
+}
+const dateRangeLabel = computed(() => {
+  if (dateFrom.value && dateTo.value) {
+    return `${dateFrom.value} au ${dateTo.value}`;
+  } else if (dateFrom.value) {
+    return `Depuis le ${dateFrom.value}`;
+  } else if (dateTo.value) {
+    return `Jusqu'au ${dateTo.value}`;
+  } else {
+    return 'Filtrer par date';
+  }
+});
+const typeFilter = ref('');
+const categorieFilter = ref('');
+const statutFilter = ref('');
+const moyenPaiementFilter = ref('');
+const showDetailsModal = ref(false);
+const selectedEntry = ref(null);
+const showAddModal = ref(false);
+const editingEntry = ref(null);
+const formEntry = ref({
+  date: '',
+  type: '',
+  montant: '',
+  user: '',
+  categorie: '',
+  moyen_paiement: '',
+  statut: 'en attente',
+  reference: '',
+  piece_jointe: '',
+  commentaire: '',
+  utilisateur_validateur: '',
+  date_validation: '',
+  details: '',
+  id_entreprise: authStore.user?.id_entreprise || ''
+});
+// SUPPRIMER la modale de confirmation d'édition (showEditModal)
+const entryToEdit = ref(null);
+const editDetails = ref('');
+const entryToDelete = ref(null);
+const showDeleteModal = ref(false);
+
+function openAddModal(entry = null) {
+  if (entry) {
+    editingEntry.value = entry;
+    formEntry.value = { ...entry };
+  } else {
+    editingEntry.value = null;
+    formEntry.value = {
+      date: '',
+      type: '',
+      montant: '',
+      user: '',
+      categorie: '',
+      moyen_paiement: '',
+      statut: 'en attente',
+      reference: '',
+      piece_jointe: '',
+      commentaire: '',
+      utilisateur_validateur: '',
+      date_validation: '',
+      details: '',
+      id_entreprise: authStore.user?.id_entreprise || ''
+    };
+    if ('id_compta' in formEntry.value) delete formEntry.value.id_compta;
+  }
+  showAddModal.value = true;
+}
+function closeAddModal() {
+  showAddModal.value = false;
+  editingEntry.value = null;
+}
+
+async function onFileChange(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const { uploadPhoto } = await import('../config/cloudinary');
+    const result = await uploadPhoto(file);
+    if (result.success && (result.data.secure_url || result.data.url)) {
+      formEntry.value.piece_jointe = result.data.secure_url || result.data.url;
+      triggerSnackbar('Pièce jointe ajoutée !', 'success');
+    } else {
+      triggerSnackbar('Erreur upload pièce jointe', 'error');
+    }
+  } catch (err) {
+    triggerSnackbar('Erreur upload pièce jointe', 'error');
+  }
+}
+
+async function submitAddEdit() {
+  loading.value = true;
+  formEntry.value.id_entreprise = authStore.user?.id_entreprise || '';
+  const requiredFields = [
+    'date', 'type', 'montant', 'user', 'details', 'id_entreprise'
+  ];
+  for (const field of requiredFields) {
+    if (!formEntry.value[field] || (typeof formEntry.value[field] === 'string' && formEntry.value[field].trim() === '')) {
+      triggerSnackbar(`Champ obligatoire manquant : ${field}`, 'error');
+      loading.value = false;
+      return;
+    }
+  }
+  try {
+    if (editingEntry.value) {
+      if (!editingEntry.value.id_compta) {
+        triggerSnackbar('Identifiant du mouvement manquant.', 'error');
+        loading.value = false;
+        return;
+      }
+      const response = await apiService.put(`/api_comptabilite.php?action=update&id=${editingEntry.value.id_compta}`, formEntry.value);
+      if (response.success) {
+        Object.assign(editingEntry.value, formEntry.value);
+        triggerSnackbar('Mouvement modifié !', 'success');
+        closeAddModal();
+      } else {
+        triggerSnackbar('Erreur lors de la modification', 'error');
+      }
+    } else {
+      const response = await apiService.post('/api_comptabilite.php?action=create', formEntry.value);
+      if (response.success) {
+        comptaEntries.value.unshift({ ...formEntry.value });
+        triggerSnackbar('Mouvement ajouté !', 'success');
+        closeAddModal();
+      } else {
+        triggerSnackbar('Erreur lors de l\'ajout', 'error');
+      }
+    }
+  } catch (e) {
+    triggerSnackbar('Erreur lors de l\'enregistrement', 'error');
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -193,11 +595,22 @@ const filteredComptaEntries = computed(() => {
     entries = entries.filter(entry =>
       (entry.user && entry.user.toLowerCase().includes(s)) ||
       (entry.type && entry.type.toLowerCase().includes(s)) ||
-      (entry.details && entry.details.toLowerCase().includes(s))
+      (entry.details && entry.details.toLowerCase().includes(s)) ||
+      (entry.reference && entry.reference.toLowerCase().includes(s)) ||
+      (entry.commentaire && entry.commentaire.toLowerCase().includes(s))
     );
   }
   if (typeFilter.value) {
     entries = entries.filter(entry => entry.type === typeFilter.value);
+  }
+  if (categorieFilter.value) {
+    entries = entries.filter(entry => entry.categorie === categorieFilter.value);
+  }
+  if (statutFilter.value) {
+    entries = entries.filter(entry => entry.statut === statutFilter.value);
+  }
+  if (moyenPaiementFilter.value) {
+    entries = entries.filter(entry => entry.moyen_paiement === moyenPaiementFilter.value);
   }
   if (dateFrom.value) {
     entries = entries.filter(entry => entry.date && entry.date >= dateFrom.value);
@@ -230,10 +643,6 @@ const totalSorties = computed(() => {
   return comptaEntries.value.filter(e => e.type === 'Sortie').reduce((acc, e) => acc + e.montant, 0);
 });
 
-function formatCurrency(val) {
-  if (val == null) return '—';
-  return val.toLocaleString('fr-FR') + ' F CFA';
-}
 function formatComptaDate(dateString) {
   if (!dateString) return '—';
   try {
@@ -280,7 +689,7 @@ function exportPDF() {
   doc.setFontSize(16);
   doc.setTextColor(26,95,74);
   doc.setFont('helvetica', 'bold');
-  doc.text('Mouvements comptables', 105, 38, { align: 'center' });
+  doc.text(`Mouvements comptables`, 105, 38, { align: 'center' });
   doc.setFillColor(240, 253, 244);
   doc.roundedRect(40, 44, 130, 12, 4, 4, 'F');
   doc.setFontSize(11);
@@ -313,249 +722,231 @@ function exportPDF() {
 </script>
 
 <style scoped>
-.compta-offset {
-  margin-left: 0;
+ .main-table.compta-main-table tbody tr:nth-child(even) td {
+  background: #f8fafc;
 }
-.compta-header {
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #f0f1f3;
-  flex-shrink: 0;
+.main-table.compta-main-table tbody tr:nth-child(odd) td {
+  background: #fff;
+}   
+.page-main.compta-page {
+  background: #e0e7ef;
+  min-height: 100vh;
+  padding: 2.5rem 0 0 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  align-items: stretch;
 }
-.compta-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 0.25rem 0;
-  letter-spacing: -0.02em;
-}
-.compta-subtitle {
-  font-size: 0.8125rem;
-  color: #64748b;
-  margin: 0;
-}
-.compta-summary {
+.page-card.compta-card {
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 4px 24px 0 rgba(26,95,74,0.08);
+  padding: 2.2rem 2.5rem 1.5rem 2.5rem;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0 auto 2.5rem auto;
   display: flex;
+  flex-direction: column;
   gap: 1.2rem;
-  margin: 1rem 0 0.5rem 0;
+  flex: 1 1 0%;
 }
-.summary-card {
-  background: #f8fafc;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(26,95,74,0.07);
-  padding: 1rem 1.5rem;
+.page-header.compta-header-flex {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  min-width: 180px;
+  justify-content: space-between;
+  margin-bottom: 0.7rem;
+  gap: 1.5rem;
 }
-.summary-icon {
-  font-size: 1.5rem;
+.compta-header-actions {
+  width: 100%;
 }
-.summary-label {
-  font-size: 0.85rem;
-  color: #64748b;
+.compta-add-btn {
+  margin-left: auto;
 }
-.summary-value {
-  font-size: 1.15rem;
+.page-title.compta-title {
+  margin: 0;
+  font-size: 1.45rem;
   font-weight: 700;
   color: #1a202c;
 }
-.compta-filters {
-  margin-top: 0.5rem;
+.compta-statcards-row {
   display: flex;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 900px;
+  gap: 1.5rem;
+  margin-bottom: 0.7rem;
+  justify-content: center;
 }
-.compta-search-input {
-  flex: 3;
-  min-width: 220px;
-  padding: 0.5rem 1.25rem;
-  border: 1px solid #e2e8f0;
+.compta-filter-box {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+  justify-content: flex-start;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  flex-wrap: wrap;
+}
+.filter-input {
+  padding: 0.75rem;
+  border: 1.5px solid #10b981;
   border-radius: 8px;
   font-size: 1rem;
-  background: #f8fafc;
-  transition: border-color 0.2s;
-}
-.compta-date-input, .compta-type-input {
-  flex: 1;
-  min-width: 120px;
-  padding: 0.5rem 0.5rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 1rem;
-  background: #f8fafc;
-  transition: border-color 0.2s;
-}
-.compta-search-input:focus, .compta-date-input:focus, .compta-type-input:focus {
-  outline: none;
-  border-color: #1a5f4a;
-}
-.table-container {
-  flex: 1;
-  overflow: auto;
-  border-radius: 18px;
-  border: none;
   background: #fff;
-  min-height: 0;
-  box-shadow: 0 4px 24px 0 rgba(26, 95, 74, 0.08);
-  margin-bottom: 2rem;
 }
-.compta-table {
+/* Correction affichage datepicker */
+.datepicker-wrapper {
+  min-width: 180px;
+}
+.compta-add-btn {
+  margin-left: auto;
+  padding: 0.85rem 1.7rem;
+  border: none;
+  background: #1a5f4a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 1.08rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px 0 rgba(26,95,74,0.08);
+  cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s;
+  margin-top: 0.2rem;
+}
+.compta-add-btn:hover {
+  background: #145040;
+  box-shadow: 0 4px 16px 0 rgba(26,95,74,0.13);
+}
+.datepicker-input {
+  width: 100%;
+  min-width: 120px;
+  max-width: 240px;
+  background: #fff;
+  border: 1.5px solid #10b981;
+  border-radius: 8px !important;
+  font-size: 1rem;
+  padding: 0.75rem;
+  height: 44px;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  margin: 0;
+  outline: none;
+}
+.datepicker-input:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px #bbf7d0;
+  border-radius: 8px !important;
+}
+.datepicker-input {
+  width: 200px !important;
+  min-width: 160px;
+  max-width: 240px;
+  background: #fff;
+  border: 1.5px solid #10b981;
+  border-radius: 8px;
+  font-size: 1rem;
+  padding: 0.75rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.datepicker-input:focus {
+  border-color: #059669;
+  outline: none;
+}
+@media (max-width: 900px) {
+  .datepicker-wrapper {
+    min-width: 120px;
+    max-width: 100%;
+  }
+  .datepicker-input {
+    min-width: 100px;
+    font-size: 0.95rem;
+    padding: 0.6rem;
+  }
+}
+.compta-add-btn {
+  padding: 0.5rem 1rem;
+  border: 1.5px solid #10b981;
+  background: #1a5f4a;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-primary.btn-excel {
+  padding: 0.5rem 1rem;
+  border: 1.5px solid #3b82f6;
+  background: #3b82f6;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-primary.btn-excel:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+.btn-primary.btn-pdf {
+  padding: 0.5rem 1rem;
+  border: 1.5px solid #dc2626;
+  background: #dc2626;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-primary.btn-pdf:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+.table-container.compta-table-container {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px 0 rgba(26,95,74,0.08);
+  padding: 0.5rem 1.2rem 1.2rem 1.2rem;
+  margin-top: 1.2rem;
+}
+.main-table.compta-main-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   background: #fff;
-  table-layout: fixed;
-  border-radius: 18px;
+  table-layout: auto;
+  border-radius: 14px;
   overflow: hidden;
+  box-shadow: none;
 }
-.compta-table thead tr {
-  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-  border-radius: 18px 18px 0 0;
-}
-.compta-table th {
-  padding: 1rem 0.875rem;
-  text-align: left;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #1a202c;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 2px solid #e2e8f0;
-  background: none;
-}
-.compta-table th:first-child {
-  border-top-left-radius: 18px;
-}
-.compta-table th:last-child {
-  border-top-right-radius: 18px;
-}
-.compta-table td {
-  padding: 1rem 0.875rem;
-  font-size: 0.95rem;
-  color: #334155;
-  border-bottom: 1px solid #f1f5f9;
-  background: #fff;
-  transition: background 0.18s;
-}
-.data-row {
-  transition: background 0.18s;
-}
-.data-row:nth-child(even) td {
+.main-table.compta-main-table thead tr {
   background: #f8fafc;
 }
-.data-row:hover td {
-  background: #e0e7ef;
-}
-.data-row:last-child td {
-  border-bottom: none;
-}
-.date-cell {
-  font-weight: 500;
-  color: #64748b;
-  font-family: 'SF Mono', 'Consolas', monospace;
-  font-size: 0.75rem;
-}
-.montant-cell {
+.main-table.compta-main-table th {
+  text-transform: uppercase;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: #1a202c;
+  color: #334155;
+  letter-spacing: 0.02em;
+  padding: 1.1rem 0.7rem 1.1rem 0.7rem;
+  border-bottom: 1.5px solid #e5e7eb;
+  background: #f8fafc;
+  text-align: left;
 }
-.type-badge {
-  display: inline-block;
-  padding: 0.25rem 0.625rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
-  white-space: nowrap;
+.main-table.compta-main-table td {
+  padding: 0.85rem 0.7rem;
+  font-size: 1rem;
+  color: #1f2937;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
 }
-.type-badge.type-entree {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #86efac;
-}
-.type-badge.type-sortie {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fca5a5;
-}
-.user-cell {
-  font-weight: 500;
-}
-.details-cell {
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  max-width: 100%;
-}
-.details-cell span.details-text {
-  display: inline-block;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-.actions-cell {
-  display: flex;
-  gap: 0.5rem;
-}
-.btn-action {
-  background: #f3f4f6;
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.18s;
-  box-shadow: 0 1px 2px #0001;
-  font-size: 1.1rem;
-}
-.btn-action.edit:hover {
-  background: #e0e7ef;
-}
-.btn-action.delete:hover {
-  background: #fee2e2;
-}
-.icon-view {
-  font-size: 1.15rem;
-  color: #2563eb;
-  pointer-events: none;
-}
-.btn-view {
-  margin-left: 0.5rem;
-  background: #f3f4f6;
-  border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.18s;
-  box-shadow: 0 1px 2px #0001;
-}
-.btn-view:hover {
-  background: #e0e7ef;
+.main-table.compta-main-table tr:last-child td {
+  border-bottom: none;
 }
 .empty-state {
   padding: 2.5rem 1rem !important;
   text-align: center;
   color: #94a3b8;
-  font-size: 0.875rem;
+  font-size: 0.98rem;
   white-space: normal !important;
 }
 .error-state {
@@ -600,10 +991,78 @@ function exportPDF() {
   min-width: 340px;
   max-width: 98vw;
   box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+}
+/* Modale de suppression harmonisée */
+.modal-content.user-modal {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
+  min-width: 320px;
+  max-width: 380px;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  animation: modalIn 0.18s cubic-bezier(.4,2,.6,1) both;
+  gap: 1.2rem;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.modal-header h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #dc2626;
+  margin: 0;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.7rem;
+  color: #888;
+  cursor: pointer;
+}
+.modal-body p {
+  font-size: 1.05rem;
+  margin: 0.5rem 0 0.2rem 0;
+  color: #1a202c;
+  text-align: left;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.2rem;
+}
+.btn-secondary {
+  background: #e5e7eb;
+  color: #1a2a2a;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.btn-secondary:hover {
+  background: #f3f4f6;
+}
+.btn-primary.btn-delete {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.6em 1.3em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.btn-primary.btn-delete:hover {
+  background: #b91c1c;
 }
 .modal-content h3 {
   font-size: 1.25rem;
@@ -668,16 +1127,49 @@ function exportPDF() {
   background: #dc2626 !important;
   color: #fff !important;
 }
+.snackbar {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(26, 95, 74, 0.9);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: opacity 0.3s;
+  z-index: 4000;
+}
+.snackbar.success {
+  background: rgba(52, 211, 153, 0.9);
+}
+.snackbar.error {
+  background: rgba(239, 68, 68, 0.9);
+}
 @keyframes modalIn {
   from { opacity: 0; transform: translateY(40px) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
+@media (max-width: 1200px) {
+  .page-card.compta-card {
+    padding: 1.2rem 0.5rem;
+  }
+}
 @media (max-width: 768px) {
-  .compta-title { font-size: 1.25rem; }
-  .compta-subtitle { font-size: 0.75rem; }
+  .page-card.compta-card {
+    padding: 1rem 0.2rem;
+    border-radius: 14px;
+  }
+  .compta-title { font-size: 1.15rem; }
   .compta-table th, .compta-table td { padding: 0.5rem 0.625rem; font-size: 0.75rem; }
-  .summary-card { min-width: 120px; padding: 0.7rem 0.7rem; }
-  .compta-filters { max-width: 100vw; }
-  .grid-2-cols { grid-template-columns: 1fr; gap: 1rem; }
+  .compta-statcards-row { flex-direction: column; gap: 0.7rem; }
+}
+.date-range-filter {
+  min-width: 180px;
+  display: flex;
+  align-items: center;
 }
 </style>

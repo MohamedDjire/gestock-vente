@@ -160,7 +160,278 @@ button:focus-visible {
 .card {
   padding: 2em;
 }
-
+.section-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 16px #0001;
+  padding: 2rem 2.5rem;
+  margin-bottom: 2rem;
+}
+.card-header {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.users-table th, .users-table td {
+  padding: 0.75em 1em;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.users-table th {
+  background: #f3f4f6;
+  color: #1a5f4a;
+  font-weight: 700;
+}
+.users-table tr:hover {
+  background: #e6f4f1;
+}
+.btn-primary {
+  background: #1a5f4a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6em 1.2em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover {
+  background: #15704a;
+}
+.btn-secondary {
+  background: #f3f4f6;
+  color: #1a5f4a;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.6em 1.2em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-secondary:hover {
+  background: #e6f4f1;
+}
+.badge {
+  display: inline-block;
+  padding: 0.3em 0.8em;
+  border-radius: 999px;
+  font-size: 0.95em;
+  font-weight: 600;
+  background: #e6f4f1;
+  color: #1a5f4a;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #0006;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.2rem 1.2rem;
+  min-width: 300px;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  animation: modalIn 0.18s cubic-bezier(.4,2,.6,1) both;
+}
+.modal-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 0.5rem;
+}
+.modal-actions {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.2rem;
+}
+@media (max-width: 600px) {
+  .modal-content {
+    max-width: 98vw;
+    padding: 0.7rem 0.3rem;
+  }
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #1a5f4a;
+  cursor: pointer;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.user-form input, .user-form select, .user-form textarea {
+  width: 100%;
+  padding: 0.7em 1em;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 1.2rem;
+  font-size: 1rem;
+  background: #f9fafb;
+}
+.user-form label {
+  font-weight: 600;
+  color: #1a5f4a;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+/* .snackbar styles are defined elsewhere in the template */
+.empty-state {
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 2rem;
+  color: #1a5f4a;
+  font-size: 1.1rem;
+  margin: 2rem 0;
+}
+.error-state {
+  color: #dc2626;
+  background: #fee2e2;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-top: 1.5rem;
+  justify-content: flex-end;
+}
+.compta-offset {
+  margin-top: 2.5rem;
+}
+.compta-table {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 2px 12px 0 rgba(26,95,74,0.07);
+  border: 1.5px solid #f0f0f0;
+}
+.compta-table thead tr {
+  background: #f8fafc;
+}
+.compta-table th {
+  background: #f8fafc;
+  color: #1a202c;
+  font-weight: 700;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 0.95rem;
+  padding: 1rem 0.875rem;
+}
+.compta-table td {
+  background: #fff;
+  color: #222;
+  font-size: 0.95rem;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 1rem 0.875rem;
+}
+.data-row:nth-child(even) td {
+  background: #f8fafc;
+}
+.data-row:hover td {
+  background: #e6f4f1;
+}
+.type-badge {
+  background: #e6f4f1;
+  color: #1a5f4a;
+  border-radius: 999px;
+  font-size: 0.95em;
+  font-weight: 600;
+  padding: 0.3em 0.8em;
+  border: none;
+}
+.type-badge.type-entree {
+  background: #d1fae5;
+  color: #065f46;
+}
+.type-badge.type-sortie {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.btn-action, .btn-view {
+  background: #f8fafc;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s;
+  box-shadow: 0 1px 2px #0001;
+  font-size: 1.1rem;
+}
+.btn-action.edit:hover {
+  background: #e6f4f1;
+}
+.btn-action.delete:hover {
+  background: #fee2e2;
+}
+.btn-view:hover {
+  background: #e6f4f1;
+}
+.grid-2-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem 2.5rem;
+}
+@media (max-width: 768px) {
+  .grid-2-cols {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+@media (max-width: 900px) {
+  .users-table-container {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+  }
+  .compta-table {
+    min-width: 700px;
+    font-size: 0.78rem;
+  }
+  .compta-table th, .compta-table td {
+    padding: 0.5rem 0.4rem;
+    font-size: 0.78rem;
+  }
+  .compta-table th {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    z-index: 2;
+  }
+}
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
@@ -171,5 +442,103 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+  }
+}
+.summary-card {
+  background: linear-gradient(90deg,#e0f2fe 0%,#f8fafc 100%);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(26,95,74,0.13);
+  padding: 3.2rem 3.5rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  min-width: 320px;
+  border: 1px solid #bae6fd;
+}
+.summary-icon {
+  font-size: 3.2rem;
+  margin-right: 1.5rem;
+}
+.summary-label {
+  font-size: 1.25rem;
+  color: #64748b;
+  font-weight: 700;
+}
+.summary-value {
+  color: #2563eb;
+  font-size: 2.8rem;
+  font-weight: 900;
+  margin-top: 0.3rem;
+}
+.compta-summary {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
+  gap: 2.5rem;
+  margin: 2.5rem 0 2rem 0;
+}
+.stat-card {
+  flex: 1 1 0;
+  min-width: 220px;
+  max-width: 100%;
+  margin: 0 0.5rem;
+}
+@media (max-width: 900px) {
+  .compta-summary { flex-direction: column; gap: 1.2rem; }
+  .stat-card { min-width: 180px; margin: 0 auto; }
+}
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 100%;
+}
+.user-form .form-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.user-form label {
+  font-weight: 600;
+  color: #1a5f4a;
+  margin-bottom: 0.2rem;
+  font-size: 1rem;
+}
+.user-form input, .user-form select, .user-form textarea {
+  width: 100%;
+  padding: 0.6em 1em;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: #f9fafb;
+  margin-bottom: 0;
+}
+.user-form textarea {
+  min-height: 38px;
+  resize: vertical;
+}
+.user-form .form-group input,
+.user-form .form-group select,
+.user-form .form-group textarea {
+  max-width: 220px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+.user-form .form-group {
+  align-items: flex-start;
+}
+.grid-2-cols {
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem 2.5rem;
+}
+@media (max-width: 768px) {
+  .user-form .form-group input,
+  .user-form .form-group select,
+  .user-form .form-group textarea {
+    max-width: 100%;
   }
 }

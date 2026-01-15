@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vuepic/vue-datepicker": "^12.1.0",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
     "cloudinary": "^2.8.0",
@@ -19,6 +20,7 @@
     "vue": "^3.5.24",
     "vue-chartjs": "^5.3.3",
     "vue-router": "^4.6.4",
+    "vue3-date-time-picker": "^2.8.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

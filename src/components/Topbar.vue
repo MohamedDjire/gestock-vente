@@ -131,6 +131,7 @@ import { useForfait } from '../composables/useForfait.js'
 import { ref, onMounted, provide, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { uploadPhoto } from '../config/cloudinary'
+import { apiService } from '../composables/Api/apiService.js'
 
 const authStore = useAuthStore()
 const onAvatarChange = async (e) => {
@@ -140,6 +141,9 @@ const onAvatarChange = async (e) => {
     const result = await uploadPhoto(file)
     if (result.success && (result.data.secure_url || result.data.url)) {
       const photoUrl = result.data.secure_url || result.data.url;
+      // Mettre à jour la photo dans la base de données via l'API
+      const id = authStore.user.id_utilisateur || authStore.user.id;
+      await apiService.put(`/index.php?action=update&id=${id}`, { photo: photoUrl });
       // Mettre à jour la photo dans le store Pinia et localStorage
       const updatedUser = { ...authStore.user, photo: photoUrl };
       authStore.setAuthData(authStore.token, updatedUser);
