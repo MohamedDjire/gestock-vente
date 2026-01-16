@@ -1,4 +1,3 @@
-<!-- Bloc dupliqué supprimé : il ne reste qu'un seul <template>, <script setup> et <style> -->
 <template>
   <div class="compta-page compta-bg">
     <section class="compta-hero">
@@ -47,7 +46,6 @@
 </template>
 
 <script setup>
-<<<<<<< HEAD
 import { ref, onMounted } from 'vue'
 import ComptaHeader from '../components/comptabilite/ComptaHeader.vue'
 import ComptaKpi from '../components/comptabilite/ComptaKpi.vue'
@@ -67,8 +65,6 @@ import {
   getAuditTrail
 } from '../composables/api/apiCompta'
 import { updateEcriture } from '../composables/api/apiCompta'
-=======
-import { ref, computed, onMounted, watch } from 'vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker';
 import '@vuepic/vue-datepicker/dist/main.css';
 import { useCurrency } from '../composables/useCurrency.js'
@@ -78,7 +74,6 @@ import autoTable from 'jspdf-autotable';
 import { useAuthStore } from '../stores/auth.js'
 import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
->>>>>>> fc8e382d3fe4531c524fb054efee767a2da18f2b
 
 function closeDeleteModal() {
             showDeleteModal.value = false

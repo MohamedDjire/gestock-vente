@@ -114,7 +114,6 @@ const formatNumber = (value) => {
 const loadDashboardData = async () => {
   loading.value = true
   try {
-<<<<<<< HEAD
     // Récupérer l'id_entreprise
     let id_entreprise = null
     const user = localStorage.getItem('prostock_user')
@@ -151,14 +150,12 @@ const loadDashboardData = async () => {
       variationVenteJour: 0.8,
       variationProduit: 0.0,
       variationRupture: -2.1
-=======
-    const user = authStore.user
+    }
+    const userAuth = authStore.user
     let pointVenteId = route.query.point_vente
-    
     // Si pas de point de vente dans l'URL, utiliser celui de l'utilisateur par défaut
-    if (!pointVenteId && user) {
-      const isAdmin = user.role && ['admin', 'superadmin'].includes(String(user.role).toLowerCase())
-      
+    if (!pointVenteId && userAuth) {
+      const isAdmin = userAuth.role && ['admin', 'superadmin'].includes(String(userAuth.role).toLowerCase())
       // Pour les non-admins, utiliser leur premier point de vente (obligatoire)
       if (!isAdmin && user.permissions_points_vente && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
         pointVenteId = user.permissions_points_vente[0]
@@ -237,7 +234,6 @@ const loadDashboardData = async () => {
         variationProduit: 0,
         variationRupture: 0
       }
->>>>>>> fc8e382d3fe4531c524fb054efee767a2da18f2b
     }
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error)
