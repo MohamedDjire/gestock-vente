@@ -1,38 +1,32 @@
 <template>
   <div class="sales-table">
     <h3 class="table-title">Top commerciaux</h3>
-    <table>
+    <div v-if="loading" class="loading-state">Chargement...</div>
+    <div v-else-if="topPointsVente.length === 0" class="empty-state">Aucun point de vente trouvé</div>
+    <table v-else>
       <thead>
         <tr>
-          <th>Nom</th>
+          <th>Point de Vente</th>
           <th>Ventes</th>
-          <th>Produits</th>
-          <th>Premium</th>
+          <th>CA Total</th>
+          <th>Ventes Aujourd'hui</th>
           <th>Statut</th>
         </tr>
       </thead>
       <tbody>
-        <tr>
+        <tr v-for="(pv, index) in topPointsVente" :key="pv.id_point_vente">
           <td class="user-cell">
-            <img class="avatar" src="https://randomuser.me/api/portraits/men/32.jpg" alt="" />
-            Nicholas Patrick
+            <div class="avatar-placeholder">{{ pv.nom_point_vente?.charAt(0)?.toUpperCase() || 'P' }}</div>
+            {{ pv.nom_point_vente || 'Point de Vente' }}
           </td>
-          <td>$2540.58</td>
-          <td>150</td>
-          <td>105</td>
-          <td><span class="badge gold">Gold</span></td>
-        </tr>
-       
-      
-        <tr>
-          <td class="user-cell">
-            <img class="avatar" src="https://randomuser.me/api/portraits/women/35.jpg" alt="" />
-            Larissa Burton
+          <td>{{ pv.nombre_ventes || 0 }}</td>
+          <td>{{ formatPrice(pv.chiffre_affaires_total || 0) }}</td>
+          <td>{{ formatPrice(pv.chiffre_affaires_journalier || 0) }}</td>
+          <td>
+            <span :class="['badge', pv.actif ? 'badge-success' : 'badge-warning']">
+              {{ pv.actif ? 'Actif' : 'Inactif' }}
+            </span>
           </td>
-          <td>$2340.58</td>
-          <td>120</td>
-          <td>99</td>
-          <td><span class="badge gold">Gold</span></td>
         </tr>
       </tbody>
     </table>
@@ -40,7 +34,42 @@
 </template>
 
 <script setup>
-// Statique pour l'instant
+import { ref, onMounted } from 'vue'
+import { apiService } from '../composables/Api/apiService.js'
+import { useCurrency } from '../composables/useCurrency.js'
+
+const { formatPrice } = useCurrency()
+const topPointsVente = ref([])
+const loading = ref(false)
+
+const loadTopPointsVente = async () => {
+  loading.value = true
+  try {
+    const response = await apiService.get('/api_point_vente.php?action=all')
+    if (response.success && Array.isArray(response.data)) {
+      // Trier par chiffre d'affaires total décroissant et prendre le top 5
+      const sorted = response.data
+        .map(pv => ({
+          ...pv,
+          chiffre_affaires_total: parseFloat(pv.chiffre_affaires_total || 0),
+          nombre_ventes: parseInt(pv.nombre_ventes || 0),
+          chiffre_affaires_journalier: parseFloat(pv.chiffre_affaires_journalier || 0)
+        }))
+        .sort((a, b) => b.chiffre_affaires_total - a.chiffre_affaires_total)
+        .slice(0, 5)
+      
+      topPointsVente.value = sorted
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des top points de vente:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadTopPointsVente()
+})
 </script>
 
 <style scoped>
@@ -136,5 +165,24 @@
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #1a5f4a22;
+}
+.avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.loading-state, .empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.95rem;
 }
 </style>

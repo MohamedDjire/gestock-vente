@@ -1,107 +1,259 @@
-/* Style unifié pour la modale user-modal (section utilisateurs) */
-/* Correction : scroll uniquement sur le corps, footer toujours visible */
-.modal-content.user-modal {
-  background: #fff;
-  color: #222;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-  max-width: 500px;
-  width: 95vw;
-  height: 90vh;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  position: relative;
-  overflow: hidden;
+/* ============================================
+   STYLES UNIFIÉS POUR TOUTES LES MODALES
+   ============================================ */
+
+/* Animation d'entrée pour les modales */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
-.modal-content.user-modal .modal-header {
-  padding: 1.2rem 1.5rem 0.5rem 1.5rem;
-  border-bottom: 1px solid #eee;
+
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
-.modal-content.user-modal .modal-body {
-  padding: 1.5rem;
-  overflow-y: auto;
-  flex: 1 1 0%;
-  min-height: 0;
-  max-height: 100%;
-  box-sizing: border-box;
-}
-.modal-content.user-modal .modal-footer,
-.modal-content.user-modal .modal-actions {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #eee;
-  flex-shrink: 0;
-  background: inherit;
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  box-sizing: border-box;
-}
-.modal-close {
-  background: none;
-  border: none;
-  color: #222;
-  font-size: 1.5rem;
-  position: absolute;
-  top: 1rem;
-  right: 1.2rem;
-  cursor: pointer;
-}
-/* Style propre et unique pour la modale point-vente-modal (comme produit/stock) */
+
+/* Overlay de fond pour toutes les modales */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0,0,0,0.4);
-  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 9999;
+  animation: overlayFadeIn 0.2s ease-out;
+  padding: 1rem;
+  box-sizing: border-box;
 }
-.modal-content.point-vente-modal {
-  background: #fff;
-  color: #222;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-  max-width: 500px;
-  width: 95vw;
+
+/* Contenu de la modale - Style de base */
+.modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 600px;
+  width: 100%;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  padding: 0;
   position: relative;
+  animation: modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
-.modal-content.point-vente-modal .modal-header {
-  padding: 1.2rem 1.5rem 0.5rem 1.5rem;
-  border-bottom: 1px solid #333;
+
+/* Variantes de taille pour les modales */
+.modal-content.small {
+  max-width: 400px;
 }
-.modal-content.point-vente-modal .modal-body {
-  padding: 1.5rem;
+
+.modal-content.medium {
+  max-width: 600px;
+}
+
+.modal-content.large {
+  max-width: 900px;
+}
+
+.modal-content.fullscreen {
+  max-width: 95vw;
+  max-height: 95vh;
+}
+
+/* Modale view-modal pour affichage de détails */
+.modal-content.view-modal {
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-content.view-modal .modal-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Header de la modale */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  background: #ffffff;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  line-height: 1.2;
+}
+
+.modal-header .modal-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  line-height: 1.2;
+}
+
+/* Bouton de fermeture */
+.modal-close {
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.5rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.modal-close:active {
+  transform: scale(0.95);
+}
+
+/* Body de la modale */
+.modal-body {
+  padding: 2rem;
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
+  color: #374151;
+  line-height: 1.6;
 }
-.modal-content.point-vente-modal .modal-footer {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #333;
-  flex-shrink: 0;
-  background: inherit;
+
+.modal-body p {
+  margin: 0 0 1rem 0;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* Footer/Actions de la modale */
+.modal-footer,
+.modal-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 1rem;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  background: #ffffff;
 }
-.modal-close {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 1.5rem;
-  position: absolute;
-  top: 1rem;
-  right: 1.2rem;
-  cursor: pointer;
+
+/* Styles spécifiques pour modales avec structure header/body/footer */
+.modal-content.user-modal,
+.modal-content.point-vente-modal {
+  max-width: 500px;
+  width: 95vw;
+  height: 90vh;
+  max-height: 90vh;
+  padding: 0;
+}
+
+.modal-content.user-modal .modal-header,
+.modal-content.point-vente-modal .modal-header {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-content.user-modal .modal-body,
+.modal-content.point-vente-modal .modal-body {
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+.modal-content.user-modal .modal-footer,
+.modal-content.user-modal .modal-actions,
+.modal-content.point-vente-modal .modal-footer,
+.modal-content.point-vente-modal .modal-actions {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Message d'avertissement dans les modales */
+.modal-warning {
+  color: #dc2626;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+  font-weight: 500;
+  padding: 0.75rem;
+  background: #fef2f2;
+  border-radius: 8px;
+  border-left: 3px solid #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 0.5rem;
+  }
+  
+  .modal-content {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: 12px;
+  }
+  
+  .modal-header {
+    padding: 1.25rem 1.5rem;
+  }
+  
+  .modal-header h3,
+  .modal-header .modal-title {
+    font-size: 1.25rem;
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+  }
+  
+  .modal-footer,
+  .modal-actions {
+    padding: 1.25rem 1.5rem;
+    flex-direction: column;
+  }
+  
+  .modal-footer button,
+  .modal-actions button {
+    width: 100%;
+  }
 }
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -230,68 +382,6 @@ button:focus-visible {
   font-weight: 600;
   background: #e6f4f1;
   color: #1a5f4a;
-}
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: #0006;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.modal-content {
-  background: #fff;
-  border-radius: 16px;
-  padding: 1.2rem 1.2rem;
-  min-width: 300px;
-  max-width: 420px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  animation: modalIn 0.18s cubic-bezier(.4,2,.6,1) both;
-}
-.modal-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 0.5rem;
-}
-.modal-actions {
-  width: 100%;
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.2rem;
-}
-@media (max-width: 600px) {
-  .modal-content {
-    max-width: 98vw;
-    padding: 0.7rem 0.3rem;
-  }
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #1a5f4a;
-  cursor: pointer;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 2rem;
 }
 .user-form input, .user-form select, .user-form textarea {
   width: 100%;

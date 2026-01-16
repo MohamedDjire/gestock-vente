@@ -1,14 +1,19 @@
 <template>
   <div class="point-vente-page">
-    <div class="products-header">
-      <h2 class="dashboard-title">Points de Vente</h2>
-      <button @click="openCreateModal" class="btn-primary">
-        <span>+</span> Nouveau Point de Vente
-      </button>
-    </div>
+    <!-- Vue Admin : Liste des points de vente -->
+    <template v-if="isAdmin">
+      <div class="products-header">
+        <h2 class="dashboard-title">Points de Vente</h2>
+        <button 
+          @click="openCreateModal" 
+          class="btn-primary"
+        >
+          <span>+</span> Nouveau Point de Vente
+        </button>
+      </div>
 
-    <!-- Contenu masqué jusqu'à ce qu'un point de vente soit ajouté -->
-    <div v-if="pointsVente.length > 0">
+      <!-- Contenu masqué jusqu'à ce qu'un point de vente soit ajouté -->
+      <div v-if="pointsVente.length > 0">
       <!-- Dashboard des Ventes - Métriques comme dans la capture -->
       <div class="ventes-dashboard">
         <div class="ventes-dashboard-header">
@@ -442,11 +447,570 @@
         </div>
       </div>
     </div>
+    </template>
+
+    <!-- Vue Agent : Gestion des ventes, livraisons, commandes -->
+    <template v-else>
+      <div class="agent-point-vente-page">
+        <div class="agent-header">
+          <h2 class="dashboard-title">{{ currentPointVente?.nom_point_vente || 'Chargement...' }}</h2>
+          <div class="agent-stats-cards">
+            <div class="agent-stat-card">
+              <div class="stat-icon">💰</div>
+              <div class="stat-info">
+                <div class="stat-label">CA Aujourd'hui</div>
+                <div class="stat-value">{{ formatCurrency(agentStats.caJournalier) }}</div>
+              </div>
+            </div>
+            <div class="agent-stat-card">
+              <div class="stat-icon">📦</div>
+              <div class="stat-info">
+                <div class="stat-label">Ventes Aujourd'hui</div>
+                <div class="stat-value">{{ agentStats.ventesAujourdhui }}</div>
+              </div>
+            </div>
+            <div class="agent-stat-card">
+              <div class="stat-icon">🚚</div>
+              <div class="stat-info">
+                <div class="stat-label">À Livrer</div>
+                <div class="stat-value">{{ agentStats.aLivrer }}</div>
+              </div>
+            </div>
+            <div class="agent-stat-card">
+              <div class="stat-icon">🛒</div>
+              <div class="stat-info">
+                <div class="stat-label">Commandes</div>
+                <div class="stat-value">{{ agentStats.commandes }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Onglets de navigation -->
+        <div class="agent-tabs">
+          <button 
+            v-for="tab in agentTabs" 
+            :key="tab.id"
+            @click="activeAgentTab = tab.id"
+            :class="['agent-tab', { active: activeAgentTab === tab.id }]"
+          >
+            <span class="tab-icon">{{ tab.icon }}</span>
+            <span class="tab-label">{{ tab.label }}</span>
+          </button>
+        </div>
+
+        <!-- Contenu des onglets -->
+        <div class="agent-tab-content">
+          <!-- Onglet Ventes -->
+          <div v-if="activeAgentTab === 'ventes'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Mes Ventes</h3>
+              <button @click="openSaleModal" class="btn-primary">
+                <span>+</span> Nouvelle Vente
+              </button>
+            </div>
+            
+            <!-- Filtres de recherche -->
+            <div class="ventes-filters">
+              <div class="filter-group">
+                <label>Date de début:</label>
+                <input 
+                  type="date" 
+                  v-model="venteFilterDateDebut" 
+                  @change="loadAgentVentes"
+                  class="filter-input"
+                />
+              </div>
+              <div class="filter-group">
+                <label>Date de fin:</label>
+                <input 
+                  type="date" 
+                  v-model="venteFilterDateFin" 
+                  @change="loadAgentVentes"
+                  class="filter-input"
+                />
+              </div>
+              <div class="filter-group">
+                <button @click="clearVenteFilters" class="btn-secondary">Réinitialiser</button>
+              </div>
+            </div>
+            
+            <!-- Tableau des ventes -->
+            <div class="ventes-table-container">
+              <div v-if="loadingVentes" class="loading-state">Chargement des ventes...</div>
+              <div v-else-if="agentVentes.length === 0" class="empty-state">Aucune vente trouvée</div>
+              <table v-else class="ventes-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Client</th>
+                    <th>Produits</th>
+                    <th>Quantité</th>
+                    <th>Montant Total</th>
+                    <th>Vendeur</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="vente in agentVentes" :key="vente.id_vente">
+                    <td>{{ formatDate(vente.date_vente) }}</td>
+                    <td>
+                      <span v-if="vente.client_nom">
+                        {{ vente.client_nom }} {{ vente.client_prenom || '' }}
+                      </span>
+                      <span v-else class="text-muted">Client anonyme</span>
+                    </td>
+                    <td>
+                      <div class="produits-list">
+                        <span 
+                          v-for="(produit, index) in (vente.produits || [])" 
+                          :key="index"
+                          class="produit-badge"
+                        >
+                          {{ produit.produit_nom || produit.nom }} ({{ produit.quantite }})
+                        </span>
+                      </div>
+                    </td>
+                    <td>{{ vente.nombre_produits || (vente.produits?.length || 0) }}</td>
+                    <td class="montant-cell">{{ formatCurrency(vente.montant_total) }}</td>
+                    <td>
+                      <span v-if="vente.user_nom">
+                        {{ vente.user_nom }} {{ vente.user_prenom || '' }}
+                      </span>
+                      <span v-else class="text-muted">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Onglet Livraisons -->
+          <div v-if="activeAgentTab === 'livraisons'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Livraisons à Effectuer</h3>
+              <button @click="openLivraisonModal" class="btn-primary">
+                <span>+</span> Nouvelle Livraison
+              </button>
+            </div>
+            <div class="livraisons-list">
+              <div v-if="loadingLivraisons" class="loading-state">Chargement des livraisons...</div>
+              <div v-else-if="agentLivraisons.length === 0" class="empty-state">Aucune livraison en attente</div>
+              <div v-else v-for="livraison in agentLivraisons" :key="livraison.id_vente" class="livraison-item">
+                <div class="livraison-info">
+                  <div class="livraison-client">{{ (livraison.client_nom ? `${livraison.client_nom} ${livraison.client_prenom || ''}`.trim() : 'Client') || 'Client' }}</div>
+                  <div class="livraison-adresse">{{ livraison.adresse || livraison.adresse_livraison || 'Adresse non spécifiée' }}</div>
+                  <div class="livraison-date">Date: {{ formatDate(livraison.date_vente || livraison.date_livraison) }}</div>
+                </div>
+                <div class="livraison-actions">
+                  <button @click="markAsDelivered(livraison)" class="btn-primary">Marquer comme livré</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Onglet Commandes -->
+          <div v-if="activeAgentTab === 'commandes'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Commandes en Attente</h3>
+              <button @click="openCommandeModal" class="btn-primary">
+                <span>+</span> Nouvelle Commande
+              </button>
+            </div>
+            <div class="commandes-list">
+              <div v-if="loadingCommandes" class="loading-state">Chargement des commandes...</div>
+              <div v-else-if="agentCommandes.length === 0" class="empty-state">Aucune commande en attente</div>
+              <div v-else v-for="commande in agentCommandes" :key="commande.id_vente" class="commande-item">
+                <div class="commande-info">
+                  <div class="commande-client">{{ (commande.client_nom ? `${commande.client_nom} ${commande.client_prenom || ''}`.trim() : 'Client') || 'Client' }}</div>
+                  <div class="commande-montant">{{ formatCurrency(commande.montant_total) }}</div>
+                  <div class="commande-date">Date: {{ formatDate(commande.date_vente) }}</div>
+                </div>
+                <div class="commande-actions">
+                  <button @click="processCommande(commande)" class="btn-primary">Traiter</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Onglet Retours -->
+          <div v-if="activeAgentTab === 'retours'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Retours</h3>
+              <button @click="openRetourModal" class="btn-primary">
+                <span>+</span> Nouveau Retour
+              </button>
+            </div>
+            <div class="retours-list">
+              <div v-if="loadingRetours" class="loading-state">Chargement des retours...</div>
+              <div v-else-if="agentRetours.length === 0" class="empty-state">Aucun retour</div>
+              <div v-else v-for="retour in agentRetours" :key="retour.id_vente" class="retour-item">
+                <div class="retour-info">
+                  <div class="retour-client">{{ (retour.client_nom ? `${retour.client_nom} ${retour.client_prenom || ''}`.trim() : 'Client') || 'Client' }}</div>
+                  <div class="retour-montant">{{ formatCurrency(retour.montant_total) }}</div>
+                  <div class="retour-date">Date: {{ formatDate(retour.date_vente) }}</div>
+                </div>
+                <div class="retour-actions">
+                  <button @click="viewRetourDetails(retour)" class="btn-view">Voir</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Modale de Vente -->
+    <div v-if="showSaleModal" class="modal-overlay" @click.self="closeSaleModal">
+      <div class="modal-content sale-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Nouvelle Vente</h3>
+          <button @click="closeSaleModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body sale-modal-body">
+          <div class="sale-modal-container">
+            <!-- Colonne gauche : Panier -->
+            <div class="sale-cart-column">
+              <div class="sale-cart-header">
+                <h4>Panier</h4>
+                <button @click="clearSaleCart" class="btn-clear-small" v-if="saleCart.length > 0">Vider</button>
+              </div>
+              <div class="sale-cart-content">
+                <div v-if="saleCart.length === 0" class="empty-cart-small">
+                  <p>Panier vide</p>
+                </div>
+                <div v-else class="sale-cart-items">
+                  <div v-for="(item, index) in saleCart" :key="`${item.id_produit}-${index}`" class="sale-cart-item">
+                    <div class="sale-cart-item-info">
+                      <div class="sale-cart-item-name">{{ item.nom }}</div>
+                      <div class="sale-cart-item-qty">
+                        <button @click="decreaseSaleQuantity(index)" class="qty-btn-small">−</button>
+                        <span>{{ item.quantite }}</span>
+                        <button @click="increaseSaleQuantity(index)" class="qty-btn-small">+</button>
+                      </div>
+                    </div>
+                    <div class="sale-cart-item-price">{{ formatCurrency(item.sous_total) }}</div>
+                    <button @click="removeFromSaleCart(index)" class="btn-remove-small">×</button>
+                  </div>
+                </div>
+              </div>
+              <div class="sale-cart-footer" v-if="saleCart.length > 0">
+                <div class="sale-summary">
+                  <div class="sale-summary-row">
+                    <span>Total:</span>
+                    <strong>{{ formatCurrency(saleTotal) }}</strong>
+                  </div>
+                </div>
+                <button 
+                  @click="processSaleFromModal" 
+                  class="btn-checkout" 
+                  type="button"
+                >
+                  💳 Valider la vente
+                </button>
+              </div>
+            </div>
+
+            <!-- Colonne droite : Produits -->
+            <div class="sale-products-column">
+              <div class="sale-products-header">
+                <input 
+                  v-model="saleSearchQuery"
+                  type="text"
+                  placeholder="🔍 Rechercher un produit..."
+                  class="sale-search-input"
+                />
+                <select v-model="saleSelectedCategory" class="sale-filter-select">
+                  <option value="">Toutes les catégories</option>
+                  <option v-for="cat in saleCategories" :key="cat" :value="cat">{{ cat }}</option>
+                </select>
+              </div>
+              <div class="sale-products-grid">
+                <div 
+                  v-for="product in saleFilteredProducts" 
+                  :key="product.id_produit"
+                  class="sale-product-card"
+                  :class="{ 'out-of-stock': product.quantite_stock === 0 }"
+                  @click="addToSaleCart(product)"
+                >
+                  <div class="sale-product-image">
+                    <img v-if="product.image" :src="product.image" :alt="product.nom" />
+                    <span v-else class="sale-product-icon">📦</span>
+                  </div>
+                  <div class="sale-product-info">
+                    <div class="sale-product-name">{{ product.nom }}</div>
+                    <div class="sale-product-code">{{ product.code_produit }}</div>
+                    <div class="sale-product-stock">Stock: {{ product.quantite_stock }}</div>
+                  </div>
+                  <div class="sale-product-price">{{ formatCurrency(product.prix_vente) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Livraison -->
+    <div v-if="showLivraisonModal" class="modal-overlay" @click.self="closeLivraisonModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Nouvelle Livraison</h3>
+          <button @click="closeLivraisonModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Client *</label>
+            <input v-model="livraisonForm.client_nom" type="text" placeholder="Nom du client" required />
+          </div>
+          <div class="form-group">
+            <label>Adresse de livraison *</label>
+            <textarea v-model="livraisonForm.adresse" rows="3" placeholder="Adresse complète" required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Date de livraison prévue</label>
+            <input v-model="livraisonForm.date_livraison" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea v-model="livraisonForm.notes" rows="2" placeholder="Notes supplémentaires"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeLivraisonModal" class="btn-secondary">Annuler</button>
+          <button @click="saveLivraison" class="btn-primary" :disabled="savingLivraison">
+            {{ savingLivraison ? 'Enregistrement...' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Commande -->
+    <div v-if="showCommandeModal" class="modal-overlay" @click.self="closeCommandeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Nouvelle Commande</h3>
+          <button @click="closeCommandeModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Client *</label>
+            <input v-model="commandeForm.client_nom" type="text" placeholder="Nom du client" required />
+          </div>
+          <div class="form-group">
+            <label>Produit *</label>
+            <input v-model="commandeForm.produit_nom" type="text" placeholder="Nom du produit" required />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Quantité *</label>
+              <input v-model.number="commandeForm.quantite" type="number" min="1" required />
+            </div>
+            <div class="form-group">
+              <label>Prix unitaire *</label>
+              <input v-model.number="commandeForm.prix_unitaire" type="number" min="0" step="0.01" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Date de livraison prévue</label>
+            <input v-model="commandeForm.date_livraison" type="datetime-local" />
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea v-model="commandeForm.notes" rows="2" placeholder="Notes supplémentaires"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeCommandeModal" class="btn-secondary">Annuler</button>
+          <button @click="saveCommande" class="btn-primary" :disabled="savingCommande">
+            {{ savingCommande ? 'Enregistrement...' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Retour -->
+    <div v-if="showRetourModal" class="modal-overlay" @click.self="closeRetourModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Nouveau Retour</h3>
+          <button @click="closeRetourModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Client *</label>
+            <input v-model="retourForm.client_nom" type="text" placeholder="Nom du client" required />
+          </div>
+          <div class="form-group">
+            <label>Produit retourné *</label>
+            <input v-model="retourForm.produit_nom" type="text" placeholder="Nom du produit" required />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Quantité *</label>
+              <input v-model.number="retourForm.quantite" type="number" min="1" required />
+            </div>
+            <div class="form-group">
+              <label>Montant remboursé *</label>
+              <input v-model.number="retourForm.montant_total" type="number" min="0" step="0.01" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Raison du retour *</label>
+            <select v-model="retourForm.raison" required>
+              <option value="">Sélectionner une raison</option>
+              <option value="defaut">Défaut produit</option>
+              <option value="non_conforme">Non conforme</option>
+              <option value="client">Demande client</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea v-model="retourForm.notes" rows="2" placeholder="Notes supplémentaires"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeRetourModal" class="btn-secondary">Annuler</button>
+          <button @click="saveRetour" class="btn-primary" :disabled="savingRetour">
+            {{ savingRetour ? 'Enregistrement...' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Détails de Vente -->
+    <div v-if="showVenteDetailsModal && selectedVenteDetails" class="modal-overlay" @click.self="showVenteDetailsModal = false">
+      <div class="modal-content medium">
+        <div class="modal-header">
+          <h3>Détails de la Vente</h3>
+          <button @click="showVenteDetailsModal = false" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="vente-details-info">
+            <div class="info-row">
+              <span class="info-label">Date:</span>
+              <span class="info-value">{{ formatDate(selectedVenteDetails.date_vente) }}</span>
+            </div>
+            <div class="info-row" v-if="selectedVenteDetails.client_nom">
+              <span class="info-label">Client:</span>
+              <span class="info-value">{{ selectedVenteDetails.client_nom }} {{ selectedVenteDetails.client_prenom || '' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Point de Vente:</span>
+              <span class="info-value">{{ selectedVenteDetails.nom_point_vente }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Vendeur:</span>
+              <span class="info-value">{{ selectedVenteDetails.user_nom }} {{ selectedVenteDetails.user_prenom || '' }}</span>
+            </div>
+          </div>
+          <div class="vente-details-products">
+            <h4>Produits vendus ({{ selectedVenteDetails.nombre_produits || selectedVenteDetails.produits?.length || 0 }})</h4>
+            <div class="products-list">
+              <div 
+                v-for="(produit, index) in (selectedVenteDetails.produits || [])" 
+                :key="index"
+                class="product-item"
+              >
+                <div class="product-name">{{ produit.produit_nom || produit.nom }}</div>
+                <div class="product-details">
+                  <span>Code: {{ produit.code_produit || 'N/A' }}</span>
+                  <span>Qté: {{ produit.quantite }}</span>
+                  <span>Prix: {{ formatCurrency(produit.prix_unitaire) }}</span>
+                  <span class="product-total">Total: {{ formatCurrency(produit.montant_total || produit.sous_total) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="vente-details-total">
+            <div class="total-row">
+              <span class="total-label">Montant Total:</span>
+              <span class="total-value">{{ formatCurrency(selectedVenteDetails.montant_total) }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showVenteDetailsModal = false" class="btn-secondary">Fermer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Reçu de Vente -->
+    <div v-if="showReceiptModal && lastSaleReceipt" class="modal-overlay receipt-overlay" @click.self="closeReceipt">
+      <div class="receipt-modal" @click.stop>
+        <div class="receipt-header">
+          <h2>Reçu de Vente</h2>
+          <div class="receipt-actions">
+            <button @click="printReceipt" class="btn-print-receipt">🖨️ Imprimer</button>
+            <button @click="closeReceipt" class="btn-close-receipt">×</button>
+          </div>
+        </div>
+        <div class="receipt-body">
+          <div class="receipt-company">
+            <h3>PROSTOCK</h3>
+            <p>Reçu de Vente</p>
+          </div>
+          <div class="receipt-info">
+            <div class="receipt-info-row">
+              <span class="receipt-label">Point de Vente:</span>
+              <span class="receipt-value">{{ lastSaleReceipt.point_vente }}</span>
+            </div>
+            <div class="receipt-info-row">
+              <span class="receipt-label">Date:</span>
+              <span class="receipt-value">{{ lastSaleReceipt.date }}</span>
+            </div>
+            <div class="receipt-info-row">
+              <span class="receipt-label">N° Vente:</span>
+              <span class="receipt-value">#{{ lastSaleReceipt.id_vente }}</span>
+            </div>
+          </div>
+          <div class="receipt-items">
+            <div class="receipt-items-header">
+              <span>Produit</span>
+              <span>Qté</span>
+              <span>Prix</span>
+              <span>Total</span>
+            </div>
+            <div 
+              v-for="(produit, index) in lastSaleReceipt.produits" 
+              :key="index"
+              class="receipt-item-row"
+            >
+              <span class="receipt-item-name">{{ produit.nom }}</span>
+              <span class="receipt-item-qty">{{ produit.quantite }}</span>
+              <span class="receipt-item-price">{{ formatCurrency(produit.prix_unitaire) }}</span>
+              <span class="receipt-item-total">{{ formatCurrency(produit.sous_total) }}</span>
+            </div>
+          </div>
+          <div class="receipt-summary">
+            <div class="receipt-summary-row">
+              <span>Nombre d'articles:</span>
+              <span>{{ lastSaleReceipt.nombre_articles }}</span>
+            </div>
+            <div class="receipt-summary-row" v-if="lastSaleReceipt.remise > 0">
+              <span>Sous-total:</span>
+              <span>{{ formatCurrency(lastSaleReceipt.sous_total) }}</span>
+            </div>
+            <div class="receipt-summary-row" v-if="lastSaleReceipt.remise > 0">
+              <span>Remise:</span>
+              <span class="receipt-discount">-{{ formatCurrency(lastSaleReceipt.remise) }}</span>
+            </div>
+            <div class="receipt-summary-row receipt-total-row">
+              <span>Total à payer:</span>
+              <span class="receipt-total">{{ formatCurrency(lastSaleReceipt.total) }}</span>
+            </div>
+          </div>
+          <div class="receipt-footer">
+            <p>Merci de votre visite !</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
 import { useAuthStore } from '../stores/auth'
 const authStore = useAuthStore()
 import { useRouter } from 'vue-router'
@@ -458,6 +1022,15 @@ import { logJournal } from '../composables/useJournal'
 const router = useRouter()
 
 const { formatPrice: formatCurrency } = useCurrency()
+
+// Vérifier si l'utilisateur est admin
+const isAdmin = computed(() => {
+  const user = authStore.user
+  if (!user) return false
+  // Vérifier le rôle (peut être 'Admin', 'admin', 'superadmin', etc.)
+  const role = String(user.role || user.user_role || '').toLowerCase()
+  return role === 'admin' || role === 'superadmin'
+})
 
 const pointsVente = ref([])
 const entrepots = ref([])
@@ -479,6 +1052,81 @@ const rapportData = ref({
   commandes_en_attente: 0
 })
 const loadingRapport = ref(false)
+
+// Vue Agent
+const currentPointVente = ref(null)
+const activeAgentTab = ref('ventes')
+const agentTabs = [
+  { id: 'ventes', label: 'Ventes', icon: '💰' },
+  { id: 'livraisons', label: 'Livraisons', icon: '🚚' },
+  { id: 'commandes', label: 'Commandes', icon: '🛒' },
+  { id: 'retours', label: 'Retours', icon: '↩️' }
+]
+const agentStats = ref({
+  caJournalier: 0,
+  ventesAujourdhui: 0,
+  aLivrer: 0,
+  commandes: 0
+})
+const agentVentes = ref([])
+const agentLivraisons = ref([])
+const agentCommandes = ref([])
+const agentRetours = ref([])
+const loadingVentes = ref(false)
+const loadingLivraisons = ref(false)
+const loadingCommandes = ref(false)
+const loadingRetours = ref(false)
+
+// Filtres pour les ventes
+const venteFilterDateDebut = ref('')
+const venteFilterDateFin = ref('')
+
+// Modales Agent
+const showSaleModal = ref(false)
+const showLivraisonModal = ref(false)
+const showCommandeModal = ref(false)
+const showRetourModal = ref(false)
+const showVenteDetailsModal = ref(false)
+const selectedVenteDetails = ref(null)
+
+// Modale Vente
+const saleCart = ref([])
+const saleProducts = ref([])
+const saleSearchQuery = ref('')
+const saleSelectedCategory = ref('')
+const saleCategories = ref([])
+const processingSale = ref(false)
+
+// Formulaires
+const livraisonForm = ref({
+  client_nom: '',
+  adresse: '',
+  date_livraison: '',
+  notes: ''
+})
+const commandeForm = ref({
+  client_nom: '',
+  produit_nom: '',
+  quantite: 1,
+  prix_unitaire: 0,
+  date_livraison: '',
+  notes: ''
+})
+const retourForm = ref({
+  client_nom: '',
+  produit_nom: '',
+  quantite: 1,
+  montant_total: 0,
+  raison: '',
+  notes: ''
+})
+const savingLivraison = ref(false)
+const savingCommande = ref(false)
+const savingRetour = ref(false)
+
+// Reçu de vente
+const lastSaleReceipt = ref(null)
+const showReceiptModal = ref(false)
 
 const formData = ref({
   nom_point_vente: '',
@@ -562,10 +1210,12 @@ const filteredPointsVente = computed(() => {
 const formatDate = (dateString) => {
   if (!dateString) return '—'
   const date = new Date(dateString)
-  return date.toLocaleDateString('fr-FR', { 
+  return date.toLocaleString('fr-FR', { 
     day: '2-digit', 
     month: '2-digit', 
-    year: 'numeric'
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
@@ -596,6 +1246,835 @@ const loadPointsVente = async () => {
     showNotification('error', 'Erreur', error?.message || 'Erreur lors du chargement des points de vente')
   } finally {
     loading.value = false
+  }
+}
+
+// Fonctions pour la vue Agent
+const loadAgentPointVente = async () => {
+  const user = authStore.user
+  console.log('loadAgentPointVente - User:', user)
+  
+  if (!user || !user.id_utilisateur) {
+    console.error('Utilisateur non connecté')
+    return
+  }
+  
+  try {
+    // Récupérer les points de vente de l'utilisateur depuis l'API
+    // L'API filtre automatiquement selon les permissions
+    const pointsVenteResponse = await apiService.get('/api_point_vente.php?action=all')
+    console.log('Réponse points de vente:', pointsVenteResponse)
+    
+    if (pointsVenteResponse && pointsVenteResponse.success && pointsVenteResponse.data && pointsVenteResponse.data.length > 0) {
+      // Prendre le premier point de vente disponible pour cet utilisateur
+      const pointVente = pointsVenteResponse.data[0]
+      const pointVenteId = pointVente.id_point_vente
+      
+      console.log('Point de vente trouvé:', pointVente)
+      
+      // Charger les détails complets et les stats
+      const [pointVenteResponse, statsResponse] = await Promise.all([
+        apiService.get(`/api_point_vente.php?id_point_vente=${pointVenteId}`),
+        apiService.get(`/api_point_vente.php?action=stats&id_point_vente=${pointVenteId}`)
+      ])
+      
+      console.log('Réponse point de vente détaillé:', pointVenteResponse)
+      console.log('Réponse stats:', statsResponse)
+      
+      if (pointVenteResponse && pointVenteResponse.success && pointVenteResponse.data) {
+        currentPointVente.value = pointVenteResponse.data
+        console.log('Point de vente chargé:', currentPointVente.value)
+      } else {
+        // Si l'API détaillée échoue, utiliser les données de base
+        currentPointVente.value = pointVente
+        console.log('Point de vente chargé (données de base):', currentPointVente.value)
+      }
+      
+      if (statsResponse && statsResponse.success) {
+        const data = statsResponse.data
+        const ventesAujourdhui = data.ventes_journalieres?.find(v => {
+          const date = new Date(v.date)
+          const today = new Date()
+          return date.toDateString() === today.toDateString()
+        })
+        
+        agentStats.value = {
+          caJournalier: ventesAujourdhui ? parseFloat(ventesAujourdhui.chiffre_affaires) : 0,
+          ventesAujourdhui: ventesAujourdhui ? parseInt(ventesAujourdhui.nombre_ventes) : 0,
+          aLivrer: parseInt(data.a_livrer || 0),
+          commandes: parseInt(data.commandes_en_attente || 0)
+        }
+      }
+    } else {
+      console.error('Aucun point de vente trouvé pour cet utilisateur')
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement du point de vente:', error)
+  }
+}
+
+const loadAgentVentes = async () => {
+  console.log('=== loadAgentVentes DÉBUT ===')
+  console.log('currentPointVente:', currentPointVente.value)
+  
+  if (!currentPointVente.value) {
+    console.log('Point de vente non défini, arrêt')
+    return
+  }
+  
+  loadingVentes.value = true
+  try {
+    // Construire l'URL avec les filtres de date
+    let url = `/api_vente.php?action=all&id_point_vente=${currentPointVente.value.id_point_vente}`
+    if (venteFilterDateDebut.value) {
+      url += `&date_debut=${venteFilterDateDebut.value}`
+    }
+    if (venteFilterDateFin.value) {
+      url += `&date_fin=${venteFilterDateFin.value}`
+    }
+    
+    console.log('URL de l\'API:', url)
+    
+    const response = await apiService.get(url)
+    console.log('Réponse API:', response)
+    
+    if (response && response.success) {
+      // Filtrer uniquement les ventes (type_vente = 'vente' ou null)
+      const allVentes = response.data || []
+      console.log('Toutes les ventes reçues:', allVentes.length)
+      console.log('Exemple de vente:', allVentes[0])
+      
+      // Filtrer les ventes : accepter toutes sauf les livraisons, commandes et retours
+      const ventesFiltered = allVentes.filter(v => {
+        const type = v.type_vente
+        // Exclure explicitement les livraisons, commandes et retours
+        if (type === 'livraison' || type === 'expedition' || type === 'commande' || type === 'retour') {
+          return false
+        }
+        // Accepter tout le reste (vente, null, undefined, vide)
+        return true
+      })
+      
+      console.log('Ventes filtrées:', ventesFiltered.length)
+      
+      // Regrouper les ventes par transaction (même date_vente, même id_user, même id_point_vente)
+      // Cela permet d'afficher une seule ligne par transaction même si plusieurs produits ont été vendus
+      const ventesGrouped = {}
+      
+      ventesFiltered.forEach(vente => {
+        // Créer une clé unique basée sur la date (arrondie à la seconde), l'utilisateur et le point de vente
+        const dateKey = new Date(vente.date_vente).toISOString().slice(0, 19) // Format: YYYY-MM-DD HH:MM:SS
+        const key = `${dateKey}_${vente.id_user}_${vente.id_point_vente}`
+        
+        if (!ventesGrouped[key]) {
+          // Première vente de cette transaction
+          ventesGrouped[key] = {
+            id_vente: vente.id_vente,
+            date_vente: vente.date_vente,
+            id_user: vente.id_user,
+            id_point_vente: vente.id_point_vente,
+            id_client: vente.id_client,
+            client_nom: vente.client_nom,
+            client_prenom: vente.client_prenom,
+            user_nom: vente.user_nom,
+            user_prenom: vente.user_prenom,
+            nom_point_vente: vente.nom_point_vente,
+            montant_total: parseFloat(vente.montant_total) || 0,
+            nombre_produits: 1,
+            produits: [{
+              id_produit: vente.id_produit,
+              produit_nom: vente.produit_nom,
+              code_produit: vente.code_produit,
+              quantite: vente.quantite,
+              prix_unitaire: vente.prix_unitaire,
+              montant_total: vente.montant_total
+            }]
+          }
+        } else {
+          // Ajouter ce produit à la transaction existante
+          ventesGrouped[key].montant_total += parseFloat(vente.montant_total) || 0
+          ventesGrouped[key].nombre_produits += 1
+          ventesGrouped[key].produits.push({
+            id_produit: vente.id_produit,
+            produit_nom: vente.produit_nom,
+            code_produit: vente.code_produit,
+            quantite: vente.quantite,
+            prix_unitaire: vente.prix_unitaire,
+            montant_total: vente.montant_total
+          })
+        }
+      })
+      
+      // Convertir l'objet en tableau et trier par date décroissante
+      const ventesArray = Object.values(ventesGrouped).sort((a, b) => 
+        new Date(b.date_vente) - new Date(a.date_vente)
+      )
+      
+      console.log('Ventes groupées:', ventesArray.length)
+      console.log('Ventes finales:', ventesArray)
+      
+      agentVentes.value = ventesArray
+    } else {
+      console.error('Réponse API non réussie:', response)
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des ventes:', error)
+  } finally {
+    loadingVentes.value = false
+    console.log('=== loadAgentVentes FIN ===')
+  }
+}
+
+const loadAgentLivraisons = async () => {
+  if (!currentPointVente.value) return
+  
+  loadingLivraisons.value = true
+  try {
+    const response = await apiService.get(`/api_vente.php?action=all&id_point_vente=${currentPointVente.value.id_point_vente}`)
+    if (response.success) {
+      // Filtrer les livraisons en attente
+      const allVentes = response.data || []
+      agentLivraisons.value = allVentes.filter(v => 
+        (v.type_vente === 'livraison' || v.type_vente === 'expedition') && 
+        (v.statut === 'en_attente' || v.statut === 'en_cours')
+      )
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des livraisons:', error)
+  } finally {
+    loadingLivraisons.value = false
+  }
+}
+
+const loadAgentCommandes = async () => {
+  if (!currentPointVente.value) return
+  
+  loadingCommandes.value = true
+  try {
+    const response = await apiService.get(`/api_vente.php?action=all&id_point_vente=${currentPointVente.value.id_point_vente}`)
+    if (response.success) {
+      // Filtrer les commandes en attente
+      const allVentes = response.data || []
+      agentCommandes.value = allVentes.filter(v => 
+        v.type_vente === 'commande' && 
+        (v.statut === 'en_attente' || v.statut === 'en_cours')
+      )
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des commandes:', error)
+  } finally {
+    loadingCommandes.value = false
+  }
+}
+
+const loadAgentRetours = async () => {
+  if (!currentPointVente.value) return
+  
+  loadingRetours.value = true
+  try {
+    const response = await apiService.get(`/api_vente.php?action=all&id_point_vente=${currentPointVente.value.id_point_vente}`)
+    if (response.success) {
+      // Filtrer les retours
+      const allVentes = response.data || []
+      agentRetours.value = allVentes.filter(v => v.type_vente === 'retour')
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des retours:', error)
+  } finally {
+    loadingRetours.value = false
+  }
+}
+
+const clearVenteFilters = () => {
+  venteFilterDateDebut.value = ''
+  venteFilterDateFin.value = ''
+  loadAgentVentes()
+}
+
+const markAsDelivered = async (livraison) => {
+  try {
+    // Mettre à jour le statut de la livraison
+    const response = await apiService.post(`/api_vente.php?action=update&id=${livraison.id_vente}`, { 
+      statut: 'livre',
+      type_vente: livraison.type_vente || 'livraison'
+    })
+    if (response.success) {
+      showNotification('success', 'Succès', 'Livraison marquée comme effectuée')
+      loadAgentLivraisons()
+      loadAgentPointVente()
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors de la mise à jour')
+    }
+  } catch (error) {
+    console.error('Erreur:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de la mise à jour')
+  }
+}
+
+const processCommande = async (commande) => {
+  try {
+    // Traiter la commande (changer le statut)
+    const response = await apiService.post(`/api_vente.php?action=update&id=${commande.id_vente}`, { 
+      statut: 'traite',
+      type_vente: 'commande'
+    })
+    if (response.success) {
+      showNotification('success', 'Succès', 'Commande traitée')
+      loadAgentCommandes()
+      loadAgentPointVente()
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors du traitement')
+    }
+  } catch (error) {
+    console.error('Erreur:', error)
+    showNotification('error', 'Erreur', 'Erreur lors du traitement')
+  }
+}
+
+const viewRetourDetails = (retour) => {
+  // Afficher les détails du retour
+  console.log('Voir détails retour:', retour)
+}
+
+// Fonctions pour les modales Agent
+const openSaleModal = async () => {
+  console.log('openSaleModal appelé')
+  // S'assurer que le point de vente est chargé AVANT d'ouvrir la modale
+  if (!currentPointVente.value) {
+    console.log('Chargement du point de vente...')
+    await loadAgentPointVente()
+  }
+  console.log('Point de vente chargé:', currentPointVente.value)
+  
+  showSaleModal.value = true
+  saleCart.value = []
+  saleSearchQuery.value = ''
+  saleSelectedCategory.value = ''
+  await loadSaleProducts()
+  console.log('Modale ouverte, produits chargés')
+}
+
+const closeSaleModal = () => {
+  showSaleModal.value = false
+  saleCart.value = []
+}
+
+const openLivraisonModal = () => {
+  showLivraisonModal.value = true
+  livraisonForm.value = {
+    client_nom: '',
+    adresse: '',
+    date_livraison: '',
+    notes: ''
+  }
+}
+
+const closeLivraisonModal = () => {
+  showLivraisonModal.value = false
+}
+
+const openCommandeModal = () => {
+  showCommandeModal.value = true
+  commandeForm.value = {
+    client_nom: '',
+    produit_nom: '',
+    quantite: 1,
+    prix_unitaire: 0,
+    date_livraison: '',
+    notes: ''
+  }
+}
+
+const closeCommandeModal = () => {
+  showCommandeModal.value = false
+}
+
+const openRetourModal = () => {
+  showRetourModal.value = true
+  retourForm.value = {
+    client_nom: '',
+    produit_nom: '',
+    quantite: 1,
+    montant_total: 0,
+    raison: '',
+    notes: ''
+  }
+}
+
+const closeRetourModal = () => {
+  showRetourModal.value = false
+}
+
+// Fonctions pour la modale de vente
+const loadSaleProducts = async () => {
+  try {
+    const user = authStore.user
+    let url = '/api_produit.php?action=all'
+    
+    console.log('👤 [PointVente] User:', user?.username, 'isAdmin:', isAdmin.value)
+    console.log('👤 [PointVente] permissions_entrepots:', user?.permissions_entrepots)
+    
+    // Si l'utilisateur n'est pas admin, passer les IDs d'entrepôts à l'API
+    if (user && !isAdmin.value) {
+      // Pour les agents, ils DOIVENT avoir des permissions d'entrepôts
+      if (user.permissions_entrepots && Array.isArray(user.permissions_entrepots) && user.permissions_entrepots.length > 0) {
+        const entrepotIds = user.permissions_entrepots.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0)
+        if (entrepotIds.length > 0) {
+          url += '&id_entrepots=' + entrepotIds.join(',')
+          console.log('🏭 [PointVente] Agent - URL avec filtrage:', url)
+          console.log('🏭 [PointVente] Agent - IDs entrepôts:', entrepotIds)
+        } else {
+          console.warn('⚠️ [PointVente] Agent - Aucun ID d\'entrepôt valide')
+          // Si l'agent n'a pas d'IDs valides, ne pas charger de produits
+          saleProducts.value = []
+          saleCategories.value = []
+          return
+        }
+      } else {
+        console.warn('⚠️ [PointVente] Agent - Aucune permission d\'entrepôt, aucun produit chargé')
+        // Si l'agent n'a pas de permissions, ne pas charger de produits
+        saleProducts.value = []
+        saleCategories.value = []
+        return
+      }
+    } else {
+      console.log('✅ [PointVente] Admin - Pas de filtre, tous les produits')
+    }
+    
+    const response = await apiService.get(url)
+    console.log('📦 [PointVente] Réponse API:', response)
+    
+    if (response && response.success && response.data) {
+      let allProducts = Array.isArray(response.data) ? response.data : []
+      
+      console.log('📦 [PointVente] Total produits reçus:', allProducts.length)
+      
+      // Filtrer par produits actifs
+      allProducts = allProducts.filter(p => p.actif === 1 || p.actif === true || p.actif === '1')
+      
+      console.log('📦 [PointVente] Produits actifs:', allProducts.length)
+      
+      // Afficher les entrepôts des produits pour vérification
+      if (allProducts.length > 0) {
+        const entrepotsUniques = [...new Set(allProducts.map(p => p.entrepot).filter(Boolean))]
+        console.log('📦 [PointVente] Entrepôts dans les produits reçus:', entrepotsUniques)
+      }
+      
+      saleProducts.value = allProducts
+      // Extraire les catégories uniques
+      const cats = [...new Set(saleProducts.value.map(p => p.categorie).filter(Boolean))]
+      saleCategories.value = cats.sort()
+      console.log('✅ [PointVente] Produits finaux chargés:', saleProducts.value.length)
+    } else {
+      console.error('❌ [PointVente] Réponse API invalide:', response)
+      saleProducts.value = []
+    }
+  } catch (error) {
+    console.error('❌ [PointVente] Erreur lors du chargement des produits:', error)
+    saleProducts.value = []
+  }
+}
+
+const saleFilteredProducts = computed(() => {
+  let filtered = saleProducts.value.filter(p => p.actif === 1)
+  
+  if (saleSearchQuery.value) {
+    const query = saleSearchQuery.value.toLowerCase()
+    filtered = filtered.filter(p => 
+      p.nom?.toLowerCase().includes(query) ||
+      p.code_produit?.toLowerCase().includes(query)
+    )
+  }
+  
+  if (saleSelectedCategory.value) {
+    filtered = filtered.filter(p => p.categorie === saleSelectedCategory.value)
+  }
+  
+  return filtered.sort((a, b) => a.nom.localeCompare(b.nom))
+})
+
+const saleTotal = computed(() => {
+  return saleCart.value.reduce((sum, item) => sum + (item.sous_total || 0), 0)
+})
+
+const addToSaleCart = (product) => {
+  if (product.quantite_stock === 0) return
+  
+  const existingIndex = saleCart.value.findIndex(item => item.id_produit === product.id_produit)
+  
+  if (existingIndex >= 0) {
+    increaseSaleQuantity(existingIndex)
+  } else {
+    const prixUnitaire = product.prix_vente || 0
+    const quantite = 1
+    saleCart.value.push({
+      id_produit: product.id_produit,
+      code_produit: product.code_produit,
+      nom: product.nom,
+      prix_unitaire: prixUnitaire,
+      quantite: quantite,
+      quantite_stock: product.quantite_stock || 0,
+      sous_total: prixUnitaire * quantite
+    })
+  }
+}
+
+const removeFromSaleCart = (index) => {
+  saleCart.value.splice(index, 1)
+}
+
+const increaseSaleQuantity = (index) => {
+  const item = saleCart.value[index]
+  if (item.quantite < item.quantite_stock) {
+    item.quantite++
+    item.sous_total = item.prix_unitaire * item.quantite
+  }
+}
+
+const decreaseSaleQuantity = (index) => {
+  const item = saleCart.value[index]
+  if (item.quantite > 1) {
+    item.quantite--
+    item.sous_total = item.prix_unitaire * item.quantite
+  } else {
+    removeFromSaleCart(index)
+  }
+}
+
+const clearSaleCart = () => {
+  saleCart.value = []
+}
+
+const processSaleFromModal = async () => {
+  console.log('=== processSaleFromModal DÉBUT ===')
+  console.log('Panier:', saleCart.value)
+  console.log('Point de vente actuel:', currentPointVente.value)
+  
+  if (saleCart.value.length === 0) {
+    console.log('Panier vide, arrêt')
+    alert('Veuillez ajouter des produits au panier')
+    return
+  }
+  
+  // Si le point de vente n'est pas chargé, le charger maintenant
+  if (!currentPointVente.value) {
+    console.log('Point de vente non chargé, chargement...')
+    await loadAgentPointVente()
+    
+    // Si toujours null après chargement, essayer de récupérer depuis l'API
+    if (!currentPointVente.value) {
+      try {
+        const pointsVenteResponse = await apiService.get('/api_point_vente.php?action=all')
+        if (pointsVenteResponse && pointsVenteResponse.success && pointsVenteResponse.data && pointsVenteResponse.data.length > 0) {
+          currentPointVente.value = pointsVenteResponse.data[0]
+          console.log('Point de vente récupéré depuis API:', currentPointVente.value)
+        } else {
+          alert('Aucun point de vente assigné à votre compte. Contactez l\'administrateur.')
+          return
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération du point de vente:', error)
+        alert('Erreur lors du chargement du point de vente')
+        return
+      }
+    }
+  }
+  
+  console.log('Point de vente final:', currentPointVente.value)
+  console.log('Début de la vente...')
+  
+  try {
+    const produits = saleCart.value.map(item => ({
+      id_produit: item.id_produit,
+      quantite: item.quantite,
+      prix_unitaire: item.prix_unitaire
+    }))
+    
+    const saleData = {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      produits: produits,
+      remise: 0,
+      notes: null
+    }
+    
+    console.log('Envoi des données:', saleData)
+    const response = await apiService.post('/api_vente.php', saleData)
+    console.log('Réponse reçue:', response)
+    
+    if (response && response.success) {
+      console.log('Vente réussie!')
+      // Récupérer l'ID de la vente depuis la réponse
+      const idVente = response.data?.id_vente || response.data?.ventes?.[0]?.id_vente || Date.now()
+      
+      // Calculer le total avant de vider le panier
+      const totalVente = saleCart.value.reduce((sum, item) => sum + (item.sous_total || 0), 0)
+      const totalItems = saleCart.value.reduce((sum, item) => sum + (item.quantite || 0), 0)
+      
+      // Créer le reçu avec toutes les informations
+      lastSaleReceipt.value = {
+        id_vente: idVente,
+        date: new Date().toLocaleString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        point_vente: currentPointVente.value.nom_point_vente,
+        produits: saleCart.value.map(item => ({
+          nom: item.nom,
+          code: item.code_produit,
+          quantite: item.quantite,
+          prix_unitaire: item.prix_unitaire,
+          sous_total: item.sous_total
+        })),
+        nombre_articles: totalItems,
+        sous_total: totalVente,
+        remise: 0,
+        total: totalVente
+      }
+      
+      // Vider le panier automatiquement après vente réussie (sans confirmation)
+      saleCart.value = []
+      
+      // Fermer la modale de vente
+      showSaleModal.value = false
+      
+      // Afficher le reçu (pas d'alerte de succès, le reçu suffit)
+      showReceiptModal.value = true
+      
+      // Recharger les produits pour mettre à jour les stocks
+      await loadSaleProducts()
+      
+      // Recharger les autres données en arrière-plan
+      loadAgentVentes()
+      loadAgentPointVente()
+      
+      // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
+      console.log('=== processSaleFromModal SUCCÈS ===')
+    } else {
+      console.error('Erreur API:', response)
+      alert('Erreur: ' + (response?.message || 'Erreur inconnue'))
+    }
+  } catch (error) {
+    console.error('Erreur catch:', error)
+    alert('Erreur: ' + (error?.message || 'Erreur lors de la vente'))
+  }
+  console.log('=== processSaleFromModal FIN ===')
+}
+
+const closeReceipt = () => {
+  showReceiptModal.value = false
+  lastSaleReceipt.value = null
+}
+
+const printReceipt = () => {
+  if (!lastSaleReceipt.value) return
+  
+  // Créer une nouvelle fenêtre pour l'impression du reçu uniquement
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    showNotification('error', 'Erreur', 'Veuillez autoriser les popups pour imprimer')
+    return
+  }
+  
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Reçu de Vente</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          max-width: 400px;
+          margin: 0 auto;
+        }
+        .receipt-header {
+          text-align: center;
+          border-bottom: 2px solid #000;
+          padding-bottom: 10px;
+          margin-bottom: 20px;
+        }
+        .receipt-info {
+          margin-bottom: 15px;
+        }
+        .receipt-items {
+          border-top: 1px solid #ccc;
+          border-bottom: 1px solid #ccc;
+          padding: 10px 0;
+          margin: 15px 0;
+        }
+        .receipt-item {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .receipt-total {
+          text-align: right;
+          font-weight: bold;
+          font-size: 1.2em;
+          margin-top: 15px;
+        }
+        @media print {
+          body { margin: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-header">
+        <h2>PROSTOCK</h2>
+        <p>Reçu de Vente</p>
+      </div>
+      <div class="receipt-info">
+        <p><strong>Point de Vente:</strong> ${lastSaleReceipt.value.point_vente}</p>
+        <p><strong>Date:</strong> ${lastSaleReceipt.value.date}</p>
+        <p><strong>N° Vente:</strong> ${lastSaleReceipt.value.id_vente}</p>
+      </div>
+      <div class="receipt-items">
+        ${lastSaleReceipt.value.produits.map(p => `
+          <div class="receipt-item">
+            <span>${p.nom} (x${p.quantite})</span>
+            <span>${formatCurrency(p.sous_total)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="receipt-total">
+        <p>Total: ${formatCurrency(lastSaleReceipt.value.total)}</p>
+      </div>
+      <div style="text-align: center; margin-top: 20px; font-size: 0.9em; color: #666;">
+        <p>Merci de votre visite !</p>
+      </div>
+    </body>
+    </html>
+  `)
+  
+  printWindow.document.close()
+  setTimeout(() => {
+    printWindow.print()
+  }, 250)
+}
+
+// Fonctions pour enregistrer livraison, commande, retour
+const saveLivraison = async () => {
+  if (!livraisonForm.value.client_nom || !livraisonForm.value.adresse) {
+    showNotification('error', 'Erreur', 'Veuillez remplir tous les champs obligatoires')
+    return
+  }
+  
+  if (!currentPointVente.value) return
+  
+  savingLivraison.value = true
+  try {
+    // Créer une entrée de type livraison dans stock_vente
+    const livraisonData = {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      type_vente: 'livraison',
+      statut: 'en_attente',
+      notes: `Client: ${livraisonForm.value.client_nom}\nAdresse: ${livraisonForm.value.adresse}\nDate prévue: ${livraisonForm.value.date_livraison || 'Non spécifiée'}\n${livraisonForm.value.notes || ''}`
+    }
+    
+    // Note: L'API actuelle nécessite des produits, donc on crée une entrée minimale
+    // Vous devrez peut-être adapter l'API pour supporter les livraisons sans produits
+    const response = await apiService.post('/api_vente.php', {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      produits: [], // Vide pour l'instant
+      notes: livraisonData.notes
+    })
+    
+    if (response.success) {
+      showNotification('success', 'Succès', 'Livraison enregistrée')
+      closeLivraisonModal()
+      loadAgentLivraisons()
+      loadAgentPointVente()
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors de l\'enregistrement')
+    }
+  } catch (error) {
+    console.error('Erreur:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'enregistrement')
+  } finally {
+    savingLivraison.value = false
+  }
+}
+
+const saveCommande = async () => {
+  if (!commandeForm.value.client_nom || !commandeForm.value.produit_nom || !commandeForm.value.quantite || !commandeForm.value.prix_unitaire) {
+    showNotification('error', 'Erreur', 'Veuillez remplir tous les champs obligatoires')
+    return
+  }
+  
+  if (!currentPointVente.value) return
+  
+  savingCommande.value = true
+  try {
+    const commandeData = {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      type_vente: 'commande',
+      statut: 'en_attente',
+      notes: `Client: ${commandeForm.value.client_nom}\nProduit: ${commandeForm.value.produit_nom}\nQuantité: ${commandeForm.value.quantite}\nDate prévue: ${commandeForm.value.date_livraison || 'Non spécifiée'}\n${commandeForm.value.notes || ''}`
+    }
+    
+    // Note: L'API actuelle nécessite des produits, donc on crée une entrée minimale
+    const response = await apiService.post('/api_vente.php', {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      produits: [], // Vide pour l'instant
+      notes: commandeData.notes
+    })
+    
+    if (response.success) {
+      showNotification('success', 'Succès', 'Commande enregistrée')
+      closeCommandeModal()
+      loadAgentCommandes()
+      loadAgentPointVente()
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors de l\'enregistrement')
+    }
+  } catch (error) {
+    console.error('Erreur:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'enregistrement')
+  } finally {
+    savingCommande.value = false
+  }
+}
+
+const saveRetour = async () => {
+  if (!retourForm.value.client_nom || !retourForm.value.produit_nom || !retourForm.value.quantite || !retourForm.value.montant_total || !retourForm.value.raison) {
+    showNotification('error', 'Erreur', 'Veuillez remplir tous les champs obligatoires')
+    return
+  }
+  
+  if (!currentPointVente.value) return
+  
+  savingRetour.value = true
+  try {
+    const retourData = {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      type_vente: 'retour',
+      statut: 'traite',
+      notes: `Client: ${retourForm.value.client_nom}\nProduit: ${retourForm.value.produit_nom}\nQuantité: ${retourForm.value.quantite}\nRaison: ${retourForm.value.raison}\n${retourForm.value.notes || ''}`
+    }
+    
+    // Note: L'API actuelle nécessite des produits, donc on crée une entrée minimale
+    const response = await apiService.post('/api_vente.php', {
+      id_point_vente: currentPointVente.value.id_point_vente,
+      produits: [], // Vide pour l'instant
+      notes: retourData.notes
+    })
+    
+    if (response.success) {
+      showNotification('success', 'Succès', 'Retour enregistré')
+      closeRetourModal()
+      loadAgentRetours()
+      loadAgentPointVente()
+    } else {
+      showNotification('error', 'Erreur', response.message || 'Erreur lors de l\'enregistrement')
+    }
+  } catch (error) {
+    console.error('Erreur:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de l\'enregistrement')
+  } finally {
+    savingRetour.value = false
   }
 }
 
@@ -785,9 +2264,36 @@ function getJournalUser() {
   return 'inconnu';
 }
 
-onMounted(() => {
-  loadEntrepots()
-  loadPointsVente()
+// Watcher pour recharger les données quand on change d'onglet (agent)
+watch(activeAgentTab, (newTab) => {
+  if (!isAdmin.value) {
+    if (newTab === 'ventes') loadAgentVentes()
+    else if (newTab === 'livraisons') loadAgentLivraisons()
+    else if (newTab === 'commandes') loadAgentCommandes()
+    else if (newTab === 'retours') loadAgentRetours()
+  }
+})
+
+onMounted(async () => {
+  if (isAdmin.value) {
+    loadEntrepots()
+    loadPointsVente()
+  } else {
+    // Pour les agents, charger leur point de vente et les données
+    console.log('onMounted - Agent, chargement du point de vente...')
+    await loadAgentPointVente()
+    console.log('onMounted - Point de vente après chargement:', currentPointVente.value)
+    if (currentPointVente.value) {
+      loadAgentVentes()
+    }
+  }
+})
+
+// Recharger les ventes quand on revient sur la page (si on est sur l'onglet ventes)
+onActivated(() => {
+  if (!isAdmin.value && activeAgentTab.value === 'ventes' && currentPointVente.value) {
+    loadAgentVentes()
+  }
 })
 </script>
 
@@ -1022,72 +2528,11 @@ onMounted(() => {
   transform: scale(1.1);
 }
 
-/* Modals */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
+/* Styles spécifiques pour les modales de la page PointVente */
+/* Les styles de base (.modal-overlay, .modal-content, etc.) sont définis dans style.css */
 
 .details-modal, .rapport-modal {
   max-width: 900px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #1f2937;
-}
-
-.modal-close {
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #6b7280;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.2s;
-}
-
-.modal-close:hover {
-  background: #f3f4f6;
-  color: #1f2937;
-}
-
-.modal-body {
-  padding: 1.5rem;
 }
 
 .form-group {
@@ -1471,6 +2916,985 @@ onMounted(() => {
 @media (max-width: 480px) {
   .ventes-metrics-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Styles pour la vue Agent */
+.agent-point-vente-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.agent-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.agent-stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.agent-stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stat-icon {
+  font-size: 2rem;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.agent-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.agent-tab {
+  background: transparent;
+  border: none;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-tab:hover {
+  color: #1a5f4a;
+  background: #f0fdf4;
+}
+
+.agent-tab.active {
+  color: #1a5f4a;
+  border-bottom-color: #1a5f4a;
+  background: #f0fdf4;
+}
+
+.tab-icon {
+  font-size: 1.25rem;
+}
+
+.agent-tab-content {
+  width: 100%;
+}
+
+.agent-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin: 0;
+}
+
+/* Styles pour la modale de détails de vente */
+.vente-details-info {
+  margin-bottom: 1.5rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.info-value {
+  color: #111827;
+  font-weight: 500;
+}
+
+.vente-details-products {
+  margin-top: 1.5rem;
+}
+
+.vente-details-products h4 {
+  margin-bottom: 1rem;
+  color: #111827;
+  font-size: 1.1rem;
+}
+
+.products-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.product-item {
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.product-name {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+}
+
+.product-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.product-total {
+  font-weight: 600;
+  color: #111827;
+  margin-left: auto;
+}
+
+.vente-details-total {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid #e5e7eb;
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.total-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #059669;
+}
+
+/* Filtres de recherche pour les ventes */
+.ventes-filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.filter-input {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  min-width: 150px;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Tableau des ventes */
+.ventes-table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.ventes-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ventes-table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.ventes-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ventes-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.ventes-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.ventes-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.ventes-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.montant-cell {
+  font-weight: 600;
+  color: #059669;
+}
+
+.produits-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.produit-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: #eff6ff;
+  color: #1e40af;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.text-muted {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.livraisons-list,
+.commandes-list,
+.retours-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.livraison-item,
+.commande-item,
+.retour-item {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: box-shadow 0.2s;
+}
+
+.livraison-item:hover,
+.commande-item:hover,
+.retour-item:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.vente-info,
+.livraison-info,
+.commande-info,
+.retour-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vente-date,
+.livraison-date,
+.commande-date,
+.retour-date {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.vente-client,
+.livraison-client,
+.commande-client,
+.retour-client {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.vente-montant,
+.commande-montant,
+.retour-montant {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.livraison-adresse {
+  font-size: 0.95rem;
+  color: #64748b;
+}
+
+.vente-actions,
+.livraison-actions,
+.commande-actions,
+.retour-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #64748b;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .agent-stats-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .agent-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .agent-tab {
+    white-space: nowrap;
+    padding: 0.75rem 1rem;
+  }
+  
+  .vente-item,
+  .livraison-item,
+  .commande-item,
+  .retour-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}
+
+/* Styles pour la modale de vente */
+.sale-modal {
+  max-width: 1100px;
+  width: calc(100% - 2rem);
+  max-height: 85vh;
+  height: 85vh;
+  position: relative;
+  margin-left: calc(280px + max(2rem, (100vw - 280px - 1100px) / 2));
+  margin-right: auto;
+}
+
+@media (max-width: 1600px) {
+  .sale-modal {
+    margin-left: calc(280px + 2rem);
+    max-width: calc(100vw - 280px - 4rem);
+    width: calc(100vw - 280px - 4rem);
+  }
+}
+
+@media (max-width: 1200px) {
+  .sale-modal {
+    margin-left: 280px;
+    max-width: calc(100vw - 280px - 2rem);
+    width: calc(100vw - 280px - 2rem);
+  }
+}
+
+.sale-modal-body {
+  padding: 0;
+  height: calc(85vh - 120px);
+  overflow: hidden;
+}
+
+.sale-modal-container {
+  display: flex;
+  height: 100%;
+  gap: 1rem;
+}
+
+.sale-cart-column {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow: hidden;
+}
+
+.sale-cart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sale-cart-header h4 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #1a5f4a;
+}
+
+.btn-clear-small {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.sale-cart-content {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.empty-cart-small {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+}
+
+.sale-cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sale-cart-item {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.sale-cart-item-info {
+  flex: 1;
+}
+
+.sale-cart-item-name {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+}
+
+.sale-cart-item-qty {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qty-btn-small {
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sale-cart-item-price {
+  font-weight: 700;
+  color: #1a5f4a;
+  font-size: 1.125rem;
+}
+
+.btn-remove-small {
+  background: #ef4444;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sale-cart-footer {
+  border-top: 2px solid #e5e7eb;
+  padding-top: 1rem;
+}
+
+.sale-summary {
+  margin-bottom: 1rem;
+}
+
+.sale-summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+}
+
+.sale-summary-row strong {
+  color: #1a5f4a;
+  font-size: 1.25rem;
+}
+
+.btn-checkout {
+  width: 100%;
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.125rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-checkout:hover:not(:disabled) {
+  background: #134e3a;
+}
+
+.btn-checkout:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sale-products-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sale-products-header {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sale-search-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1.5px solid #10b981;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.sale-filter-select {
+  padding: 0.75rem;
+  border: 1.5px solid #10b981;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 200px;
+}
+
+.sale-products-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+  padding-right: 0.5rem;
+}
+
+.sale-product-card {
+  background: white;
+  border-radius: 8px;
+  padding: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sale-product-card:hover:not(.out-of-stock) {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+.sale-product-card.out-of-stock {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sale-product-image {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sale-product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sale-product-icon {
+  font-size: 2.5rem;
+}
+
+.sale-product-info {
+  flex: 1;
+}
+
+.sale-product-name {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: #1f2937;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.sale-product-code {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.sale-product-stock {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.sale-product-price {
+  font-weight: 700;
+  color: #1a5f4a;
+  font-size: 1rem;
+  text-align: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+@media (max-width: 1200px) {
+  .sale-modal-container {
+    flex-direction: column;
+  }
+  
+  .sale-cart-column {
+    flex: 0 0 auto;
+    max-height: 300px;
+  }
+  
+  .sale-products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+/* Styles pour la modale de reçu */
+.receipt-overlay {
+  z-index: 10000;
+}
+
+.receipt-modal {
+  background: white;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.receipt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid #e5e7eb;
+  background: #1a5f4a;
+  color: white;
+}
+
+.receipt-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.receipt-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.btn-print-receipt {
+  background: white;
+  color: #1a5f4a;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.btn-print-receipt:hover {
+  background: #f0fdf4;
+}
+
+.btn-close-receipt {
+  background: transparent;
+  color: white;
+  border: none;
+  font-size: 1.5rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-close-receipt:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.receipt-body {
+  padding: 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.receipt-company {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.receipt-company h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.75rem;
+  color: #1a5f4a;
+  font-weight: 700;
+}
+
+.receipt-company p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.receipt-info {
+  margin-bottom: 2rem;
+}
+
+.receipt-info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.receipt-label {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.receipt-value {
+  color: #111827;
+  font-weight: 600;
+}
+
+.receipt-items {
+  margin-bottom: 2rem;
+}
+
+.receipt-items-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 2px solid #e5e7eb;
+  font-weight: 700;
+  color: #1a5f4a;
+  font-size: 0.9rem;
+}
+
+.receipt-item-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.receipt-item-name {
+  color: #111827;
+  font-weight: 600;
+}
+
+.receipt-item-qty,
+.receipt-item-price,
+.receipt-item-total {
+  color: #374151;
+  text-align: right;
+}
+
+.receipt-item-total {
+  font-weight: 600;
+  color: #1a5f4a;
+}
+
+.receipt-summary {
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.receipt-summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+}
+
+.receipt-summary-row:last-child {
+  margin-bottom: 0;
+}
+
+.receipt-total-row {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #e5e7eb;
+  font-size: 1.3rem;
+}
+
+.receipt-total {
+  font-weight: 700;
+  color: #1a5f4a;
+  font-size: 1.5rem;
+}
+
+.receipt-discount {
+  color: #dc2626;
+}
+
+.receipt-footer {
+  text-align: center;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e5e7eb;
+}
+
+.receipt-footer p {
+  margin: 0.5rem 0;
+  color: #6b7280;
+}
+
+@media print {
+  .receipt-overlay,
+  .receipt-overlay * {
+    visibility: visible;
+  }
+  
+  .receipt-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    z-index: 9999;
+  }
+  
+  .receipt-header .receipt-actions {
+    display: none;
+  }
+  
+  .receipt-modal {
+    box-shadow: none;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
   }
 }
 </style>

@@ -5,7 +5,7 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
-    include: ['chart.js/auto', 'jspdf', 'jspdf-autotable', 'xlsx']
+    include: ['chart.js/auto', 'jspdf', 'jspdf-autotable', 'xlsx', '@vuepic/vue-datepicker']
   },
   resolve: {
     alias: {

@@ -311,7 +311,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuthStore } from '../stores/auth.js'
-import { apiService } from '../composables/api/apiService.js'
+import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
 
 const comptaEntries = ref([]);
@@ -974,67 +974,25 @@ function exportPDF() {
   color: #94a3b8;
   cursor: not-allowed;
 }
-/* Modale */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3000;
-}
-.modal-content {
-  background: #fff;
-  border-radius: 16px;
-  padding: 2.2rem 2.5rem;
-  min-width: 340px;
-  max-width: 98vw;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
-}
+/* Styles spécifiques pour les modales de la page Comptabilite */
+/* Les styles de base (.modal-overlay, .modal-content, etc.) sont définis dans style.css */
+
 /* Modale de suppression harmonisée */
 .modal-content.user-modal {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
-  padding: 2rem 2.5rem 1.5rem 2.5rem;
-  min-width: 320px;
   max-width: 380px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
 }
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.modal-header h3 {
+
+.modal-content.user-modal .modal-header h3 {
   font-size: 1.2rem;
-  font-weight: 700;
   color: #dc2626;
-  margin: 0;
 }
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.7rem;
-  color: #888;
-  cursor: pointer;
-}
+
 .modal-body p {
   font-size: 1.05rem;
   margin: 0.5rem 0 0.2rem 0;
   color: #1a202c;
   text-align: left;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.2rem;
 }
 .btn-secondary {
   background: #e5e7eb;
