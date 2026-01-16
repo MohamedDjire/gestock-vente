@@ -460,12 +460,13 @@
 
   <!-- Modal de création/édition -->
   <div v-if="showModal" class="modal-overlay" @click="closeModal">
-    <div class="modal-content" @click.stop>
+    <div class="modal-content large" @click.stop>
       <div class="modal-header">
         <h3>{{ editingProduct ? 'Modifier le Produit' : 'Nouveau Produit' }}</h3>
         <button @click="closeModal" class="modal-close">×</button>
       </div>
-      <form @submit.prevent="saveProduct" class="product-form">
+      <div class="modal-body">
+        <form @submit.prevent="saveProduct" class="product-form">
         <div class="form-row">
             <div class="form-group">
               <label>Code Produit</label>
@@ -632,13 +633,14 @@
             </span>
           </div>
 
-          <div class="modal-actions">
-            <button type="button" @click="closeModal" class="btn-cancel">Annuler</button>
-            <button type="submit" class="btn-save" :disabled="saving">
-              {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
-            </button>
-        </div>
-      </form>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" @click="closeModal" class="btn-cancel">Annuler</button>
+        <button type="button" @click="saveProduct" class="btn-save" :disabled="saving">
+          {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2202,11 +2204,18 @@ function getJournalUser() {
 const loadEntrepots = async () => {
   try {
     const response = await apiService.get('/api_entrepot.php?action=all')
+    console.log('🏭 [Products] Réponse entrepôts:', response)
     if (response && response.success) {
       entrepots.value = response.data || []
+      console.log('🏭 [Products] Entrepôts chargés:', entrepots.value.length)
+      console.log('🏭 [Products] Noms des entrepôts:', entrepots.value.map(e => e.nom_entrepot))
+    } else {
+      console.warn('⚠️ [Products] Réponse invalide pour les entrepôts')
+      entrepots.value = []
     }
   } catch (error) {
-    console.error('Erreur lors du chargement des entrepôts:', error)
+    console.error('❌ [Products] Erreur lors du chargement des entrepôts:', error)
+    entrepots.value = []
   }
 }
 
@@ -2813,29 +2822,8 @@ onMounted(() => {
   color: #6b7280;
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  overflow-y: auto;
-}
+/* Styles spécifiques pour les modales de la page Products */
+/* Les styles de base (.modal-overlay, .modal-content, etc.) sont définis dans style.css */
 
 /* Modals avec structure header/body/footer (comme import-modal) */
 .import-modal,
@@ -2851,44 +2839,8 @@ onMounted(() => {
   flex: 1;
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-header h3 {
-  margin: 0;
-  color: #1a1a1a;
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-  margin-top: auto;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  cursor: pointer;
-  color: #6b7280;
-  line-height: 1;
-}
-
 .product-form {
-  padding: 1.5rem;
+  padding: 0;
 }
 
 .form-row {

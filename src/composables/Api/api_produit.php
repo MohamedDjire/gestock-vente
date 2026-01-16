@@ -106,7 +106,7 @@ try {
  * Récupérer tous les produits d'une entreprise
  * @param int|null $idPointVente Si fourni, ne retourne que les produits disponibles dans ce point de vente
  */
-function getAllProducts($bdd, $enterpriseId, $idPointVente = null) {
+function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots = null) {
     $sql = "
         SELECT 
             p.id_produit,
@@ -132,10 +132,48 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null) {
                 ELSE 'normal'
             END AS statut_stock
         FROM stock_produit p
-        WHERE p.id_entreprise = :enterprise_id
+        WHERE p.id_entreprise = ?
     ";
     
-    $params = ['enterprise_id' => $enterpriseId];
+    $params = [$enterpriseId];
+    
+    // Filtrer par entrepôts assignés si fourni (POUR LES AGENTS SEULEMENT)
+    if ($idEntrepots !== null && is_array($idEntrepots) && count($idEntrepots) > 0) {
+        error_log("🔍 [API Produit] Filtrage par entrepôts demandé. IDs: " . json_encode($idEntrepots));
+        
+        // Récupérer les noms des entrepôts assignés
+        $idsAutorises = array_map('intval', $idEntrepots);
+        $idsAutorises = array_filter($idsAutorises, function($id) { return $id > 0; });
+        
+        error_log("🔍 [API Produit] IDs autorisés après filtrage: " . json_encode($idsAutorises));
+        
+        if (count($idsAutorises) > 0) {
+            $in = implode(',', array_fill(0, count($idsAutorises), '?'));
+            $stmtEntrepots = $bdd->prepare("SELECT nom_entrepot FROM stock_entrepot WHERE id_entrepot IN ($in) AND id_entreprise = ?");
+            $paramsEntrepots = array_values($idsAutorises);
+            $paramsEntrepots[] = $enterpriseId;
+            $stmtEntrepots->execute($paramsEntrepots);
+            $nomsEntrepots = $stmtEntrepots->fetchAll(PDO::FETCH_COLUMN);
+            
+            error_log("🔍 [API Produit] Noms d'entrepôts trouvés: " . json_encode($nomsEntrepots));
+            
+            if (count($nomsEntrepots) > 0) {
+                // Filtrer les produits par nom d'entrepôt (insensible à la casse)
+                $placeholders = implode(',', array_fill(0, count($nomsEntrepots), '?'));
+                $sql .= " AND LOWER(TRIM(COALESCE(p.entrepot, 'Magasin'))) IN ($placeholders)";
+                foreach ($nomsEntrepots as $nom) {
+                    $params[] = strtolower(trim($nom));
+                }
+                error_log("✅ [API Produit] Filtre appliqué avec " . count($nomsEntrepots) . " entrepôts");
+            } else {
+                // Si aucun entrepôt n'est trouvé, ne retourner aucun produit
+                $sql .= " AND 1 = 0";
+                error_log("⚠️ [API Produit] Aucun entrepôt trouvé, aucun produit retourné");
+            }
+        }
+    } else {
+        error_log("ℹ️ [API Produit] Pas de filtre par entrepôts (admin ou pas de permissions)");
+    }
     
     // Filtrer par point de vente si fourni
     if ($idPointVente !== null) {
@@ -146,29 +184,57 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null) {
             $sql .= " AND EXISTS (
                 SELECT 1 FROM stock_produit_point_vente ppv
                 WHERE ppv.id_produit = p.id_produit
-                AND ppv.id_point_vente = :id_point_vente
-                AND ppv.id_entreprise = :enterprise_id
+                AND ppv.id_point_vente = ?
+                AND ppv.id_entreprise = ?
                 AND ppv.actif = 1
             )";
-            $params['id_point_vente'] = (int)$idPointVente;
+            $params[] = (int)$idPointVente;
+            $params[] = $enterpriseId;
         } else {
             // Fallback : utiliser l'entrepôt du point de vente
             $sql .= " AND EXISTS (
                 SELECT 1 FROM stock_point_vente pv
                 INNER JOIN stock_entrepot e ON e.id_entrepot = pv.id_entrepot
-                WHERE pv.id_point_vente = :id_point_vente
-                AND pv.id_entreprise = :enterprise_id
+                WHERE pv.id_point_vente = ?
+                AND pv.id_entreprise = ?
                 AND (p.entrepot IS NULL OR LOWER(TRIM(p.entrepot)) = LOWER(TRIM(e.nom_entrepot)))
             )";
-            $params['id_point_vente'] = (int)$idPointVente;
+            $params[] = (int)$idPointVente;
+            $params[] = $enterpriseId;
         }
     }
     
     $sql .= " ORDER BY p.date_creation DESC";
     
+    error_log("🔍 [API Produit] Requête SQL finale: " . $sql);
+    error_log("🔍 [API Produit] Paramètres: " . json_encode($params));
+    error_log("🔍 [API Produit] Enterprise ID: " . $enterpriseId);
+    
     $stmt = $bdd->prepare($sql);
     $stmt->execute($params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    error_log("✅ [API Produit] Nombre de produits retournés: " . count($result));
+    if (count($result) > 0) {
+        $entrepotsDansResultats = array_unique(array_column($result, 'entrepot'));
+        error_log("📦 [API Produit] Entrepôts dans les résultats: " . json_encode($entrepotsDansResultats));
+        error_log("📦 [API Produit] Exemples de produits (3 premiers): " . json_encode(array_slice($result, 0, 3)));
+    } else {
+        error_log("⚠️ [API Produit] AUCUN PRODUIT RETOURNÉ!");
+        // Vérifier combien de produits existent au total pour cette entreprise
+        $stmtTotal = $bdd->prepare("SELECT COUNT(*) as total FROM stock_produit WHERE id_entreprise = ?");
+        $stmtTotal->execute([$enterpriseId]);
+        $total = $stmtTotal->fetch(PDO::FETCH_ASSOC);
+        error_log("📊 [API Produit] Total produits dans l'entreprise: " . $total['total']);
+        
+        // Vérifier les entrepôts des produits existants
+        $stmtEntrepots = $bdd->prepare("SELECT DISTINCT entrepot FROM stock_produit WHERE id_entreprise = ? AND actif = 1");
+        $stmtEntrepots->execute([$enterpriseId]);
+        $entrepotsProduits = $stmtEntrepots->fetchAll(PDO::FETCH_COLUMN);
+        error_log("📦 [API Produit] Entrepôts dans les produits de l'entreprise: " . json_encode($entrepotsProduits));
+    }
+    
+    return $result;
 }
 
 /**
@@ -381,7 +447,15 @@ try {
             if ($action === 'all') {
                 // Récupérer le paramètre id_point_vente si fourni
                 $idPointVente = isset($_GET['id_point_vente']) ? (int)$_GET['id_point_vente'] : null;
-                $resultat = getAllProducts($bdd, $enterpriseId, $idPointVente);
+                // Récupérer les IDs d'entrepôts si fournis (pour les agents)
+                $idEntrepots = null;
+                if (isset($_GET['id_entrepots']) && !empty($_GET['id_entrepots'])) {
+                    $idEntrepots = is_array($_GET['id_entrepots']) ? $_GET['id_entrepots'] : explode(',', $_GET['id_entrepots']);
+                    $idEntrepots = array_map('intval', $idEntrepots);
+                    $idEntrepots = array_filter($idEntrepots, function($id) { return $id > 0; });
+                    $idEntrepots = array_values($idEntrepots); // Réindexer
+                }
+                $resultat = getAllProducts($bdd, $enterpriseId, $idPointVente, $idEntrepots);
             } elseif ($action === 'single' && $id !== null) {
                 $resultat = getProductById($bdd, $id, $enterpriseId);
             } elseif ($action === 'search' && $query !== null) {

@@ -748,46 +748,12 @@ const getJournalUser = () => {
   color: #dc2626;
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  background: #ffffff;
-  border-radius: 16px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin: 0;
-}
+/* Styles spécifiques pour les modales de la page Clients */
+/* Les styles de base (.modal-overlay, .modal-content, etc.) sont définis dans style.css */
+/* Utiliser .modal-close au lieu de .btn-close pour la cohérence */
 
 .btn-close {
+  /* Alias pour compatibilité - utilise les styles de .modal-close */
   padding: 0.5rem;
   background: transparent;
   border: none;

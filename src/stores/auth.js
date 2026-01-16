@@ -169,6 +169,42 @@ export const useAuthStore = defineStore('auth', () => {
         }
         
         console.log('✅ Token reçu:', authToken.substring(0, 20) + '...')
+        console.log('👤 [Auth] Données utilisateur reçues:', JSON.stringify(userData, null, 2))
+        console.log('👤 [Auth] permissions_entrepots:', userData?.permissions_entrepots)
+        console.log('👤 [Auth] permissions_entrepots type:', typeof userData?.permissions_entrepots)
+        console.log('👤 [Auth] permissions_entrepots isArray:', Array.isArray(userData?.permissions_entrepots))
+        console.log('👤 [Auth] permissions_entrepots length:', userData?.permissions_entrepots?.length)
+        
+        // S'assurer que les permissions sont des tableaux
+        if (userData && !Array.isArray(userData.permissions_entrepots)) {
+          console.warn('⚠️ [Auth] permissions_entrepots n\'est pas un tableau, conversion...')
+          if (userData.permissions_entrepots === null || userData.permissions_entrepots === undefined) {
+            userData.permissions_entrepots = []
+          } else if (typeof userData.permissions_entrepots === 'string') {
+            try {
+              userData.permissions_entrepots = JSON.parse(userData.permissions_entrepots)
+            } catch (e) {
+              console.error('❌ [Auth] Erreur lors du parsing JSON:', e)
+              userData.permissions_entrepots = []
+            }
+          }
+        }
+        
+        if (userData && !Array.isArray(userData.permissions_points_vente)) {
+          console.warn('⚠️ [Auth] permissions_points_vente n\'est pas un tableau, conversion...')
+          if (userData.permissions_points_vente === null || userData.permissions_points_vente === undefined) {
+            userData.permissions_points_vente = []
+          } else if (typeof userData.permissions_points_vente === 'string') {
+            try {
+              userData.permissions_points_vente = JSON.parse(userData.permissions_points_vente)
+            } catch (e) {
+              console.error('❌ [Auth] Erreur lors du parsing JSON:', e)
+              userData.permissions_points_vente = []
+            }
+          }
+        }
+        
+        console.log('👤 [Auth] permissions_entrepots après correction:', userData?.permissions_entrepots)
         
         // Sauvegarder dans le store et localStorage
         setAuthData(authToken, userData)

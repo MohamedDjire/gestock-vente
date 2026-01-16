@@ -219,10 +219,45 @@ function getUserById($bdd, $userId) {
         throw new Exception("Utilisateur non trouvé");
     }
     
-
-    // Récupérer les permissions JSON
-    $user['permissions_entrepots'] = json_decode($user['permissions_entrepots'] ?? '[]');
-    $user['permissions_points_vente'] = json_decode($user['permissions_points_vente'] ?? '[]');
+    // Charger les permissions depuis les tables de liaison (comme dans login.php)
+    $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+    $stmtE->execute(['id' => $user['id_utilisateur']]);
+    $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
+    $permissions_entrepots = array_map('intval', $permissions_entrepots);
+    
+    $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+    $stmtPV->execute(['id' => $user['id_utilisateur']]);
+    $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+    $permissions_points_vente = array_map('intval', $permissions_points_vente);
+    
+    // Si les tables de liaison sont vides, essayer de lire depuis le JSON (fallback)
+    if (empty($permissions_entrepots)) {
+        $jsonEntrepots = $user['permissions_entrepots'] ?? null;
+        if ($jsonEntrepots && $jsonEntrepots !== 'NULL' && $jsonEntrepots !== '[]') {
+            $decoded = json_decode($jsonEntrepots, true);
+            if (is_array($decoded) && !empty($decoded)) {
+                $permissions_entrepots = array_map('intval', $decoded);
+                $permissions_entrepots = array_filter($permissions_entrepots, function($id) { return $id > 0; });
+                $permissions_entrepots = array_values($permissions_entrepots);
+            }
+        }
+    }
+    
+    if (empty($permissions_points_vente)) {
+        $jsonPointsVente = $user['permissions_points_vente'] ?? null;
+        if ($jsonPointsVente && $jsonPointsVente !== 'NULL' && $jsonPointsVente !== '[]') {
+            $decoded = json_decode($jsonPointsVente, true);
+            if (is_array($decoded) && !empty($decoded)) {
+                $permissions_points_vente = array_map('intval', $decoded);
+                $permissions_points_vente = array_filter($permissions_points_vente, function($id) { return $id > 0; });
+                $permissions_points_vente = array_values($permissions_points_vente);
+            }
+        }
+    }
+    
+    // Utiliser les permissions des tables de liaison (priorité)
+    $user['permissions_entrepots'] = $permissions_entrepots;
+    $user['permissions_points_vente'] = $permissions_points_vente;
 
     // Récupérer l'accès comptabilité (champ booléen)
     $stmtAcces = $bdd->prepare("SELECT acces_comptabilite FROM stock_utilisateur WHERE id_utilisateur = :id");

@@ -448,6 +448,7 @@ import AccessSelector from '../components/AccessSelector.vue'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
 import { uploadPhoto } from '../config/cloudinary'
+import { useCurrency } from '../composables/useCurrency.js'
             const uploadingPhoto = ref(false)
             const photoError = ref('')
             async function onPhotoChange(e) {
@@ -575,14 +576,7 @@ const filteredUsers = computed(() => {
 })
 
 // Méthodes utilitaires
-const formatPrice = (price) => {
-  if (!price) return '0 FCFA'
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'XOF',
-    minimumFractionDigits: 0
-  }).format(price).replace('XOF', 'FCFA')
-}
+const { formatPrice } = useCurrency()
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
@@ -1460,51 +1454,8 @@ onMounted(async () => {
   cursor: not-allowed;
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.modal-header h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a5f4a;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #6b7280;
-  cursor: pointer;
-  line-height: 1;
-}
+/* Styles spécifiques pour les modales de la page GestionCompte */
+/* Les styles de base (.modal-overlay, .modal-content, etc.) sont définis dans style.css */
 
 .user-form {
   display: flex;
@@ -1537,12 +1488,7 @@ onMounted(async () => {
   font-size: 1rem;
 }
 
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
+/* Les styles .modal-actions sont définis dans style.css */
 
 .btn-secondary {
   background: #f3f4f6;

@@ -72,7 +72,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
@@ -80,8 +80,11 @@ import { logJournal } from '../composables/useJournal'
 import { apiService } from '../composables/Api/apiService.js'
 import { getEcritures } from '../composables/api/apiCompta'
 import { useCurrency } from '../composables/useCurrency.js'
+import { useAuthStore } from '../stores/auth.js'
 
 const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
 const { formatPrice: formatCurrency } = useCurrency()
 
 const currentPointVente = ref(null)
@@ -98,8 +101,8 @@ const stats = ref({
   variationRupture: 0
 })
 const loading = ref(false)
-const teamTarget = ref(82)
-const clearedQueue = ref(1400)
+const teamTarget = ref(0)
+const clearedQueue = ref(0)
 
 const formatNumber = (value) => {
   if (value >= 1000) {
@@ -111,6 +114,7 @@ const formatNumber = (value) => {
 const loadDashboardData = async () => {
   loading.value = true
   try {
+<<<<<<< HEAD
     // Récupérer l'id_entreprise
     let id_entreprise = null
     const user = localStorage.getItem('prostock_user')
@@ -147,6 +151,93 @@ const loadDashboardData = async () => {
       variationVenteJour: 0.8,
       variationProduit: 0.0,
       variationRupture: -2.1
+=======
+    const user = authStore.user
+    let pointVenteId = route.query.point_vente
+    
+    // Si pas de point de vente dans l'URL, utiliser celui de l'utilisateur par défaut
+    if (!pointVenteId && user) {
+      const isAdmin = user.role && ['admin', 'superadmin'].includes(String(user.role).toLowerCase())
+      
+      // Pour les non-admins, utiliser leur premier point de vente (obligatoire)
+      if (!isAdmin && user.permissions_points_vente && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
+        pointVenteId = user.permissions_points_vente[0]
+        // Mettre à jour l'URL sans recharger la page
+        if (route.query.point_vente !== pointVenteId) {
+          router.replace({ query: { ...route.query, point_vente: pointVenteId } })
+        }
+      }
+    }
+    
+    if (pointVenteId) {
+      // Charger les données du point de vente spécifique
+      const [pointVenteResponse, statsResponse, productsResponse] = await Promise.all([
+        apiService.get(`/api_point_vente.php?id_point_vente=${pointVenteId}`),
+        apiService.get(`/api_point_vente.php?action=stats&id_point_vente=${pointVenteId}`),
+        apiService.get('/api_produit.php?action=all')
+      ])
+      
+      if (pointVenteResponse.success) {
+        currentPointVente.value = pointVenteResponse.data
+      }
+      
+      if (statsResponse.success) {
+        const data = statsResponse.data
+        // Calculer les statistiques
+        const ventesJournalieres = data.ventes_journalieres || []
+        const totalVentes = ventesJournalieres.reduce((sum, v) => sum + (parseFloat(v.chiffre_affaires) || 0), 0)
+        const venteAujourdhui = ventesJournalieres.find(v => {
+          const date = new Date(v.date)
+          const today = new Date()
+          return date.toDateString() === today.toDateString()
+        })
+        
+        // Calculer les variations (comparaison avec la veille)
+        const venteHier = ventesJournalieres.find(v => {
+          const date = new Date(v.date)
+          const yesterday = new Date()
+          yesterday.setDate(yesterday.getDate() - 1)
+          return date.toDateString() === yesterday.toDateString()
+        })
+        
+        const venteJourValue = venteAujourdhui ? parseFloat(venteAujourdhui.chiffre_affaires) : 0
+        const venteHierValue = venteHier ? parseFloat(venteHier.chiffre_affaires) : 0
+        const variationVenteJour = venteHierValue > 0 ? ((venteJourValue - venteHierValue) / venteHierValue) * 100 : 0
+        
+        // Calculer les produits et stocks en rupture
+        let totalProduit = 0
+        let stocksRupture = 0
+        if (productsResponse.success) {
+          const products = productsResponse.data || []
+          totalProduit = products.length
+          stocksRupture = products.filter(p => (p.quantite_stock || 0) <= 0).length
+        }
+        
+        stats.value = {
+          venteTotal: totalVentes,
+          venteJour: venteJourValue,
+          totalProduit: totalProduit,
+          stocksRupture: stocksRupture,
+          variationVenteTotal: 0, // À calculer si nécessaire
+          variationVenteJour: variationVenteJour,
+          variationProduit: 0, // À calculer si nécessaire
+          variationRupture: 0 // À calculer si nécessaire
+        }
+      }
+    } else {
+      // Pas de point de vente disponible
+      currentPointVente.value = null
+      stats.value = {
+        venteTotal: 0,
+        venteJour: 0,
+        totalProduit: 0,
+        stocksRupture: 0,
+        variationVenteTotal: 0,
+        variationVenteJour: 0,
+        variationProduit: 0,
+        variationRupture: 0
+      }
+>>>>>>> fc8e382d3fe4531c524fb054efee767a2da18f2b
     }
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error)
@@ -155,10 +246,14 @@ const loadDashboardData = async () => {
   }
 }
 
-// Surveiller les changements de route
+// Surveiller les changements de route et de l'utilisateur
 watch(() => route.query.point_vente, () => {
   loadDashboardData()
-}, { immediate: true })
+}, { immediate: false })
+
+watch(() => authStore.user, () => {
+  loadDashboardData()
+}, { immediate: false, deep: true })
 
 const updateTeamTarget = () => {
   // Sauvegarder la valeur dans localStorage
@@ -171,14 +266,16 @@ const updateClearedQueue = () => {
 }
 
 onMounted(() => {
-  // Charger les valeurs sauvegardées
-  const savedTarget = localStorage.getItem('team_target')
-  const savedQueue = localStorage.getItem('cleared_queue')
-  if (savedTarget) teamTarget.value = parseInt(savedTarget)
-  if (savedQueue) clearedQueue.value = parseInt(savedQueue)
-  
+  // Charger les données immédiatement au montage
   loadDashboardData()
 })
+
+// Recharger les données quand l'utilisateur change
+watch(() => authStore.user, (newUser) => {
+  if (newUser) {
+    loadDashboardData()
+  }
+}, { immediate: false, deep: true })
 
 function getJournalUser() {
   const userStr = localStorage.getItem('prostock_user');

@@ -124,6 +124,53 @@ function loginUser($bdd, $email, $password) {
     $updateStmt = $bdd->prepare("UPDATE stock_utilisateur SET dernier_login = NOW() WHERE id_utilisateur = :id");
     $updateStmt->execute(['id' => $user['id_utilisateur']]);
     
+    // Charger les permissions d'accès (entrepôts et points de vente) depuis les tables de liaison
+    $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+    $stmtE->execute(['id' => $user['id_utilisateur']]);
+    $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
+    // Convertir en entiers pour éviter les problèmes de type
+    $permissions_entrepots = array_map('intval', $permissions_entrepots);
+    
+    $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+    $stmtPV->execute(['id' => $user['id_utilisateur']]);
+    $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+    // Convertir en entiers pour éviter les problèmes de type
+    $permissions_points_vente = array_map('intval', $permissions_points_vente);
+    
+    // Si les tables de liaison sont vides, essayer de lire depuis le JSON (fallback)
+    if (empty($permissions_entrepots)) {
+        $jsonEntrepots = $user['permissions_entrepots'] ?? null;
+        if ($jsonEntrepots && $jsonEntrepots !== 'NULL' && $jsonEntrepots !== '[]') {
+            $decoded = json_decode($jsonEntrepots, true);
+            if (is_array($decoded) && !empty($decoded)) {
+                $permissions_entrepots = array_map('intval', $decoded);
+                $permissions_entrepots = array_filter($permissions_entrepots, function($id) { return $id > 0; });
+                $permissions_entrepots = array_values($permissions_entrepots);
+            }
+        }
+    }
+    
+    if (empty($permissions_points_vente)) {
+        $jsonPointsVente = $user['permissions_points_vente'] ?? null;
+        if ($jsonPointsVente && $jsonPointsVente !== 'NULL' && $jsonPointsVente !== '[]') {
+            $decoded = json_decode($jsonPointsVente, true);
+            if (is_array($decoded) && !empty($decoded)) {
+                $permissions_points_vente = array_map('intval', $decoded);
+                $permissions_points_vente = array_filter($permissions_points_vente, function($id) { return $id > 0; });
+                $permissions_points_vente = array_values($permissions_points_vente);
+            }
+        }
+    }
+    
+    // Ajouter les permissions à l'utilisateur
+    $user['permissions_entrepots'] = $permissions_entrepots;
+    $user['permissions_points_vente'] = $permissions_points_vente;
+    
+    // Log pour debug
+    error_log("🔐 [Login] Utilisateur: " . $user['username'] . " (ID: " . $user['id_utilisateur'] . ")");
+    error_log("🔐 [Login] Permissions entrepôts: " . json_encode($permissions_entrepots));
+    error_log("🔐 [Login] Permissions points de vente: " . json_encode($permissions_points_vente));
+    
     // Retirer le mot de passe de la réponse
     unset($user['mot_de_passe']);
     
@@ -152,11 +199,21 @@ try {
     $user = loginUser($bdd, $data['email'], $data['password']);
     $token = generateAuthToken($user);
     
+    // Vérifier que les permissions sont bien présentes
+    error_log("🔐 [Login Response] User ID: " . $user['id_utilisateur']);
+    error_log("🔐 [Login Response] Permissions entrepôts: " . json_encode($user['permissions_entrepots'] ?? 'NON DÉFINI'));
+    error_log("🔐 [Login Response] Permissions points de vente: " . json_encode($user['permissions_points_vente'] ?? 'NON DÉFINI'));
+    
     $resultat = [
         'user' => $user,
         'token' => $token,
         'expires_in' => JWT_EXPIRATION // Durée d'expiration en secondes
     ];
+    
+    // Log de la réponse complète (sans le mot de passe)
+    $responseLog = $resultat;
+    unset($responseLog['user']['mot_de_passe']);
+    error_log("🔐 [Login Response] Réponse complète: " . json_encode($responseLog, JSON_UNESCAPED_UNICODE));
     
     $bdd->commit();
     

@@ -185,6 +185,24 @@
       </div>
     </div>
     
+    <!-- Modal Confirmation Vider Panier -->
+    <div v-if="showClearCartModal" class="modal-overlay" @click.self="cancelClearCart">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Vider le panier</h3>
+          <button class="modal-close" @click="cancelClearCart">×</button>
+        </div>
+        <div class="modal-body">
+          <p>Êtes-vous sûr de vouloir vider le panier ?</p>
+          <p class="modal-warning">Cette action est irréversible et supprimera tous les produits du panier.</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="cancelClearCart">Annuler</button>
+          <button class="btn-primary" style="background: #dc2626;" @click="confirmClearCart">Vider le panier</button>
+        </div>
+      </div>
+    </div>
+    
     <!-- Modal Remise -->
     <div v-if="showDiscountModal" class="modal-overlay" @click.self="showDiscountModal = false">
       <div class="modal-content" @click.stop>
@@ -341,8 +359,19 @@ import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { createEcriture } from '../composables/api/apiCompta'
 import { useAuthStore } from '../stores/auth.js'
+import { useCurrency } from '../composables/useCurrency.js'
 
 const authStore = useAuthStore()
+const { formatPrice } = useCurrency()
+
+// Vérifier si l'utilisateur est admin
+const isAdmin = computed(() => {
+  const user = authStore.user
+  if (!user) return false
+  // Vérifier le rôle (peut être 'Admin', 'admin', 'superadmin', etc.)
+  const role = String(user.role || user.user_role || '').toLowerCase()
+  return role === 'admin' || role === 'superadmin'
+})
 
 // Données
 const products = ref([])
@@ -362,7 +391,8 @@ const processingSale = ref(false)
 
 // Computed
 const filteredProducts = computed(() => {
-  let filtered = products.value.filter(p => p.actif === 1)
+  // Ne pas filtrer par actif ici car c'est déjà fait dans loadProducts
+  let filtered = products.value
   
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
@@ -398,37 +428,132 @@ const total = computed(() => {
 })
 
 // Méthodes
-const formatPrice = (price) => {
-  if (!price) return '0 FCFA'
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'XOF',
-    minimumFractionDigits: 0
-  }).format(price).replace('XOF', 'FCFA')
-}
+// formatPrice est maintenant fourni par useCurrency()
 
 const loadingProducts = ref(false)
 
 const loadProducts = async () => {
   loadingProducts.value = true
   try {
-    const response = await apiService.get('/api_produit.php?action=all')
+    const user = authStore.user
+    
+    // Si les permissions sont vides, essayer de les recharger depuis l'API
+    if (user && !isAdmin.value && (!user.permissions_entrepots || user.permissions_entrepots.length === 0)) {
+      console.warn('⚠️ [Ventes] Permissions vides, rechargement depuis l\'API...')
+      try {
+        const userResponse = await apiService.get(`/index.php?action=single&id=${user.id_utilisateur || user.id}`)
+        console.log('📥 [Ventes] Réponse API utilisateur:', userResponse)
+        if (userResponse && userResponse.success && userResponse.data) {
+          console.log('✅ [Ventes] Utilisateur rechargé:', userResponse.data)
+          // Mettre à jour les permissions dans le store avec setAuthData pour sauvegarder dans localStorage
+          if (userResponse.data.permissions_entrepots && Array.isArray(userResponse.data.permissions_entrepots)) {
+            authStore.setAuthData(authStore.token, {
+              ...authStore.user,
+              permissions_entrepots: userResponse.data.permissions_entrepots,
+              permissions_points_vente: userResponse.data.permissions_points_vente || authStore.user.permissions_points_vente || []
+            })
+            console.log('✅ [Ventes] Permissions mises à jour dans le store:', authStore.user.permissions_entrepots)
+          } else {
+            console.warn('⚠️ [Ventes] Permissions toujours vides après rechargement')
+          }
+        }
+      } catch (error) {
+        console.error('❌ [Ventes] Erreur lors du rechargement des permissions:', error)
+      }
+    }
+    
+    let url = '/api_produit.php?action=all'
+    
+    console.log('👤 [Ventes] User complet:', JSON.stringify(authStore.user, null, 2))
+    console.log('👤 [Ventes] User:', user?.username, 'isAdmin:', isAdmin.value)
+    console.log('👤 [Ventes] permissions_entrepots:', user?.permissions_entrepots)
+    console.log('👤 [Ventes] permissions_entrepots type:', typeof user?.permissions_entrepots)
+    console.log('👤 [Ventes] permissions_entrepots isArray:', Array.isArray(user?.permissions_entrepots))
+    console.log('👤 [Ventes] permissions_entrepots length:', user?.permissions_entrepots?.length)
+    console.log('👤 [Ventes] role:', user?.role)
+    
+    // Si l'utilisateur n'est pas admin, passer les IDs d'entrepôts à l'API
+    if (user && !isAdmin.value) {
+      // Pour les agents, ils DOIVENT avoir des permissions d'entrepôts
+      if (user.permissions_entrepots && Array.isArray(user.permissions_entrepots) && user.permissions_entrepots.length > 0) {
+        const entrepotIds = user.permissions_entrepots.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0)
+        if (entrepotIds.length > 0) {
+          url += '&id_entrepots=' + entrepotIds.join(',')
+          console.log('🏭 [Ventes] Agent - URL avec filtrage:', url)
+          console.log('🏭 [Ventes] Agent - IDs entrepôts:', entrepotIds)
+        } else {
+          console.warn('⚠️ [Ventes] Agent - Aucun ID d\'entrepôt valide')
+          // Si l'agent n'a pas d'IDs valides, ne pas charger de produits
+          products.value = []
+          categories.value = []
+          loadingProducts.value = false
+          return
+        }
+      } else {
+        console.warn('⚠️ [Ventes] Agent - Aucune permission d\'entrepôt, aucun produit chargé')
+        // Si l'agent n'a pas de permissions, ne pas charger de produits
+        products.value = []
+        categories.value = []
+        loadingProducts.value = false
+        return
+      }
+    } else {
+      console.log('✅ [Ventes] Admin - Pas de filtre, tous les produits')
+    }
+    
+    console.log('🌐 [Ventes] Appel API:', url)
+    const response = await apiService.get(url)
+    console.log('📦 [Ventes] Réponse API complète:', JSON.stringify(response, null, 2))
+    
     if (response && response.success && response.data) {
-      products.value = Array.isArray(response.data) ? response.data.map(p => ({
+      let allProducts = Array.isArray(response.data) ? response.data.map(p => ({
         ...p,
-        categorie: p.id_categorie || 'Non catégorisé'
+        categorie: p.id_categorie || 'Non catégorisé',
+        actif: p.actif === 1 || p.actif === true || p.actif === '1'
       })) : []
+      
+      console.log('📦 [Ventes] Total produits reçus de l\'API:', allProducts.length)
+      
+      // Afficher quelques exemples de produits pour debug
+      if (allProducts.length > 0) {
+        console.log('📦 [Ventes] Exemples de produits (3 premiers):', allProducts.slice(0, 3).map(p => ({
+          nom: p.nom,
+          entrepot: p.entrepot,
+          actif: p.actif
+        })))
+      }
+      
+      // Filtrer par produits actifs
+      allProducts = allProducts.filter(p => p.actif === 1 || p.actif === true || p.actif === '1')
+      
+      console.log('📦 [Ventes] Produits actifs après filtrage:', allProducts.length)
+      
+      // Afficher les entrepôts des produits pour vérification
+      if (allProducts.length > 0) {
+        const entrepotsUniques = [...new Set(allProducts.map(p => p.entrepot).filter(Boolean))]
+        console.log('📦 [Ventes] Entrepôts uniques dans les produits reçus:', entrepotsUniques)
+      } else {
+        console.warn('⚠️ [Ventes] AUCUN PRODUIT ACTIF TROUVÉ!')
+        if (response.data && response.data.length > 0) {
+          console.warn('⚠️ [Ventes] Produits inactifs trouvés:', response.data.filter(p => !(p.actif === 1 || p.actif === true || p.actif === '1')).length)
+        }
+      }
+      
+      products.value = allProducts
       
       // Extraire les catégories uniques
       const uniqueCategories = [...new Set(products.value.map(p => p.categorie))]
       categories.value = uniqueCategories.filter(c => c)
-      console.log('Produits chargés:', products.value.length)
+      console.log('✅ [Ventes] Produits finaux chargés dans l\'interface:', products.value.length)
+      console.log('✅ [Ventes] Catégories:', categories.value)
     } else {
-      console.error('Réponse API invalide:', response)
+      console.error('❌ [Ventes] Réponse API invalide:', response)
+      console.error('❌ [Ventes] response.success:', response?.success)
+      console.error('❌ [Ventes] response.data:', response?.data)
       products.value = []
     }
   } catch (error) {
-    console.error('Erreur lors du chargement des produits:', error)
+    console.error('❌ [Ventes] Erreur lors du chargement des produits:', error)
     products.value = []
   } finally {
     loadingProducts.value = false
@@ -514,12 +639,22 @@ const updateCartItem = (index) => {
   item.sous_total = (item.prix_unitaire || 0) * (item.quantite || 0)
 }
 
+const showClearCartModal = ref(false)
+
 const clearCart = () => {
-  if (confirm('Voulez-vous vraiment vider le panier ?')) {
-    cart.value = []
-    discount.value = 0
-    discountValue.value = 0
-  }
+  showClearCartModal.value = true
+}
+
+const confirmClearCart = () => {
+  cart.value = []
+  discount.value = 0
+  discountValue.value = 0
+  discountType.value = 'fixed'
+  showClearCartModal.value = false
+}
+
+const cancelClearCart = () => {
+  showClearCartModal.value = false
 }
 
 const calculateDiscount = () => {
@@ -1704,56 +1839,7 @@ onMounted(async () => {
   }
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.modal-header h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a5f4a;
-  margin: 0;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  color: #6b7280;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.modal-body {
-  margin-bottom: 1.5rem;
-}
+/* Styles spécifiques pour les modales de la page Ventes */
 
 .form-group {
   margin-bottom: 1rem;
@@ -1800,11 +1886,7 @@ onMounted(async () => {
   color: #dc2626;
 }
 
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
+/* Les styles .modal-actions sont définis dans style.css */
 
 .btn-secondary {
   background: #f3f4f6;

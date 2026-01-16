@@ -68,15 +68,15 @@
     </div>
     <!-- Modal for details -->
     <div v-if="showDetailsModal" class="modal-overlay" @click.self="closeDetails">
-      <div class="modal-content view-modal">
-        <div class="modal-header" style="display:flex;align-items:center;gap:1rem;">
-          <h3 style="margin:0;flex:1;display:flex;align-items:center;gap:0.5rem;">
-            <span style="font-size:1.3rem;">📋</span>
+      <div class="modal-content view-modal" @click.stop>
+        <div class="modal-header">
+          <h3>
+            <span style="font-size:1.3rem;margin-right:0.5rem;">📋</span>
             Détail du Mouvement
           </h3>
           <button @click="closeDetails" class="modal-close">×</button>
         </div>
-        <div class="modal-body" style="width:100%;">
+        <div class="modal-body">
           <!-- Bloc Informations Générales -->
           <div class="modal-section">
             <div class="section-title">
@@ -655,33 +655,59 @@ function exportPDF() {
   pointer-events: none;
 }
 
-/* Styles de la modale */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 3000;
-}
-.modal-content {
-  background: #fff;
-  border-radius: 16px;
-  padding: 2.2rem 2.5rem;
-  min-width: 340px;
-  max-width: 98vw;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+/* Styles spécifiques pour la modale de la page Journal */
+/* Les styles de base (.modal-overlay, .modal-content, etc.) sont définis dans style.css */
+
+.modal-content.view-modal {
+  max-width: 700px;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  animation: modalIn 0.18s cubic-bezier(.4,2,.6,1) both;
+  overflow: hidden;
 }
-.modal-content h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1a202c;
-  margin: 0 0 1rem 0;
+
+.modal-content.view-modal .modal-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Styles pour les sections de la modale */
+.modal-section {
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+.modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.section-content {
+  width: 100%;
+}
+
+.section-content.grid-2-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .section-content.grid-2-cols {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 .details-list {
@@ -702,27 +728,13 @@ function exportPDF() {
   border-bottom: none;
 }
 
-.btn-primary {
-  background-color: #1a5f4a;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  width: 100%;
-  max-width: 120px;
-  align-self: flex-end;
-}
-
-/* Ajout dans <style scoped> */
 .details-block {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
 }
+
 .details-row {
   display: flex;
   align-items: flex-start;
@@ -730,21 +742,25 @@ function exportPDF() {
   border-bottom: 1px solid #e2e8f0;
   padding-bottom: 0.7rem;
 }
+
 .details-row:last-child {
   border-bottom: none;
 }
+
 .details-label {
   min-width: 110px;
   color: #64748b;
   font-weight: 600;
   font-size: 1rem;
 }
+
 .details-value {
   color: #1a202c;
   font-size: 1rem;
   word-break: break-word;
   flex: 1;
 }
+
 .details-value-long {
   white-space: pre-line;
 }

@@ -463,28 +463,45 @@ function getVentes($bdd, $enterpriseId, $filters = []) {
     
     $whereClause = implode(' AND ', $where);
     
-    $stmt = $bdd->prepare("
+    // Vérifier si la table stock_clients existe (avec un "s")
+    $clientTableExists = false;
+    try {
+        $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_clients'");
+        $clientTableExists = $checkTable->rowCount() > 0;
+    } catch (PDOException $e) {
+        // Table n'existe pas, on continue sans
+        $clientTableExists = false;
+    }
+    
+    $sql = "
         SELECT 
             v.*,
-            p.nom AS produit_nom,
-            p.code_produit,
-            pv.nom_point_vente,
-            c.nom AS client_nom,
-            c.prenom AS client_prenom,
-            u.nom AS user_nom,
-            u.prenom AS user_prenom
+            COALESCE(p.nom, 'Produit supprimé') AS produit_nom,
+            COALESCE(p.code_produit, '') AS code_produit,
+            COALESCE(pv.nom_point_vente, 'Point de vente inconnu') AS nom_point_vente,
+            " . ($clientTableExists ? "c.nom AS client_nom, c.prenom AS client_prenom" : "NULL AS client_nom, NULL AS client_prenom") . ",
+            COALESCE(u.nom, 'Utilisateur') AS user_nom,
+            COALESCE(u.prenom, '') AS user_prenom
         FROM stock_vente v
-        INNER JOIN stock_produit p ON v.id_produit = p.id_produit
-        INNER JOIN stock_point_vente pv ON v.id_point_vente = pv.id_point_vente
-        INNER JOIN stock_utilisateur u ON v.id_user = u.id_utilisateur
-        LEFT JOIN stock_client c ON v.id_client = c.id_client
+        LEFT JOIN stock_produit p ON v.id_produit = p.id_produit
+        LEFT JOIN stock_point_vente pv ON v.id_point_vente = pv.id_point_vente
+        LEFT JOIN stock_utilisateur u ON v.id_user = u.id_utilisateur
+        " . ($clientTableExists ? "LEFT JOIN stock_clients c ON v.id_client = c.id" : "") . "
         WHERE {$whereClause}
         ORDER BY v.date_vente DESC
         LIMIT 1000
-    ");
+    ";
     
-    $stmt->execute($params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $bdd->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Erreur SQL dans getVentes: " . $e->getMessage());
+        error_log("SQL: " . $sql);
+        error_log("Params: " . print_r($params, true));
+        throw new Exception("Erreur lors de la récupération des ventes: " . $e->getMessage());
+    }
 }
 
 // =====================================================
@@ -527,6 +544,23 @@ try {
         'data' => $resultat
     ], JSON_UNESCAPED_UNICODE);
     
+} catch (PDOException $e) {
+    // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
+    header('Content-Type: application/json; charset=utf-8');
+    
+    error_log("Erreur PDO dans api_vente.php: " . $e->getMessage());
+    error_log("Trace: " . $e->getTraceAsString());
+    
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Erreur de base de données',
+        'error' => $e->getMessage()
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 } catch (Exception $e) {
     // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
     header('Access-Control-Allow-Origin: *');
@@ -534,7 +568,10 @@ try {
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
     header('Content-Type: application/json; charset=utf-8');
     
-    http_response_code($e->getCode() ?: 400);
+    error_log("Erreur dans api_vente.php: " . $e->getMessage());
+    error_log("Trace: " . $e->getTraceAsString());
+    
+    http_response_code($e->getCode() ?: 500);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage(),

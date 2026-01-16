@@ -1,8 +1,13 @@
 <template>
   <div class="entrepot-page">
+    <!-- Vue Admin -->
+    <template v-if="isAdmin">
           <div class="products-header">
             <h2 class="dashboard-title">Entrepôts</h2>
-            <button @click.stop="openCreateModal" class="btn-primary">
+            <button 
+              @click.stop="openCreateModal" 
+              class="btn-primary"
+            >
               <span>+</span> Nouvel Entrepôt
             </button>
           </div>
@@ -515,6 +520,73 @@
       </div>
     </div>
 
+    <!-- Modale Nouvelle Sortie (Agent) -->
+    <div v-if="showSortieModal" class="modal-overlay" @click.self="closeSortieModal">
+      <div class="modal-content medium" @click.stop>
+        <div class="modal-header">
+          <h3>Nouvelle Sortie vers Point de Vente</h3>
+          <button @click="closeSortieModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Produit *</label>
+            <select v-model="sortieFormData.id_produit" required class="form-input">
+              <option value="">Sélectionner un produit</option>
+              <option 
+                v-for="produit in agentProduits.filter(p => p.quantite_stock > 0)" 
+                :key="produit.id_produit"
+                :value="produit.id_produit"
+              >
+                {{ produit.nom }} (Stock: {{ produit.quantite_stock }})
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Point de Vente Destination *</label>
+            <select v-model="sortieFormData.point_vente_destination" required class="form-input">
+              <option value="">Sélectionner un point de vente</option>
+              <option 
+                v-for="pv in agentPointsVente" 
+                :key="pv.id_point_vente"
+                :value="pv.id_point_vente"
+              >
+                {{ pv.nom_point_vente }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Quantité *</label>
+            <input 
+              v-model.number="sortieFormData.quantite" 
+              type="number" 
+              min="1"
+              required
+              class="form-input"
+              :max="getMaxQuantite()"
+            />
+            <small v-if="sortieFormData.id_produit" class="form-hint" style="display: block; margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
+              Stock disponible: {{ getStockDisponible() }}
+            </small>
+          </div>
+          <div class="form-group">
+            <label>Motif</label>
+            <textarea 
+              v-model="sortieFormData.motif" 
+              rows="3"
+              placeholder="Raison de la sortie..."
+              class="form-input"
+            ></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeSortieModal" class="btn-secondary">Annuler</button>
+          <button @click="createSortie" class="btn-primary" :disabled="loadingSortie || !canCreateSortie">
+            {{ loadingSortie ? 'Enregistrement...' : 'Enregistrer la Sortie' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Confirmations -->
     <div v-if="confirmation.show" class="modal-overlay" @click.self="closeConfirmation">
       <div class="modal-content" @click.stop>
@@ -532,11 +604,212 @@
         </div>
       </div>
     </div>
+    </template>
+
+    <!-- Vue Agent -->
+    <template v-else>
+      <div class="agent-entrepot-page">
+        <div class="agent-header">
+          <h2 class="dashboard-title">{{ currentEntrepot?.nom_entrepot || 'Chargement...' }}</h2>
+          <div class="agent-stats-cards">
+            <div class="agent-stat-card">
+              <div class="stat-icon">📦</div>
+              <div class="stat-info">
+                <div class="stat-label">Stock Total</div>
+                <div class="stat-value">{{ agentStats.stockTotal }}</div>
+              </div>
+            </div>
+            <div class="agent-stat-card">
+              <div class="stat-icon">💶</div>
+              <div class="stat-info">
+                <div class="stat-label">Valeur Stock (Achat)</div>
+                <div class="stat-value">{{ formatCurrency(agentStats.valeurStockAchat) }}</div>
+              </div>
+            </div>
+            <div class="agent-stat-card">
+              <div class="stat-icon">💵</div>
+              <div class="stat-info">
+                <div class="stat-label">Valeur Stock (Vente)</div>
+                <div class="stat-value">{{ formatCurrency(agentStats.valeurStockVente) }}</div>
+              </div>
+            </div>
+            <div class="agent-stat-card">
+              <div class="stat-icon">📊</div>
+              <div class="stat-info">
+                <div class="stat-label">Produits</div>
+                <div class="stat-value">{{ agentStats.nombreProduits }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Onglets de navigation -->
+        <div class="agent-tabs">
+          <button 
+            v-for="tab in agentTabs" 
+            :key="tab.id"
+            @click="activeAgentTab = tab.id"
+            :class="['agent-tab', { active: activeAgentTab === tab.id }]"
+          >
+            <span class="tab-icon">{{ tab.icon }}</span>
+            <span class="tab-label">{{ tab.label }}</span>
+          </button>
+        </div>
+
+        <!-- Contenu des onglets -->
+        <div class="agent-tab-content">
+          <!-- Onglet Produits -->
+          <div v-if="activeAgentTab === 'produits'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Produits dans l'Entrepôt</h3>
+            </div>
+            <div class="produits-table-container">
+              <div v-if="loadingProduits" class="loading-state">Chargement des produits...</div>
+              <div v-else-if="agentProduits.length === 0" class="empty-state">Aucun produit trouvé</div>
+              <table v-else class="produits-table">
+                <thead>
+                  <tr>
+                    <th>Code</th>
+                    <th>Nom</th>
+                    <th>Stock</th>
+                    <th>Prix Achat</th>
+                    <th>Prix Vente</th>
+                    <th>Valeur Stock</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="produit in agentProduits" :key="produit.id_produit">
+                    <td>{{ produit.code_produit || '—' }}</td>
+                    <td><strong>{{ produit.nom }}</strong></td>
+                    <td>{{ produit.quantite_stock || 0 }}</td>
+                    <td>{{ formatCurrency(produit.prix_achat || 0) }}</td>
+                    <td>{{ formatCurrency(produit.prix_vente || 0) }}</td>
+                    <td class="montant-cell">{{ formatCurrency((produit.quantite_stock || 0) * (produit.prix_vente || 0)) }}</td>
+                    <td>
+                      <span :class="['status-badge', getStatutClass(produit.statut_stock)]">
+                        {{ getStatutLabel(produit.statut_stock) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Onglet Sorties -->
+          <div v-if="activeAgentTab === 'sorties'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Produits Sortis</h3>
+              <button @click="openSortieModal" class="btn-primary">
+                <span>+</span> Nouvelle Sortie
+              </button>
+            </div>
+            <div class="sorties-table-container">
+              <div v-if="loadingSorties" class="loading-state">Chargement des sorties...</div>
+              <div v-else-if="agentSorties.length === 0" class="empty-state">Aucune sortie trouvée</div>
+              <table v-else class="sorties-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Produit</th>
+                    <th>Quantité</th>
+                    <th>Type</th>
+                    <th>Montant</th>
+                    <th>Destination</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="sortie in agentSorties" :key="sortie.id">
+                    <td>{{ formatDate(sortie.date) }}</td>
+                    <td>
+                      <strong>{{ sortie.produit_nom }}</strong>
+                      <div class="text-muted">{{ sortie.code_produit }}</div>
+                    </td>
+                    <td>{{ sortie.quantite }}</td>
+                    <td>{{ getSortieTypeLabel(sortie.type_sortie) }}</td>
+                    <td class="montant-cell">{{ formatCurrency(sortie.montant || 0) }}</td>
+                    <td>{{ sortie.entrepot_destination || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modale Nouvelle Sortie -->
+      <div v-if="showSortieModal" class="modal-overlay" @click.self="closeSortieModal">
+        <div class="modal-content medium" @click.stop>
+          <div class="modal-header">
+            <h3>Nouvelle Sortie vers Point de Vente</h3>
+            <button @click="closeSortieModal" class="modal-close">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Produit *</label>
+              <select v-model="sortieFormData.id_produit" required class="form-input">
+                <option value="">Sélectionner un produit</option>
+                <option 
+                  v-for="produit in agentProduits.filter(p => p.quantite_stock > 0)" 
+                  :key="produit.id_produit"
+                  :value="produit.id_produit"
+                >
+                  {{ produit.nom }} (Stock: {{ produit.quantite_stock }})
+                </option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Point de Vente Destination *</label>
+              <select v-model="sortieFormData.point_vente_destination" required class="form-input">
+                <option value="">Sélectionner un point de vente</option>
+                <option 
+                  v-for="pv in agentPointsVente" 
+                  :key="pv.id_point_vente"
+                  :value="pv.id_point_vente"
+                >
+                  {{ pv.nom_point_vente }}
+                </option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Quantité *</label>
+              <input 
+                v-model.number="sortieFormData.quantite" 
+                type="number" 
+                min="1"
+                required
+                class="form-input"
+                :max="getMaxQuantite()"
+              />
+              <small v-if="sortieFormData.id_produit" class="form-hint" style="display: block; margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
+                Stock disponible: {{ getStockDisponible() }}
+              </small>
+            </div>
+            <div class="form-group">
+              <label>Motif</label>
+              <textarea 
+                v-model="sortieFormData.motif" 
+                rows="3"
+                placeholder="Raison de la sortie..."
+                class="form-input"
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="closeSortieModal" class="btn-secondary">Annuler</button>
+            <button @click="createSortie" class="btn-primary" :disabled="loadingSortie || !canCreateSortie">
+              {{ loadingSortie ? 'Enregistrement...' : 'Enregistrer la Sortie' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
@@ -553,6 +826,14 @@ const router = useRouter()
 const authStore = useAuthStore()
 const { formatPrice: formatCurrency } = useCurrency()
 
+// Vérifier si l'utilisateur est admin
+const isAdmin = computed(() => {
+  const user = authStore.user
+  if (!user) return false
+  const role = String(user.role || user.user_role || '').toLowerCase()
+  return role === 'admin' || role === 'superadmin'
+})
+
 const entrepots = ref([])
 const loading = ref(false)
 const searchQuery = ref('')
@@ -564,6 +845,36 @@ const showDetailsModal = ref(false)
 const selectedEntrepot = ref(null)
 const produitsEntrepot = ref([])
 const loadingProduits = ref(false)
+
+// Vue Agent
+const currentEntrepot = ref(null)
+const agentStats = ref({
+  stockTotal: 0,
+  valeurStockAchat: 0,
+  valeurStockVente: 0,
+  nombreProduits: 0
+})
+const agentProduits = ref([])
+const agentSorties = ref([])
+const loadingSorties = ref(false)
+const activeAgentTab = ref('produits')
+const agentTabs = [
+  { id: 'produits', label: 'Produits', icon: '📦' },
+  { id: 'sorties', label: 'Sorties', icon: '📤' }
+]
+
+// Modale de sortie
+const showSortieModal = ref(false)
+const sortieFormData = ref({
+  id_produit: null,
+  quantite: 1,
+  type_sortie: 'transfert',
+  motif: '',
+  point_vente_destination: null
+})
+const agentPointsVente = ref([])
+const loadingSortie = ref(false)
+
 const showRapportModal = ref(false)
 const rapportEntrepot = ref(null)
 const rapportData = ref({
@@ -780,8 +1091,225 @@ const handleClickOutside = (event) => {
   }
 }
 
-onMounted(() => {
-  loadEntrepots()
+// Fonctions pour la vue Agent
+const loadAgentEntrepot = async () => {
+  const user = authStore.user
+  if (!user || !user.id_utilisateur) {
+    console.error('Utilisateur non connecté')
+    return
+  }
+  
+  try {
+    // Récupérer les entrepôts de l'utilisateur depuis l'API
+    const entrepotsResponse = await apiService.get('/api_entrepot.php?action=all')
+    console.log('Réponse entrepôts:', entrepotsResponse)
+    
+    if (entrepotsResponse && entrepotsResponse.success && entrepotsResponse.data && entrepotsResponse.data.length > 0) {
+      // Prendre le premier entrepôt disponible pour cet utilisateur
+      const entrepot = entrepotsResponse.data[0]
+      currentEntrepot.value = entrepot
+      
+      // Charger les statistiques
+      agentStats.value = {
+        stockTotal: parseInt(entrepot.stock_total || 0),
+        valeurStockAchat: parseFloat(entrepot.valeur_stock_achat || 0),
+        valeurStockVente: parseFloat(entrepot.valeur_stock_vente || 0),
+        nombreProduits: parseInt(entrepot.nombre_produits || 0)
+      }
+      
+      // Charger les produits
+      await loadAgentProduits()
+      // Charger les sorties
+      await loadAgentSorties()
+    } else {
+      console.error('Aucun entrepôt trouvé pour cet utilisateur')
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement de l\'entrepôt:', error)
+  }
+}
+
+const loadAgentProduits = async () => {
+  if (!currentEntrepot.value) return
+  
+  loadingProduits.value = true
+  try {
+    const response = await apiService.get(`/api_entrepot.php?action=produits&id_entrepot=${currentEntrepot.value.id_entrepot}`)
+    if (response && response.success) {
+      agentProduits.value = response.data || []
+    } else {
+      agentProduits.value = []
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des produits:', error)
+    agentProduits.value = []
+  } finally {
+    loadingProduits.value = false
+  }
+}
+
+const loadAgentSorties = async () => {
+  if (!currentEntrepot.value) return
+  
+  loadingSorties.value = true
+  try {
+    const response = await apiService.get(`/api_entrepot.php?action=rapport&id_entrepot=${currentEntrepot.value.id_entrepot}`)
+    if (response && response.success) {
+      // Filtrer uniquement les sorties
+      const mouvements = response.data?.mouvements || []
+      agentSorties.value = mouvements
+        .filter(m => m.type === 'sortie')
+        .map(sortie => {
+          // L'API ne retourne pas prix_unitaire dans les sorties, donc montant = 0
+          // On pourrait récupérer le prix depuis le produit si nécessaire
+          return {
+            ...sortie,
+            montant: 0 // Le montant n'est pas disponible dans les données de sortie
+          }
+        })
+    } else {
+      agentSorties.value = []
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des sorties:', error)
+    agentSorties.value = []
+  } finally {
+    loadingSorties.value = false
+  }
+}
+
+const getStatutClass = (statut) => {
+  if (statut === 'rupture') return 'rupture'
+  if (statut === 'alerte') return 'alerte'
+  return 'normal'
+}
+
+const getStatutLabel = (statut) => {
+  if (statut === 'rupture') return 'Rupture'
+  if (statut === 'alerte') return 'Alerte'
+  return 'Normal'
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  return date.toLocaleString('fr-FR', { 
+    day: '2-digit', 
+    month: '2-digit', 
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// Fonctions pour la modale de sortie
+const openSortieModal = async () => {
+  showSortieModal.value = true
+  sortieFormData.value = {
+    id_produit: null,
+    quantite: 1,
+    type_sortie: 'transfert',
+    motif: '',
+    point_vente_destination: null
+  }
+  // Charger les points de vente de l'agent
+  await loadAgentPointsVente()
+}
+
+const closeSortieModal = () => {
+  showSortieModal.value = false
+  sortieFormData.value = {
+    id_produit: null,
+    quantite: 1,
+    type_sortie: 'transfert',
+    motif: '',
+    point_vente_destination: null
+  }
+}
+
+const loadAgentPointsVente = async () => {
+  try {
+    const response = await apiService.get('/api_point_vente.php?action=all')
+    if (response && response.success) {
+      agentPointsVente.value = response.data || []
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des points de vente:', error)
+  }
+}
+
+const getMaxQuantite = () => {
+  if (!sortieFormData.value.id_produit) return 0
+  const produit = agentProduits.value.find(p => p.id_produit === sortieFormData.value.id_produit)
+  return produit ? produit.quantite_stock : 0
+}
+
+const getStockDisponible = () => {
+  if (!sortieFormData.value.id_produit) return 0
+  const produit = agentProduits.value.find(p => p.id_produit === sortieFormData.value.id_produit)
+  return produit ? produit.quantite_stock : 0
+}
+
+const canCreateSortie = computed(() => {
+  return sortieFormData.value.id_produit && 
+         sortieFormData.value.point_vente_destination && 
+         sortieFormData.value.quantite > 0 &&
+         sortieFormData.value.quantite <= getMaxQuantite()
+})
+
+const createSortie = async () => {
+  if (!canCreateSortie.value) return
+  
+  loadingSortie.value = true
+  try {
+    const produit = agentProduits.value.find(p => p.id_produit === sortieFormData.value.id_produit)
+    const pointVente = agentPointsVente.value.find(pv => pv.id_point_vente === sortieFormData.value.point_vente_destination)
+    
+    const sortieData = {
+      id_produit: sortieFormData.value.id_produit,
+      quantite: sortieFormData.value.quantite,
+      type_sortie: 'transfert',
+      motif: sortieFormData.value.motif || `Transfert vers ${pointVente?.nom_point_vente || 'Point de vente'}`,
+      entrepot_destination: pointVente?.nom_point_vente || null,
+      prix_unitaire: produit?.prix_vente || null
+    }
+    
+    const response = await apiService.post('/api_stock.php?type=sortie', sortieData)
+    
+    if (response && response.success) {
+      showNotification('success', 'Succès', 'Sortie créée avec succès')
+      closeSortieModal()
+      // Recharger les données
+      await loadAgentProduits()
+      await loadAgentSorties()
+      // Recharger les statistiques
+      await loadAgentEntrepot()
+    } else {
+      showNotification('error', 'Erreur', response?.message || 'Erreur lors de la création de la sortie')
+    }
+  } catch (error) {
+    console.error('Erreur lors de la création de la sortie:', error)
+    showNotification('error', 'Erreur', 'Erreur lors de la création de la sortie')
+  } finally {
+    loadingSortie.value = false
+  }
+}
+
+// Watcher pour recharger les données quand on change d'onglet (agent)
+watch(activeAgentTab, (newTab) => {
+  if (!isAdmin.value) {
+    if (newTab === 'produits') loadAgentProduits()
+    else if (newTab === 'sorties') loadAgentSorties()
+  }
+})
+
+onMounted(async () => {
+  if (isAdmin.value) {
+    loadEntrepots()
+  } else {
+    // Pour les agents, charger leur entrepôt et les données
+    await loadAgentEntrepot()
+  }
   document.addEventListener('click', handleClickOutside)
 })
 
@@ -883,17 +1411,7 @@ const closeRapportModal = () => {
   }
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return '—'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('fr-FR', { 
-    day: '2-digit', 
-    month: '2-digit', 
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// formatDate est déjà défini plus haut pour la vue agent
 
 const getSortieTypeLabel = (type) => {
   const labels = {
@@ -1923,6 +2441,188 @@ onMounted(() => {
   background: #f9fafb;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
+}
+
+/* Styles pour la vue Agent */
+.agent-entrepot-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.agent-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.agent-stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.agent-stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stat-icon {
+  font-size: 2rem;
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+}
+
+.agent-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.agent-tab {
+  background: transparent;
+  border: none;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-tab:hover {
+  color: #1a5f4a;
+  background: #f0fdf4;
+}
+
+.agent-tab.active {
+  color: #1a5f4a;
+  border-bottom-color: #1a5f4a;
+  background: #f0fdf4;
+}
+
+.tab-icon {
+  font-size: 1.25rem;
+}
+
+.agent-tab-content {
+  width: 100%;
+}
+
+.agent-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin: 0;
+}
+
+.produits-table-container,
+.sorties-table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.produits-table,
+.sorties-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.produits-table thead,
+.sorties-table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.produits-table th,
+.sorties-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.produits-table tbody tr,
+.sorties-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.produits-table tbody tr:hover,
+.sorties-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.produits-table tbody tr:last-child,
+.sorties-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.produits-table td,
+.sorties-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.montant-cell {
+  font-weight: 600;
+  color: #059669;
+}
+
+.text-muted {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+.loading-state,
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #6b7280;
 }
 
 .rapport-stat-icon {
