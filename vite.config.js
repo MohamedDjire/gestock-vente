@@ -15,6 +15,11 @@ export default defineConfig({
   // Proxy pour contourner CORS en développement (solution alternative)
   server: {
     proxy: {
+      '/login.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
       '/index.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,
