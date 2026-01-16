@@ -3568,9 +3568,11 @@ onActivated(() => {
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 0.75rem;
   padding-right: 0.5rem;
+  align-content: start;
+  min-height: 0;
 }
 
 .sale-product-card {
@@ -3583,6 +3585,8 @@ onActivated(() => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-height: 200px;
+  height: fit-content;
 }
 
 .sale-product-card:hover:not(.out-of-stock) {
@@ -3597,13 +3601,15 @@ onActivated(() => {
 
 .sale-product-image {
   width: 100%;
-  height: 100px;
+  height: 120px;
+  min-height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #f3f4f6;
   border-radius: 6px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .sale-product-image img {
