@@ -231,7 +231,29 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
         // Appliquer la remise globale si fournie
         $remise = isset($data['remise']) ? (float)$data['remise'] : 0;
         $montantTotalFinal = $montantTotal - $remise;
-        
+
+        // Enregistrer une écriture comptable automatique
+        try {
+            $sqlEcriture = "INSERT INTO stock_compta_ecritures (date_ecriture, type_ecriture, montant, user, categorie, moyen_paiement, statut, reference, piece_jointe, commentaire, details, id_entreprise) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $stmtEcriture = $bdd->prepare($sqlEcriture);
+            $stmtEcriture->execute([
+                date('Y-m-d'),
+                'vente',
+                $montantTotalFinal,
+                $userName,
+                'Vente',
+                $data['moyen_paiement'] ?? '',
+                'validée',
+                '',
+                '',
+                '',
+                $details,
+                $enterpriseId
+            ]);
+        } catch (Exception $e) {
+            error_log("Erreur lors de l'insertion de l'écriture comptable vente : " . $e->getMessage());
+        }
+
         // Enregistrer dans le journal
         try {
             // Récupérer le nom complet de l'utilisateur

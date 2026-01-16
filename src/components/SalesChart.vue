@@ -9,33 +9,53 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { getEcritures } from '../composables/api/apiCompta'
 let chartInstance = null
 const chartCanvas = ref(null)
 
+function getMonthLabel(dateStr) {
+  const d = new Date(dateStr)
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+}
+
 onMounted(async () => {
   const Chart = (await import('chart.js/auto')).default
+  // Récupérer l'id_entreprise
+  let id_entreprise = null
+  const user = localStorage.getItem('prostock_user')
+  if (user) {
+    id_entreprise = JSON.parse(user).id_entreprise
+  }
+  let labels = []
+  let dataVentes = []
+  if (id_entreprise) {
+    const res = await getEcritures(id_entreprise)
+    if (res && Array.isArray(res.data)) {
+      // Grouper les ventes par mois
+      const ventes = res.data.filter(e => e.categorie === 'Vente')
+      const ventesParMois = {}
+      ventes.forEach(e => {
+        const mois = getMonthLabel(e.date_ecriture)
+        ventesParMois[mois] = (ventesParMois[mois] || 0) + (parseFloat(e.montant) || 0)
+      })
+      labels = Object.keys(ventesParMois).sort()
+      dataVentes = labels.map(mois => ventesParMois[mois])
+    }
+  }
   if (chartInstance) chartInstance.destroy()
   chartInstance = new Chart(chartCanvas.value, {
     type: 'line',
     data: {
-      labels: ['2015', '2016', '2017', '2018', '2019', '2020'],
+      labels: labels.length ? labels : ['Aucun'],
       datasets: [
         {
-          label: 'Approved',
-          data: [20, 25, 30, 35, 32, 40],
+          label: 'Ventes',
+          data: dataVentes.length ? dataVentes : [0],
           borderColor: '#1a5f4a',
           backgroundColor: 'rgba(26,95,74,0.1)',
           tension: 0.4,
           fill: true,
-        },
-        {
-          label: 'Submitted',
-          data: [15, 18, 28, 30, 28, 35],
-          borderColor: '#e14b4b',
-          backgroundColor: 'rgba(225,75,75,0.1)',
-          tension: 0.4,
-          fill: true,
-        },
+        }
       ],
     },
     options: {
@@ -43,7 +63,7 @@ onMounted(async () => {
         legend: { display: true },
       },
       scales: {
-        y: { beginAtZero: true, ticks: { stepSize: 10 } },
+        y: { beginAtZero: true }
       },
       responsive: true,
       maintainAspectRatio: false,

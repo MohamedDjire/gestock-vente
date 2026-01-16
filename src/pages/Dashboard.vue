@@ -78,6 +78,7 @@ import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 import { logJournal } from '../composables/useJournal'
 import { apiService } from '../composables/Api/apiService.js'
+import { getEcritures } from '../composables/api/apiCompta'
 import { useCurrency } from '../composables/useCurrency.js'
 
 const route = useRoute()
@@ -87,6 +88,8 @@ const currentPointVente = ref(null)
 const stats = ref({
   venteTotal: 0,
   venteJour: 0,
+  achatTotal: 0,
+  benefice: 0,
   totalProduit: 0,
   stocksRupture: 0,
   variationVenteTotal: 0,
@@ -108,65 +111,42 @@ const formatNumber = (value) => {
 const loadDashboardData = async () => {
   loading.value = true
   try {
-    const pointVenteId = route.query.point_vente
-    
-    if (pointVenteId) {
-      // Charger les données du point de vente spécifique
-      const [pointVenteResponse, statsResponse] = await Promise.all([
-        apiService.get(`/api_point_vente.php?id_point_vente=${pointVenteId}`),
-        apiService.get(`/api_point_vente.php?action=stats&id_point_vente=${pointVenteId}`)
-      ])
-      
-      if (pointVenteResponse.success) {
-        currentPointVente.value = pointVenteResponse.data
-      }
-      
-      if (statsResponse.success) {
-        const data = statsResponse.data
-        // Calculer les statistiques
-        const ventesJournalieres = data.ventes_journalieres || []
-        const totalVentes = ventesJournalieres.reduce((sum, v) => sum + (parseFloat(v.chiffre_affaires) || 0), 0)
-        const venteAujourdhui = ventesJournalieres.find(v => {
-          const date = new Date(v.date)
-          const today = new Date()
-          return date.toDateString() === today.toDateString()
-        })
-        
-        stats.value = {
-          venteTotal: totalVentes,
-          venteJour: venteAujourdhui ? parseFloat(venteAujourdhui.chiffre_affaires) : 0,
-          totalProduit: 0, // À calculer depuis les produits de l'entrepôt
-          stocksRupture: 0, // À calculer depuis les produits
-          variationVenteTotal: 1.1,
-          variationVenteJour: 0.8,
-          variationProduit: 0.0,
-          variationRupture: -2.1
-        }
-      }
-    } else {
-      // Charger les données globales (par défaut)
-      currentPointVente.value = null
-      
-      // Charger les statistiques globales
-      const [productsResponse] = await Promise.all([
-        apiService.get('/api_produit.php?action=all')
-      ])
-      
-      if (productsResponse.success) {
-        const products = productsResponse.data || []
-        const stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
-        
-        stats.value = {
-          venteTotal: 0,
-          venteJour: 0,
-          totalProduit: products.length,
-          stocksRupture: stocksRupture,
-          variationVenteTotal: 1.1,
-          variationVenteJour: 0.8,
-          variationProduit: 0.0,
-          variationRupture: -2.1
-        }
-      }
+    // Récupérer l'id_entreprise
+    let id_entreprise = null
+    const user = localStorage.getItem('prostock_user')
+    if (user) {
+      id_entreprise = JSON.parse(user).id_entreprise
+    }
+    // Charger les produits pour les stats produits/stocks
+    const [productsResponse, ecrituresResponse] = await Promise.all([
+      apiService.get('/api_produit.php?action=all'),
+      id_entreprise ? getEcritures(id_entreprise) : Promise.resolve({ data: [] })
+    ])
+    let venteTotal = 0, venteJour = 0, achatTotal = 0, benefice = 0
+    if (ecrituresResponse && Array.isArray(ecrituresResponse.data)) {
+      const today = new Date().toISOString().slice(0, 10)
+      venteTotal = ecrituresResponse.data.filter(e => e.categorie === 'Vente').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+      venteJour = ecrituresResponse.data.filter(e => e.categorie === 'Vente' && e.date_ecriture === today).reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+      achatTotal = ecrituresResponse.data.filter(e => e.categorie === 'Achat').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+      benefice = venteTotal - achatTotal
+    }
+    let totalProduit = 0, stocksRupture = 0
+    if (productsResponse.success) {
+      const products = productsResponse.data || []
+      totalProduit = products.length
+      stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
+    }
+    stats.value = {
+      venteTotal,
+      venteJour,
+      achatTotal,
+      benefice,
+      totalProduit,
+      stocksRupture,
+      variationVenteTotal: 1.1,
+      variationVenteJour: 0.8,
+      variationProduit: 0.0,
+      variationRupture: -2.1
     }
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error)

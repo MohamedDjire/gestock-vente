@@ -5,10 +5,8 @@ import axios from 'axios'
  * Configure axios avec l'URL de base et les intercepteurs
  */
 
-// URL de base de l'API - À adapter selon votre configuration
-// Par défaut : https://aliadjame.com/api-stock
-// Pour override : créez un fichier .env avec VITE_API_BASE_URL=votre-url
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock'
+// URL de base de l'API - relative en dev pour proxy Vite, distante en prod
+const API_BASE_URL = import.meta.env.DEV ? '/' : (import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock')
 
 // Créer une instance axios
 const apiClient = axios.create({

@@ -1,3 +1,119 @@
+/* --- Boutons modernes Comptabilité --- */
+/* Boutons harmonisés (vert principal, hover bleu) */
+.btn-compta {
+  background: linear-gradient(90deg,#1a5f4a 0%,#34d399 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7em 1.5em;
+  font-weight: 700;
+  font-size: 1.05em;
+  box-shadow: 0 2px 8px #bbf7d033;
+  transition: background 0.18s, transform 0.18s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7em;
+}
+.btn-compta:hover {
+  background: linear-gradient(90deg,#34d399 0%,#1a5f4a 100%);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 16px #bbf7d055;
+}
+.btn-compta .btn-icon {
+  font-size: 1.2em;
+  margin-right: 0.3em;
+}
+.compta-bg {
+  background: linear-gradient(120deg,#f0fdfa 0%,#bbf7d0 100%);
+  min-height: 100vh;
+  padding-bottom: 2rem;
+}
+.compta-hero {
+  background: linear-gradient(90deg,#1a5f4a 0%,#34d399 100%);
+  border-radius: 0 0 32px 32px;
+  box-shadow: 0 4px 24px #bbf7d033;
+  padding: 2.5rem 2rem 2rem 2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+}
+.hero-content h1 {
+  font-size: 2.5rem;
+  color: #166534;
+  font-weight: 900;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+.hero-icon {
+  font-size: 2.5rem;
+  margin-right: 1rem;
+}
+.hero-desc {
+  color: #34d399;
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+.compta-section {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 2px 12px 0 rgba(52,211,153,0.07);
+  padding: 2.2rem 2.5rem;
+  margin-bottom: 2.5rem;
+  border: 1.5px solid #bbf7d0;
+}
+/* --- Design Comptabilité Modernisé --- */
+.compta-bg {
+  background: linear-gradient(120deg,#f0fdfa 0%,#e0f2fe 100%);
+  min-height: 100vh;
+  padding-bottom: 2rem;
+}
+.compta-hero {
+  background: linear-gradient(90deg,#bae6fd 0%,#f0fdfa 100%);
+  border-radius: 0 0 32px 32px;
+  box-shadow: 0 4px 24px #bae6fd33;
+  padding: 2.5rem 2rem 2rem 2rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+}
+.hero-content h1 {
+  font-size: 2.5rem;
+  color: #1a5f4a;
+  font-weight: 900;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+.hero-icon {
+  font-size: 2.5rem;
+  margin-right: 1rem;
+}
+.hero-desc {
+  color: #2563eb;
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+.hero-actions {
+  display: flex;
+  align-items: center;
+}
+.compta-section {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 2px 12px 0 rgba(26,95,74,0.07);
+  padding: 2.2rem 2.5rem;
+  margin-bottom: 2.5rem;
+  border: 1.5px solid #f0f0f0;
+}
+@media (max-width: 900px) {
+  .compta-hero { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+  .compta-section { padding: 1.2rem 0.7rem; }
+}
 /* Style unifié pour la modale user-modal (section utilisateurs) */
 /* Correction : scroll uniquement sur le corps, footer toujours visible */
 .modal-content.user-modal {

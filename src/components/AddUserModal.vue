@@ -8,36 +8,42 @@
       </div>
       <div class="modal-body">
         <form @submit.prevent="handleSubmit" class="user-form" id="add-user-form">
-                  <div class="form-group">
-                    <label>Photo</label>
-                    <input type="file" accept="image/*" @change="onPhotoChange" />
-                    <div v-if="uploadingPhoto" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
-                    <div v-if="photoUrl" style="margin-top:0.5em;"><img :src="photoUrl" alt="Photo utilisateur" style="max-width:80px;border-radius:8px;" /></div>
-                    <div v-if="photoError" style="color:#dc2626;font-size:0.95em;">{{ photoError }}</div>
-                  </div>
           <div class="form-group">
-            <label>Nom *</label>
-            <input v-model="user.nom" placeholder="Nom *" required />
+            <label>Photo</label>
+            <input type="file" accept="image/*" @change="onPhotoChange" />
+            <div v-if="uploadingPhoto" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
+            <div v-if="photoUrl" style="margin-top:0.5em;"><img :src="photoUrl" alt="Photo utilisateur" style="max-width:80px;border-radius:8px;" /></div>
+            <div v-if="photoError" style="color:#dc2626;font-size:0.95em;">{{ photoError }}</div>
           </div>
-          <div class="form-group">
-            <label>Prénom *</label>
-            <input v-model="user.prenom" placeholder="Prénom *" required />
-          </div>
-          <div class="form-group">
-            <label>Email *</label>
-            <input v-model="user.email" type="email" placeholder="Email *" required />
-          </div>
-          <div class="form-group">
-            <label>Rôle *</label>
-            <select v-model="user.role" required>
-              <option value="">Rôle *</option>
-              <option value="admin">Administrateur</option>
-              <option value="utilisateur">Utilisateur</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Mot de passe *</label>
-            <input v-model="user.password" type="password" placeholder="Mot de passe *" required />
+          <div class="form-row">
+            <div class="form-col">
+              <div class="form-group">
+                <label>Nom *</label>
+                <input v-model="user.nom" placeholder="Nom *" required />
+              </div>
+              <div class="form-group">
+                <label>Prénom *</label>
+                <input v-model="user.prenom" placeholder="Prénom *" required />
+              </div>
+              <div class="form-group">
+                <label>Email *</label>
+                <input v-model="user.email" type="email" placeholder="Email *" required />
+              </div>
+            </div>
+            <div class="form-col">
+              <div class="form-group">
+                <label>Mot de passe *</label>
+                <input v-model="user.password" type="password" placeholder="Mot de passe *" required />
+              </div>
+              <div class="form-group">
+                <label>Rôle *</label>
+                <select v-model="user.role" required>
+                  <option value="">Rôle *</option>
+                  <option value="admin">Administrateur</option>
+                  <option value="utilisateur">Utilisateur</option>
+                </select>
+              </div>
+            </div>
           </div>
           <div class="form-section">
             <h4 class="section-title">Accès & Permissions</h4>
@@ -65,6 +71,7 @@
               <span>Permissions avancées</span>
               <span>{{ showPermissions ? '▲' : '▼' }}</span>
             </div>
+
             <div v-if="showPermissions" class="accordion-body">
               <label v-for="perm in permissions" :key="perm.value" class="perm-checkbox">
                 <input type="checkbox" v-model="user.permissions" :value="perm.value" />
@@ -74,7 +81,7 @@
           </div>
           <div class="modal-actions">
             <button type="button" class="btn-cancel" @click="$emit('close')">Annuler</button>
-            <button type="submit" class="btn-save">Ajouter</button>
+            <button type="submit" class="btn-save">Valider</button>
           </div>
         </form>
       </div>
@@ -83,11 +90,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, defineEmits } from 'vue'
 import AccessSelector from './AccessSelector.vue'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
 import { uploadPhoto } from '../config/cloudinary'
+
 const photoUrl = ref('')
 const uploadingPhoto = ref(false)
 const photoError = ref('')
@@ -161,17 +169,40 @@ function handleSubmit() {
   justify-content: center;
   z-index: 1000;
 }
+
 .modal-content.user-modal {
   background: #fff;
   border-radius: 18px;
   box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
   padding: 2rem 2.5rem 1.5rem 2.5rem;
   min-width: 350px;
-  max-width: 420px;
+  max-width: 700px;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 24px;
+}
+.form-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 700px) {
+  .modal-content.user-modal {
+    max-width: 98vw;
+    padding: 1rem 0.5rem;
+  }
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
 }
 .modal-header {
   display: flex;

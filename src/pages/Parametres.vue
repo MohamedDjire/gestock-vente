@@ -5,6 +5,9 @@ import { useAuthStore } from '../stores/auth.js'
 import apiEntreprise from '../composables/api/apiEntreprise.js'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
+import ComptaSecurity from '../components/comptabilite/ComptaSecurity.vue'
+          const user = ref({})
+          const auditTrail = ref([])
 
 // --- Entrepôts et points de vente (mock, à remplacer par API si besoin) ---
 const entrepots = ref([])
@@ -151,6 +154,7 @@ function parseAccess(val) {
         <!-- <li :class="{active: section==='utilisateurs'}" @click="section='utilisateurs'">Utilisateurs</li> -->
         <li :class="{active: section==='taxes'}" @click="section='taxes'">Taxes</li>
         <li :class="{active: section==='categories'}" @click="section='categories'">Catégories produits</li>
+        <li :class="{active: section==='securite'}" @click="section='securite'">Sécurité & Audit</li>
         <li :class="{active: section==='notifications'}" @click="section='notifications'">Notifications</li>
         <li :class="{active: section==='sauvegarde'}" @click="section='sauvegarde'">Sauvegarde</li>
       </ul>
@@ -158,6 +162,10 @@ function parseAccess(val) {
     <main class="settings-content">
       <div class="settings-main-panel">
         <template v-if="section==='entreprise'">
+                  <template v-if="section==='securite'">
+                    <ComptaSecurity :user="user" :audit="auditTrail" />
+                  </template>
+          
           <h2>Paramètres de l'entreprise</h2>
           <form class="settings-form">
             <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>

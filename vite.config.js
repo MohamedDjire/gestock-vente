@@ -15,12 +15,95 @@ export default defineConfig({
   // Proxy pour contourner CORS en développement (solution alternative)
   server: {
     proxy: {
-      '/api_stock': {
-        target: 'https://aliadjame.com',
+      // Proxy local pour développement PHP local
+      '/api-stock': {
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/api_stock/, '/api_stock')
-      }
+      },
+        '/api_compta_ecritures.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/index.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_utilisateur.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_fournisseur.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_compta_factures_clients.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_compta_factures_fournisseurs.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_compta_tresorerie.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_compta_rapports.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_compta_audit.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/check_forfait.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/check_forfait_limits.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_forfait.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_produit.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_entrepot.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_point_vente.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/api_alerte.php': {
+          target: 'https://aliadjame.com/api-stock',
+          changeOrigin: true,
+          secure: false,
+        },
+        // Endpoints déjà présents plus haut
+        // '/api_compta_ecritures.php', '/api_utilisateur.php', etc.
+        // ...
     }
   }
 });

@@ -1,3 +1,9 @@
+// Fonction utilitaire simple pour la modale d’écriture : upload et retourne juste l’URL
+export async function uploadToCloudinary(file) {
+  const res = await uploadPhoto(file)
+  if (res.success && res.data && res.data.url) return res.data.url
+  throw new Error(res.message || 'Erreur upload Cloudinary')
+}
 
 import axios from 'axios'
 

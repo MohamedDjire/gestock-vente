@@ -339,6 +339,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { apiService } from '../composables/Api/apiService.js'
+import { createEcriture } from '../composables/api/apiCompta'
 import { useAuthStore } from '../stores/auth.js'
 
 const authStore = useAuthStore()
@@ -575,7 +576,31 @@ const processSale = async () => {
     if (response.success) {
       // Récupérer l'ID de la vente depuis la réponse
       const idVente = response.data?.id_vente || response.data?.ventes?.[0]?.id_vente || Date.now()
-      
+
+      // Créer une écriture comptable automatiquement
+      let id_entreprise = null
+      if (selectedPointVente.value && selectedPointVente.value.id_entreprise) {
+        id_entreprise = selectedPointVente.value.id_entreprise
+      } else {
+        // fallback: récupère depuis le localStorage si besoin
+        const user = localStorage.getItem('prostock_user')
+        if (user) {
+          id_entreprise = JSON.parse(user).id_entreprise
+        }
+      }
+      if (id_entreprise) {
+        await createEcriture({
+          date_ecriture: new Date().toISOString().slice(0, 10),
+          type_ecriture: 'Entrée',
+          montant: total.value,
+          categorie: 'Vente',
+          statut: 'validé',
+          reference: idVente,
+          details: `Vente au point de vente ${selectedPointVente.value?.nom_point_vente || ''}`,
+          id_entreprise
+        })
+      }
+
       // Créer le reçu avec toutes les informations
       lastSaleReceipt.value = {
         id_vente: idVente,
@@ -599,19 +624,19 @@ const processSale = async () => {
         remise: discount.value,
         total: total.value
       }
-      
+
       // Vider le panier automatiquement après vente réussie (sans confirmation)
       cart.value = []
       discount.value = 0
       discountValue.value = 0
       discountType.value = 'fixed'
-      
+
       // Afficher le reçu (pas d'alerte de succès, le reçu suffit)
       showReceiptModal.value = true
-      
+
       // Recharger les produits pour mettre à jour les stocks
       await loadProducts()
-      
+
       // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
     } else {
       // Erreur silencieuse, juste dans la console

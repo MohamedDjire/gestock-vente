@@ -67,31 +67,35 @@
           <button @click="closeForm" class="modal-close">×</button>
         </div>
         <div class="modal-body">
-          <form @submit.prevent="submitForm" class="user-form" style="display: flex; flex-direction: column; height: 100%;">
-            <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;">
-              <div v-if="formError" class="form-error">{{ formError }}</div>
-              <div class="form-group">
-                <label>Nom *</label>
-                <input v-model="form.nom" placeholder="Nom du fournisseur" required class="form-input" />
+          <form @submit.prevent="submitForm" class="user-form" style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;">
+            <div v-if="formError" class="form-error">{{ formError }}</div>
+            <div class="form-row">
+              <div class="form-col">
+                <div class="form-group">
+                  <label>Nom *</label>
+                  <input v-model="form.nom" placeholder="Nom du fournisseur" required class="form-input" />
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <input v-model="form.email" placeholder="Email" type="email" class="form-input" />
+                </div>
+                <div class="form-group">
+                  <label>Téléphone</label>
+                  <input v-model="form.telephone" placeholder="Téléphone" class="form-input" />
+                </div>
               </div>
-              <div class="form-group">
-                <label>Email</label>
-                <input v-model="form.email" placeholder="Email" type="email" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label>Téléphone</label>
-                <input v-model="form.telephone" placeholder="Téléphone" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label>Adresse</label>
-                <input v-model="form.adresse" placeholder="Adresse" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label>Statut</label>
-                <select v-model="form.statut" class="form-input">
-                  <option value="actif">Actif</option>
-                  <option value="inactif">Inactif</option>
-                </select>
+              <div class="form-col">
+                <div class="form-group">
+                  <label>Adresse</label>
+                  <input v-model="form.adresse" placeholder="Adresse" class="form-input" />
+                </div>
+                <div class="form-group">
+                  <label>Statut</label>
+                  <select v-model="form.statut" class="form-input">
+                    <option value="actif">Actif</option>
+                    <option value="inactif">Inactif</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div class="modal-actions" style="margin-top:auto;">
@@ -139,6 +143,41 @@
     display: flex;
     flex-direction: column;
     min-height: 420px;
+    max-width: 420px;
+    min-width: 350px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: auto;
+  }
+
+  .modal-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 24px;
+  }
+  .form-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .modal-content.user-modal {
+      max-width: 98vw;
+      padding: 1rem 0.5rem;
+    }
+    .form-row {
+      flex-direction: column;
+      gap: 0;
+    }
   }
   .modal-body {
     flex: 1;
@@ -224,6 +263,7 @@ function closeForm() {
   form.value = { nom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
   formError.value = ''
 }
+import { createEcriture } from '../composables/api/apiCompta'
 async function submitForm() {
   if (!form.value.nom) {
     formError.value = 'Le nom est obligatoire'
@@ -232,12 +272,31 @@ async function submitForm() {
   formError.value = ''
   try {
     let actionType = ''
+    let fournisseurCreated = null
     if (editingFournisseur.value) {
       await apiFournisseur.update(editingFournisseur.value.id, form.value)
       actionType = 'Modification fournisseur'
     } else {
-      await apiFournisseur.create(form.value)
+      fournisseurCreated = await apiFournisseur.create(form.value)
       actionType = 'Ajout fournisseur'
+      // Création écriture comptable automatique (achat)
+      let id_entreprise = null
+      const user = localStorage.getItem('prostock_user')
+      if (user) {
+        id_entreprise = JSON.parse(user).id_entreprise
+      }
+      if (id_entreprise) {
+        await createEcriture({
+          date_ecriture: new Date().toISOString().slice(0, 10),
+          type_ecriture: 'Sortie',
+          montant: form.value.montant || 0,
+          categorie: 'Achat',
+          statut: 'validé',
+          reference: fournisseurCreated?.id || '',
+          details: `Achat fournisseur: ${form.value.nom}`,
+          id_entreprise
+        })
+      }
     }
     await logJournal({
       user: getJournalUser(),
