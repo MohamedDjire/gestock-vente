@@ -9,7 +9,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { getEcritures } from '../composables/api/apiCompta'
+import { getEcritures } from '../composables/Api/apiCompta.js'
 let chartInstance = null
 const chartCanvas = ref(null)
 

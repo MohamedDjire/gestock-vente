@@ -322,7 +322,7 @@
 
     <!-- Modal Ajouter/Modifier Utilisateur -->
     <div v-if="showUserModal" class="modal-overlay" @click.self="closeUserModal">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content user-modal" @click.stop>
         <div class="modal-header">
           <h3>{{ editingUser ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur' }}</h3>
           <button class="modal-close" @click="closeUserModal">×</button>
@@ -409,17 +409,20 @@
 
     <!-- Modal Confirmation Suppression -->
     <div v-if="showDeleteModal" class="modal-overlay" @click.self="showDeleteModal = false">
-      <div class="modal-content confirm-modal" @click.stop>
-        <div class="modal-header">
-          <h3>⚠️ Confirmer la suppression</h3>
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">⚠️</span>
+            <h3>Confirmer la suppression</h3>
+          </div>
           <button class="modal-close" @click="showDeleteModal = false">×</button>
         </div>
         <div class="modal-body">
           <p>Êtes-vous sûr de vouloir supprimer l'utilisateur <strong>{{ userToDelete?.prenom }} {{ userToDelete?.nom }}</strong> ?</p>
-          <p class="warning-text">Cette action est irréversible.</p>
+          <p class="modal-warning">Cette action est irréversible.</p>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" @click="showDeleteModal = false">Annuler</button>
+          <button class="btn-cancel" @click="showDeleteModal = false">Annuler</button>
           <button class="btn-danger" @click="deleteUser" :disabled="deletingUser">
             {{ deletingUser ? 'Suppression...' : 'Supprimer' }}
           </button>
@@ -445,8 +448,8 @@ function triggerSnackbar(message, type = 'success') {
 import { apiService } from '../composables/Api/apiService.js'
 import { useAuthStore } from '../stores/auth.js'
 import AccessSelector from '../components/AccessSelector.vue'
-import apiEntrepot from '../composables/api/api_entrepot.js'
-import apiPointVente from '../composables/api/api_point_vente.js'
+import apiEntrepot from '../composables/Api/api_entrepot.js'
+import apiPointVente from '../composables/Api/api_point_vente.js'
 import { uploadPhoto } from '../config/cloudinary'
 import { useCurrency } from '../composables/useCurrency.js'
             const uploadingPhoto = ref(false)

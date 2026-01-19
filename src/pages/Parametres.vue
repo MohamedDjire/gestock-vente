@@ -2,9 +2,9 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
-import apiEntreprise from '../composables/api/apiEntreprise.js'
-import apiEntrepot from '../composables/api/api_entrepot.js'
-import apiPointVente from '../composables/api/api_point_vente.js'
+import apiEntreprise from '../composables/Api/apiEntreprise.js'
+import apiEntrepot from '../composables/Api/api_entrepot.js'
+import apiPointVente from '../composables/Api/api_point_vente.js'
 import ComptaSecurity from '../components/comptabilite/ComptaSecurity.vue'
           const user = ref({})
           const auditTrail = ref([])
@@ -221,8 +221,8 @@ function parseAccess(val) {
           <!-- Modale harmonisée pour ajout/édition taxe -->
           <div v-if="showTaxModal" class="modal-overlay" @click.self="closeTaxModal">
             <div class="modal-content user-modal" @click.stop>
-              <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-                <h3 style="margin:0;flex:1;text-align:center;">{{ editingTax ? 'Modifier la taxe' : 'Ajouter une taxe' }}</h3>
+              <div class="modal-header">
+                <h3>{{ editingTax ? 'Modifier la taxe' : 'Ajouter une taxe' }}</h3>
                 <button @click="closeTaxModal" class="modal-close">×</button>
               </div>
               <div class="modal-body">
@@ -235,9 +235,9 @@ function parseAccess(val) {
                     <label>Taux (%)</label>
                     <input v-model="taxForm.taux" type="number" min="0" max="100" required placeholder="Ex: 18" />
                   </div>
-                  <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:1rem;">
+                  <div class="modal-actions">
                     <button type="button" @click="closeTaxModal" class="btn-cancel">Annuler</button>
-                    <button type="submit" class="btn-save" style="background:#10b981;">Valider</button>
+                    <button type="submit" class="btn-save">Valider</button>
                   </div>
                 </form>
               </div>

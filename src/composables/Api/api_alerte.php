@@ -231,9 +231,42 @@ function deleteAlerte($bdd, $alerteId, $enterpriseId) {
 }
 
 /**
+ * Supprimer les alertes devenues obsolètes (produit réapprovisionné au-dessus du seuil)
+ * - rupture : supprimer si quantite_stock > 0
+ * - stock_faible : supprimer si quantite_stock > COALESCE(seuil_minimum, 0)
+ * - expiration : supprimer si date_expiration est null ou au-delà de 7 jours
+ */
+function cleanObsoleteAlertes($bdd, $enterpriseId) {
+    // Rupture : produit réapprovisionné (stock > 0)
+    $bdd->prepare("
+        DELETE a FROM stock_alerte a
+        INNER JOIN stock_produit p ON a.id_produit = p.id_produit AND a.id_entreprise = p.id_entreprise
+        WHERE a.id_entreprise = :eid AND a.type_alerte = 'rupture' AND p.quantite_stock > 0
+    ")->execute(['eid' => $enterpriseId]);
+
+    // Stock faible : produit au-dessus du seuil
+    $bdd->prepare("
+        DELETE a FROM stock_alerte a
+        INNER JOIN stock_produit p ON a.id_produit = p.id_produit AND a.id_entreprise = p.id_entreprise
+        WHERE a.id_entreprise = :eid AND a.type_alerte = 'stock_faible' AND p.quantite_stock > COALESCE(p.seuil_minimum, 0)
+    ")->execute(['eid' => $enterpriseId]);
+
+    // Expiration : plus dans la fenêtre 7 jours
+    $bdd->prepare("
+        DELETE a FROM stock_alerte a
+        INNER JOIN stock_produit p ON a.id_produit = p.id_produit AND a.id_entreprise = p.id_entreprise
+        WHERE a.id_entreprise = :eid AND a.type_alerte = 'expiration'
+        AND (p.date_expiration IS NULL OR p.date_expiration > DATE_ADD(CURDATE(), INTERVAL 7 DAY))
+    ")->execute(['eid' => $enterpriseId]);
+}
+
+/**
  * Générer automatiquement les alertes pour tous les produits
  */
 function generateAlertes($bdd, $enterpriseId) {
+    // D'abord supprimer les alertes devenues obsolètes (produit réapprovisionné, etc.)
+    cleanObsoleteAlertes($bdd, $enterpriseId);
+
     // Alertes de rupture
     $ruptureStmt = $bdd->prepare("
         SELECT id_produit, nom, quantite_stock

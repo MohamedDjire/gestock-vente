@@ -92,8 +92,8 @@
 <script setup>
 import { ref, reactive, onMounted, defineEmits } from 'vue'
 import AccessSelector from './AccessSelector.vue'
-import apiEntrepot from '../composables/api/api_entrepot.js'
-import apiPointVente from '../composables/api/api_point_vente.js'
+import apiEntrepot from '../composables/Api/api_entrepot.js'
+import apiPointVente from '../composables/Api/api_point_vente.js'
 import { uploadPhoto } from '../config/cloudinary'
 
 const photoUrl = ref('')
@@ -160,27 +160,10 @@ function handleSubmit() {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
+/* .modal-overlay, .modal-header, .modal-close, .modal-actions, .btn-cancel, .btn-save : style.css */
 .modal-content.user-modal {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
-  padding: 2rem 2.5rem 1.5rem 2.5rem;
-  min-width: 350px;
   max-width: 700px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
+  min-width: 350px;
 }
 
 .form-row {
@@ -197,30 +180,11 @@ function handleSubmit() {
 @media (max-width: 700px) {
   .modal-content.user-modal {
     max-width: 98vw;
-    padding: 1rem 0.5rem;
   }
   .form-row {
     flex-direction: column;
     gap: 0;
   }
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.modal-header h3 {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #218c6a;
-}
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.7rem;
-  color: #888;
-  cursor: pointer;
 }
 .modal-row {
   display: flex;
@@ -262,31 +226,5 @@ function handleSubmit() {
   align-items: center;
   gap: 0.5em;
   font-size: 0.98rem;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.2rem;
-}
-.btn-cancel, .btn-save {
-  padding: 0.6rem 1.2rem;
-  border-radius: 7px;
-  border: none;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-cancel {
-  background: #e5e7eb;
-  color: #1a2a2a;
-}
-.btn-save {
-  background: #218c6a;
-  color: #fff;
-}
-.btn-save:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
 }
 </style>

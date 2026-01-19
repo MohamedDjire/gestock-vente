@@ -3,8 +3,9 @@
  * API Vente - Gestion des ventes
  * Endpoint: /api-stock/api_vente.php
  */
+// Capturer toute sortie parasite (BOM, espaces de includes) avant le JSON
+ob_start();
 
-// Activer la gestion des erreurs et définir les headers CORS AVANT TOUT
 // Désactiver l'affichage des erreurs pour éviter qu'elles polluent la réponse JSON
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
@@ -28,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // =====================================================
 $dbFile = __DIR__ . '/config/database.php';
 if (!file_exists($dbFile)) {
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode([
         'success' => false, 
@@ -40,6 +42,7 @@ if (!file_exists($dbFile)) {
 require_once $dbFile;
 
 if (!function_exists('createDatabaseConnection')) {
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode([
         'success' => false, 
@@ -52,6 +55,7 @@ if (!function_exists('createDatabaseConnection')) {
 try {
     $bdd = createDatabaseConnection();
 } catch (PDOException $e) {
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode([
         'success' => false, 
@@ -70,6 +74,7 @@ if (!file_exists($middlewareFile)) {
 }
 
 if (!file_exists($middlewareFile)) {
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode([
         'success' => false, 
@@ -82,6 +87,7 @@ if (!file_exists($middlewareFile)) {
 require_once $middlewareFile;
 
 if (!function_exists('authenticateAndAuthorize')) {
+    if (ob_get_level()) ob_end_clean();
     http_response_code(500);
     echo json_encode([
         'success' => false, 
@@ -94,12 +100,14 @@ if (!function_exists('authenticateAndAuthorize')) {
 // Authentifier l'utilisateur
 try {
     $currentUser = authenticateAndAuthorize($bdd);
-    $enterpriseId = $currentUser['enterprise_id'];
-    $userId = $currentUser['id'];
-} catch (Exception $e) {
-    http_response_code(401);
+    $enterpriseId = $currentUser['enterprise_id'] ?? $currentUser['user_enterprise_id'] ?? null;
+    $userId = $currentUser['id'] ?? $currentUser['user_id'] ?? null;
+    $userRole = strtolower(trim((string)($currentUser['role'] ?? $currentUser['user_role'] ?? 'agent')));
+} catch (Throwable $e) {
+    if (ob_get_level()) ob_end_clean();
+    http_response_code($e->getCode() === 403 ? 403 : 401);
     echo json_encode([
-        'success' => false,
+        'success' => false, 
         'message' => 'Non autorisé',
         'error' => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
@@ -232,6 +240,39 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
         $remise = isset($data['remise']) ? (float)$data['remise'] : 0;
         $montantTotalFinal = $montantTotal - $remise;
 
+        // Préparer userName et details (utilisés par comptabilité et journal)
+        $userName = 'Utilisateur';
+        if ($currentUser) {
+            $nom = trim(($currentUser['nom'] ?? '') . ' ' . ($currentUser['prenom'] ?? ''));
+            $userName = !empty($nom) ? $nom : ($currentUser['email'] ?? 'Utilisateur');
+        } else {
+            $stmtUser = $bdd->prepare("SELECT nom, prenom, email FROM stock_utilisateur WHERE id_utilisateur = :id");
+            $stmtUser->execute(['id' => $userId]);
+            $userData = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            if ($userData) {
+                $nom = trim(($userData['nom'] ?? '') . ' ' . ($userData['prenom'] ?? ''));
+                $userName = !empty($nom) ? $nom : ($userData['email'] ?? 'Utilisateur');
+            }
+        }
+        $pointVenteName = 'Point de vente inconnu';
+        $stmtPv = $bdd->prepare("SELECT nom_point_vente FROM stock_point_vente WHERE id_point_vente = :id");
+        $stmtPv->execute(['id' => $idPointVente]);
+        $pvData = $stmtPv->fetch(PDO::FETCH_ASSOC);
+        if ($pvData && !empty($pvData['nom_point_vente'])) {
+            $pointVenteName = $pvData['nom_point_vente'];
+        }
+        $produitsList = [];
+        foreach ($ventesCreees as $vente) {
+            $produitsList[] = sprintf("%s (x%d)", $vente['produit_nom'] ?? 'Produit', $vente['quantite'] ?? 0);
+        }
+        $details = sprintf(
+            "Point de vente: %s | Produits: %s | Total: %s FCFA%s",
+            $pointVenteName,
+            implode(', ', array_slice($produitsList, 0, 5)) . (count($produitsList) > 5 ? sprintf(' et %d autre(s)', count($produitsList) - 5) : ''),
+            number_format($montantTotalFinal, 0, ',', ' '),
+            $remise > 0 ? sprintf(" | Remise: %s FCFA", number_format($remise, 0, ',', ' ')) : ""
+        );
+
         // Enregistrer une écriture comptable automatique
         try {
             $sqlEcriture = "INSERT INTO stock_compta_ecritures (date_ecriture, type_ecriture, montant, user, categorie, moyen_paiement, statut, reference, piece_jointe, commentaire, details, id_entreprise) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -256,49 +297,6 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
 
         // Enregistrer dans le journal
         try {
-            // Récupérer le nom complet de l'utilisateur
-            $userName = 'Utilisateur';
-            if ($currentUser) {
-                $nom = trim(($currentUser['nom'] ?? '') . ' ' . ($currentUser['prenom'] ?? ''));
-                $userName = !empty($nom) ? $nom : ($currentUser['email'] ?? 'Utilisateur');
-            } else {
-                // Récupérer le nom de l'utilisateur depuis la base
-                $stmtUser = $bdd->prepare("SELECT nom, prenom, email FROM stock_utilisateur WHERE id_utilisateur = :id");
-                $stmtUser->execute(['id' => $userId]);
-                $userData = $stmtUser->fetch(PDO::FETCH_ASSOC);
-                if ($userData) {
-                    $nom = trim(($userData['nom'] ?? '') . ' ' . ($userData['prenom'] ?? ''));
-                    $userName = !empty($nom) ? $nom : ($userData['email'] ?? 'Utilisateur');
-                }
-            }
-            
-            // Récupérer le nom du point de vente
-            $pointVenteName = 'Point de vente inconnu';
-            $stmtPv = $bdd->prepare("SELECT nom_point_vente FROM stock_point_vente WHERE id_point_vente = :id");
-            $stmtPv->execute(['id' => $idPointVente]);
-            $pvData = $stmtPv->fetch(PDO::FETCH_ASSOC);
-            if ($pvData && !empty($pvData['nom_point_vente'])) {
-                $pointVenteName = $pvData['nom_point_vente'];
-            }
-            
-            // Créer une liste détaillée des produits vendus
-            $produitsList = [];
-            foreach ($ventesCreees as $vente) {
-                $produitsList[] = sprintf(
-                    "%s (x%d)",
-                    $vente['produit_nom'] ?? 'Produit',
-                    $vente['quantite'] ?? 0
-                );
-            }
-            
-            // Format cohérent avec les autres actions du journal
-            $details = sprintf(
-                "Point de vente: %s | Produits: %s | Total: %s FCFA%s",
-                $pointVenteName,
-                implode(', ', array_slice($produitsList, 0, 5)) . (count($produitsList) > 5 ? sprintf(' et %d autre(s)', count($produitsList) - 5) : ''),
-                number_format($montantTotalFinal, 0, ',', ' '),
-                $remise > 0 ? sprintf(" | Remise: %s FCFA", number_format($remise, 0, ',', ' ')) : ""
-            );
             
             // Vérifier si la table stock_journal existe (essayer plusieurs noms possibles)
             $tableNames = ['stock_journal', 'journal'];
@@ -441,8 +439,21 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
 
 /**
  * Récupérer les ventes
+ * - Admin / superadmin : voient toutes les ventes du point de vente / entreprise.
+ * - Autres (agent, caissier, etc.) : ne voient que leurs propres ventes (v.id_user = userId).
  */
-function getVentes($bdd, $enterpriseId, $filters = []) {
+function getVentes($bdd, $enterpriseId, $filters = [], $userId = null, $userRole = 'agent') {
+    // Si stock_vente n'existe pas, retourner un tableau vide (évite 500)
+    try {
+        $check = $bdd->query("SHOW TABLES LIKE 'stock_vente'");
+        if (!$check || !$check->fetch()) {
+            return [];
+        }
+    } catch (PDOException $e) {
+        error_log("getVentes: vérification stock_vente: " . $e->getMessage());
+        return [];
+    }
+
     $where = ["v.id_entreprise = :id_entreprise"];
     $params = ['id_entreprise' => $enterpriseId];
     
@@ -460,16 +471,28 @@ function getVentes($bdd, $enterpriseId, $filters = []) {
         $where[] = "v.id_point_vente = :id_point_vente";
         $params['id_point_vente'] = (int)$filters['id_point_vente'];
     }
+
+    // Restriction : seuls admin et superadmin voient toutes les ventes ; les autres uniquement les leurs
+    $role = strtolower(trim((string)$userRole));
+    $isAdmin = in_array($role, ['admin', 'superadmin'], true);
+    if (!$isAdmin) {
+        if ($userId !== null && $userId !== '') {
+            $where[] = "v.id_user = :id_user";
+            $params['id_user'] = (int)$userId;
+        } else {
+            // Sans id_user (token invalide), ne rien renvoyer
+            $where[] = "1 = 0";
+        }
+    }
     
     $whereClause = implode(' AND ', $where);
     
-    // Vérifier si la table stock_clients existe (avec un "s")
+    // Vérifier si stock_clients existe (JOIN optionnel)
     $clientTableExists = false;
     try {
         $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_clients'");
-        $clientTableExists = $checkTable->rowCount() > 0;
+        $clientTableExists = ($checkTable && $checkTable->fetch());
     } catch (PDOException $e) {
-        // Table n'existe pas, on continue sans
         $clientTableExists = false;
     }
     
@@ -497,10 +520,39 @@ function getVentes($bdd, $enterpriseId, $filters = []) {
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
-        error_log("Erreur SQL dans getVentes: " . $e->getMessage());
+        $msg = $e->getMessage() ?: 'Erreur SQL inconnue';
+        $orderBy = 'v.date_vente DESC';
+        if (stripos($msg, 'date_vente') !== false) {
+            $orderBy = 'v.id_vente DESC';
+        }
+        // Si stock_point_vente ou stock_utilisateur manquent (ou date_vente), réessayer sans ces JOINs
+        if (stripos($msg, 'stock_point_vente') !== false || stripos($msg, 'stock_utilisateur') !== false || stripos($msg, 'date_vente') !== false) {
+            $sqlFallback = "
+                SELECT 
+                    v.*,
+                    COALESCE(p.nom, 'Produit supprimé') AS produit_nom,
+                    COALESCE(p.code_produit, '') AS code_produit,
+                    NULL AS nom_point_vente,
+                    NULL AS client_nom, NULL AS client_prenom,
+                    NULL AS user_nom, NULL AS user_prenom
+                FROM stock_vente v
+                LEFT JOIN stock_produit p ON v.id_produit = p.id_produit
+                WHERE {$whereClause}
+                ORDER BY {$orderBy}
+                LIMIT 1000
+            ";
+            try {
+                $stmt = $bdd->prepare($sqlFallback);
+                $stmt->execute($params);
+                return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e2) {
+                error_log("getVentes fallback échoué: " . $e2->getMessage());
+            }
+        }
+        error_log("Erreur SQL dans getVentes: " . $msg);
         error_log("SQL: " . $sql);
         error_log("Params: " . print_r($params, true));
-        throw new Exception("Erreur lors de la récupération des ventes: " . $e->getMessage());
+        throw new Exception("Erreur lors de la récupération des ventes: " . $msg);
     }
 }
 
@@ -521,7 +573,7 @@ try {
                     'date_fin' => $_GET['date_fin'] ?? null,
                     'id_point_vente' => $_GET['id_point_vente'] ?? null
                 ];
-                $resultat = getVentes($bdd, $enterpriseId, $filters);
+                $resultat = getVentes($bdd, $enterpriseId, $filters, $userId, $userRole);
             } else {
                 throw new Exception("Action non valide");
             }
@@ -539,43 +591,48 @@ try {
             throw new Exception("Méthode HTTP non supportée");
     }
     
+    if (ob_get_level()) ob_end_clean();
     echo json_encode([
         'success' => true,
         'data' => $resultat
     ], JSON_UNESCAPED_UNICODE);
+    exit;
     
 } catch (PDOException $e) {
-    // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
+    if (ob_get_level()) ob_end_clean();
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
     header('Content-Type: application/json; charset=utf-8');
     
-    error_log("Erreur PDO dans api_vente.php: " . $e->getMessage());
+    $errMsg = $e->getMessage() ?: 'Erreur de base de données';
+    error_log("Erreur PDO dans api_vente.php: " . $errMsg);
     error_log("Trace: " . $e->getTraceAsString());
     
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Erreur de base de données',
-        'error' => $e->getMessage()
+        'message' => 'Erreur de base de données: ' . $errMsg,
+        'error' => $errMsg
     ], JSON_UNESCAPED_UNICODE);
     exit;
-} catch (Exception $e) {
-    // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
+} catch (Throwable $e) {
+    if (ob_get_level()) ob_end_clean();
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
     header('Content-Type: application/json; charset=utf-8');
     
-    error_log("Erreur dans api_vente.php: " . $e->getMessage());
+    $errMsg = $e->getMessage() ?: 'Erreur inconnue';
+    error_log("Erreur dans api_vente.php: " . $errMsg);
     error_log("Trace: " . $e->getTraceAsString());
     
-    http_response_code($e->getCode() ?: 500);
+    $code = $e->getCode();
+    http_response_code((is_int($code) && $code >= 400 && $code < 600) ? $code : 500);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage(),
-        'error' => $e->getMessage()
+        'message' => $errMsg,
+        'error' => $errMsg
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }

@@ -431,28 +431,33 @@
     </div>
 
     <!-- Confirmations -->
-    <div v-if="confirmation.show" class="confirmation-overlay" @click.self="closeConfirmation">
-      <div class="confirmation-modal">
-        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-          <h3 style="margin:0;flex:1;">{{ confirmation.title }}</h3>
+    <div v-if="confirmation.show" class="modal-overlay" @click.self="closeConfirmation">
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">{{ confirmation.icon || '⚠️' }}</span>
+            <h3>{{ confirmation.title }}</h3>
+          </div>
           <button @click="closeConfirmation" class="modal-close">×</button>
         </div>
         <div class="modal-body">
           <p>{{ confirmation.message }}</p>
         </div>
-        <div class="confirmation-actions">
-          <button @click="closeConfirmation" class="btn-secondary">Annuler</button>
-          <button @click="confirmAction" class="btn-primary" style="background:#dc2626;">Confirmer</button>
+        <div class="modal-actions">
+          <button @click="closeConfirmation" class="btn-cancel">Annuler</button>
+          <button @click="confirmAction" class="btn-danger">Confirmer</button>
         </div>
       </div>
     </div>
     </template>
 
-    <!-- Vue Agent : Gestion des ventes, livraisons, commandes -->
+    <!-- Vue Agent : Gestion des ventes, livraisons, commandes (ou Historique pour admin via ?point_vente=) -->
     <template v-else>
       <div class="agent-point-vente-page">
         <div class="agent-header">
+          <button v-if="isAdmin && $route.query.point_vente" @click="router.push('/point-vente')" class="btn-back-to-list">
+            ← Retour à la liste
+          </button>
           <h2 class="dashboard-title">{{ currentPointVente?.nom_point_vente || 'Chargement...' }}</h2>
           <div class="agent-stats-cards">
             <div class="agent-stat-card">
@@ -752,7 +757,7 @@
 
     <!-- Modale Livraison -->
     <div v-if="showLivraisonModal" class="modal-overlay" @click.self="closeLivraisonModal">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content point-vente-modal" @click.stop>
         <div class="modal-header">
           <h3>Nouvelle Livraison</h3>
           <button @click="closeLivraisonModal" class="modal-close">×</button>
@@ -786,7 +791,7 @@
 
     <!-- Modale Commande -->
     <div v-if="showCommandeModal" class="modal-overlay" @click.self="closeCommandeModal">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content point-vente-modal" @click.stop>
         <div class="modal-header">
           <h3>Nouvelle Commande</h3>
           <button @click="closeCommandeModal" class="modal-close">×</button>
@@ -830,7 +835,7 @@
 
     <!-- Modale Retour -->
     <div v-if="showRetourModal" class="modal-overlay" @click.self="closeRetourModal">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content point-vente-modal" @click.stop>
         <div class="modal-header">
           <h3>Nouveau Retour</h3>
           <button @click="closeRetourModal" class="modal-close">×</button>
@@ -1013,13 +1018,14 @@
 import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
 import { useAuthStore } from '../stores/auth'
 const authStore = useAuthStore()
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
 
 const router = useRouter()
+const route = useRoute()
 
 const { formatPrice: formatCurrency } = useCurrency()
 
@@ -1211,6 +1217,7 @@ const formatDate = (dateString) => {
   if (!dateString) return '—'
   const date = new Date(dateString)
   return date.toLocaleString('fr-FR', { 
+    weekday: 'long',
     day: '2-digit', 
     month: '2-digit', 
     year: 'numeric',
@@ -1266,8 +1273,9 @@ const loadAgentPointVente = async () => {
     console.log('Réponse points de vente:', pointsVenteResponse)
     
     if (pointsVenteResponse && pointsVenteResponse.success && pointsVenteResponse.data && pointsVenteResponse.data.length > 0) {
-      // Prendre le premier point de vente disponible pour cet utilisateur
-      const pointVente = pointsVenteResponse.data[0]
+      // Si ?point_vente= est dans l'URL (ex. depuis "Historique" dans Ventes), utiliser ce point s'il est dans la liste
+      const idQuery = route.query.point_vente ? parseInt(route.query.point_vente) : null
+      const pointVente = (idQuery && pointsVenteResponse.data.find(p => p.id_point_vente == idQuery)) || pointsVenteResponse.data[0]
       const pointVenteId = pointVente.id_point_vente
       
       console.log('Point de vente trouvé:', pointVente)
@@ -1847,8 +1855,8 @@ const processSaleFromModal = async () => {
       await loadSaleProducts()
       
       // Recharger les autres données en arrière-plan
-      loadAgentVentes()
-      loadAgentPointVente()
+      await loadAgentVentes()
+      await loadAgentPointVente()
       
       // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
       console.log('=== processSaleFromModal SUCCÈS ===')
@@ -2264,18 +2272,46 @@ function getJournalUser() {
   return 'inconnu';
 }
 
-// Watcher pour recharger les données quand on change d'onglet (agent)
-watch(activeAgentTab, (newTab) => {
-  if (!isAdmin.value) {
-    if (newTab === 'ventes') loadAgentVentes()
-    else if (newTab === 'livraisons') loadAgentLivraisons()
-    else if (newTab === 'commandes') loadAgentCommandes()
-    else if (newTab === 'retours') loadAgentRetours()
+// Quand un admin arrive avec ?point_vente= (sans remontage, ex. depuis Historique dans Ventes)
+watch(() => route.query.point_vente, async (id) => {
+  if (!isAdmin.value || !id) return
+  try {
+    const r = await apiService.get(`/api_point_vente.php?id_point_vente=${id}`)
+    if (r && r.success && r.data) {
+      currentPointVente.value = r.data
+    } else {
+      currentPointVente.value = { id_point_vente: parseInt(id), nom_point_vente: 'Point de vente' }
+    }
+    loadAgentVentes()
+  } catch {
+    currentPointVente.value = { id_point_vente: parseInt(id), nom_point_vente: 'Point de vente' }
+    loadAgentVentes()
   }
 })
 
+// Watcher pour recharger les données quand on change d'onglet (agent ou admin en mode historique)
+watch(activeAgentTab, (newTab) => {
+  if (newTab === 'ventes' && currentPointVente.value) loadAgentVentes()
+  else if (newTab === 'livraisons' && currentPointVente.value) loadAgentLivraisons()
+  else if (newTab === 'commandes' && currentPointVente.value) loadAgentCommandes()
+  else if (newTab === 'retours' && currentPointVente.value) loadAgentRetours()
+})
+
 onMounted(async () => {
-  if (isAdmin.value) {
+  if (isAdmin.value && route.query.point_vente) {
+    // Admin : afficher l'historique du point via ?point_vente=ID (depuis "Historique" dans Ventes)
+    try {
+      const r = await apiService.get(`/api_point_vente.php?id_point_vente=${route.query.point_vente}`)
+      if (r && r.success && r.data) {
+        currentPointVente.value = r.data
+      } else {
+        currentPointVente.value = { id_point_vente: parseInt(route.query.point_vente), nom_point_vente: 'Point de vente' }
+      }
+    } catch {
+      currentPointVente.value = { id_point_vente: parseInt(route.query.point_vente), nom_point_vente: 'Point de vente' }
+    }
+    loadAgentVentes()
+  } else if (isAdmin.value) {
     loadEntrepots()
     loadPointsVente()
   } else {
@@ -2291,7 +2327,7 @@ onMounted(async () => {
 
 // Recharger les ventes quand on revient sur la page (si on est sur l'onglet ventes)
 onActivated(() => {
-  if (!isAdmin.value && activeAgentTab.value === 'ventes' && currentPointVente.value) {
+  if (activeAgentTab.value === 'ventes' && currentPointVente.value) {
     loadAgentVentes()
   }
 })
@@ -2790,47 +2826,6 @@ onActivated(() => {
   font-weight: 600;
 }
 
-/* Confirmations */
-.confirmation-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.confirmation-modal {
-  background: white;
-  border-radius: 16px;
-  padding: 2rem;
-  min-width: 400px;
-  max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-}
-
-.confirmation-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: #1a5f4a;
-}
-
-.confirmation-message {
-  margin-bottom: 1.5rem;
-  color: #6b7280;
-}
-
-.confirmation-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
 /* Dashboard des Ventes */
 .ventes-dashboard {
   background: #ffffff;
@@ -2931,6 +2926,22 @@ onActivated(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.btn-back-to-list {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid #10b981;
+  color: #1a5f4a;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn-back-to-list:hover {
+  background: #f0fdf4;
 }
 
 .agent-stats-cards {

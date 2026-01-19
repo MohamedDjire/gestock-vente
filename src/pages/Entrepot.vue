@@ -490,8 +490,8 @@
                   :class="mouvement.type"
                 >
                   <div class="mouvement-header">
-                    <span class="mouvement-type-badge" :class="mouvement.type">
-                      {{ mouvement.type === 'entree' ? '➕ Entrée' : '➖ Sortie' }}
+                    <span class="mouvement-type-badge" :class="[mouvement.type, mouvement.type_sortie]">
+                      {{ mouvement.type === 'entree' ? '➕ Entrée' : (mouvement.type_sortie === 'transfert' ? '↔️ Transfert' : '➖ ' + (getSortieTypeLabel(mouvement.type_sortie) || 'Sortie')) }}
                     </span>
                     <span class="mouvement-date">{{ formatDate(mouvement.date) }}</span>
                   </div>
@@ -503,7 +503,7 @@
                     <div class="mouvement-info">
                       <span>Quantité: <strong>{{ mouvement.quantite }}</strong></span>
                       <span v-if="mouvement.type_sortie">Type: <strong>{{ getSortieTypeLabel(mouvement.type_sortie) }}</strong></span>
-                      <span v-if="mouvement.entrepot_destination">Vers: <strong>{{ mouvement.entrepot_destination }}</strong></span>
+                      <span v-if="mouvement.entrepot_destination">→ Vers: <strong>{{ mouvement.entrepot_destination }}</strong></span>
                     </div>
                     <div v-if="mouvement.motif || mouvement.notes" class="mouvement-notes">
                       {{ mouvement.motif || mouvement.notes }}
@@ -541,7 +541,7 @@
               </option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" v-if="isAdmin">
             <label>Point de Vente Destination *</label>
             <select v-model="sortieFormData.point_vente_destination" required class="form-input">
               <option value="">Sélectionner un point de vente</option>
@@ -553,6 +553,17 @@
                 {{ pv.nom_point_vente }}
               </option>
             </select>
+          </div>
+          <div class="form-group" v-else>
+            <label>Point de Vente Destination</label>
+            <input 
+              type="text" 
+              :value="agentPointsVente.find(pv => pv.id_point_vente === sortieFormData.point_vente_destination)?.nom_point_vente || 'Non défini'"
+              class="form-input"
+              disabled
+              readonly
+            />
+            <small class="form-hint">Votre point de vente assigné</small>
           </div>
           <div class="form-group">
             <label>Quantité *</label>
@@ -589,10 +600,12 @@
 
     <!-- Confirmations -->
     <div v-if="confirmation.show" class="modal-overlay" @click.self="closeConfirmation">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-          <h3 style="margin:0;flex:1;">{{ confirmation.title }}</h3>
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">{{ confirmation.icon || '⚠️' }}</span>
+            <h3>{{ confirmation.title }}</h3>
+          </div>
           <button @click="closeConfirmation" class="modal-close">×</button>
         </div>
         <div class="modal-body">
@@ -600,7 +613,7 @@
         </div>
         <div class="modal-actions">
           <button @click="closeConfirmation" class="btn-cancel">Annuler</button>
-          <button @click="confirmAction" class="btn-save" style="background:#dc2626;">Confirmer</button>
+          <button @click="confirmAction" class="btn-save btn-danger">Confirmer</button>
         </div>
       </div>
     </div>
@@ -1205,15 +1218,28 @@ const formatDate = (dateString) => {
 // Fonctions pour la modale de sortie
 const openSortieModal = async () => {
   showSortieModal.value = true
-  sortieFormData.value = {
-    id_produit: null,
-    quantite: 1,
-    type_sortie: 'transfert',
-    motif: '',
-    point_vente_destination: null
-  }
   // Charger les points de vente de l'agent
   await loadAgentPointsVente()
+  
+  // Si l'utilisateur n'est pas admin, sélectionner automatiquement son point de vente
+  if (!isAdmin.value && agentPointsVente.value.length > 0) {
+    sortieFormData.value = {
+      id_produit: null,
+      quantite: 1,
+      type_sortie: 'transfert',
+      motif: '',
+      point_vente_destination: agentPointsVente.value[0].id_point_vente
+    }
+  } else {
+    // Pour l'admin, laisser le choix
+    sortieFormData.value = {
+      id_produit: null,
+      quantite: 1,
+      type_sortie: 'transfert',
+      motif: '',
+      point_vente_destination: null
+    }
+  }
 }
 
 const closeSortieModal = () => {
@@ -2114,72 +2140,7 @@ onMounted(() => {
   transform: scale(1.1);
 }
 
-/* Modals */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
-.details-modal {
-  max-width: 900px;
-}
-
-.rapport-modal {
-  max-width: 900px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  color: #1a5f4a;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 2rem;
-  cursor: pointer;
-  color: #6b7280;
-  line-height: 1;
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-}
+/* Modals : styles de base dans style.css (.modal-overlay, .modal-content, .modal-header, .modal-close, .modal-body, .modal-footer, .modal-actions) */
 
 .form-group {
   margin-bottom: 1rem;
@@ -2276,29 +2237,6 @@ onMounted(() => {
   width: 100%;
 }
 
-/* Confirmations */
-.confirmation-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.confirmation-modal {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
 /* Product Form Styles */
 .product-form {
   padding: 1.5rem;
@@ -2360,15 +2298,6 @@ onMounted(() => {
   font-weight: 700;
   color: #1a5f4a;
   margin-bottom: 1rem;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
 }
 
 .btn-cancel {

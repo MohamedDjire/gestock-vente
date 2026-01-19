@@ -1,14 +1,15 @@
 <template>
   <div v-if="show" class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content user-modal" @click.stop>
+    <div class="modal-content large" @click.stop>
       <div class="modal-header">
         <h3>{{ entry && Object.keys(entry).length ? 'Modifier une écriture' : 'Ajouter une écriture' }}</h3>
         <button class="modal-close" @click="$emit('close')">×</button>
       </div>
       <div class="modal-body">
-        <form @submit.prevent="submit" class="user-form">
-          <div class="form-row">
-            <div class="form-col">
+        <form @submit.prevent="submit" class="modal-form">
+          <div class="form-section">
+            <h4 class="section-title">💰 Montant et type</h4>
+            <div class="form-row">
               <div class="form-group">
                 <label>Date *</label>
                 <input v-model="form.date_ecriture" type="date" required />
@@ -23,11 +24,12 @@
                   <option value="Ajustement">Ajustement</option>
                 </select>
               </div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
                 <label>Montant *</label>
-                <input v-model.number="form.montant" type="number" step="0.01" min="0" required />
+                <input v-model.number="form.montant" type="number" step="0.01" min="0" required placeholder="0.00" />
               </div>
-
               <div class="form-group">
                 <label>Catégorie</label>
                 <select v-model="form.categorie">
@@ -39,6 +41,8 @@
                   <option value="Autre">Autre</option>
                 </select>
               </div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
                 <label>Moyen de paiement</label>
                 <select v-model="form.moyen_paiement">
@@ -50,8 +54,6 @@
                   <option value="Autre">Autre</option>
                 </select>
               </div>
-            </div>
-            <div class="form-col">
               <div class="form-group">
                 <label>Statut</label>
                 <select v-model="form.statut">
@@ -61,32 +63,43 @@
                   <option value="rejeté">Rejeté</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="section-title">📎 Référence et pièce jointe</h4>
+            <div class="form-row">
               <div class="form-group">
                 <label>Référence</label>
-                <input v-model="form.reference" placeholder="Référence" />
+                <input v-model="form.reference" placeholder="Numéro ou référence" />
               </div>
               <div class="form-group">
                 <label>Pièce jointe</label>
                 <input type="file" accept="image/*" @change="onFileChange" />
                 <div v-if="form.piece_jointe" class="preview-img">
-                  <img :src="form.piece_jointe" alt="Aperçu" style="max-width:100px;max-height:100px;" />
+                  <img :src="form.piece_jointe" alt="Aperçu" />
                 </div>
-              </div>
-              <div class="form-group">
-                <label>Commentaire</label>
-                <textarea v-model="form.commentaire" placeholder="Commentaire"></textarea>
-              </div>
-              <div class="form-group">
-                <label>Détails</label>
-                <textarea v-model="form.details" placeholder="Détails"></textarea>
+                <small v-if="uploading" class="form-hint">Envoi en cours...</small>
               </div>
             </div>
           </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="$emit('close')">Annuler</button>
-            <button type="submit" class="btn-save">{{ entry && Object.keys(entry).length ? 'Modifier' : 'Ajouter' }}</button>
+
+          <div class="form-section">
+            <h4 class="section-title">📝 Commentaires</h4>
+            <div class="form-group">
+              <label>Commentaire</label>
+              <textarea v-model="form.commentaire" placeholder="Commentaire libre" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Détails</label>
+              <textarea v-model="form.details" placeholder="Détails supplémentaires" rows="2"></textarea>
+            </div>
           </div>
         </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" @click="$emit('close')">Annuler</button>
+        <button type="button" class="btn-save" @click="submit">{{ entry && Object.keys(entry).length ? 'Modifier' : 'Ajouter' }}</button>
       </div>
     </div>
   </div>
@@ -189,16 +202,8 @@ async function submit() {
 </script>
 
 <style scoped>
-.form-row {
-  display: flex;
-  gap: 24px;
-}
-
-.form-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+/* .modal-form, .form-section, .form-row, .form-group : style.css (disposition type Produit) */
+.preview-img { margin-top: 0.5rem; }
+.preview-img img { max-width: 100px; max-height: 100px; border-radius: 8px; border: 1px solid #e5e7eb; }
 </style>
 

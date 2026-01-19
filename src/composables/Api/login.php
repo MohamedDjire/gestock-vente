@@ -125,17 +125,40 @@ function loginUser($bdd, $email, $password) {
     $updateStmt->execute(['id' => $user['id_utilisateur']]);
     
     // Charger les permissions d'accès (entrepôts et points de vente) depuis les tables de liaison
-    $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
-    $stmtE->execute(['id' => $user['id_utilisateur']]);
-    $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
-    // Convertir en entiers pour éviter les problèmes de type
-    $permissions_entrepots = array_map('intval', $permissions_entrepots);
+    $permissions_entrepots = [];
+    $permissions_points_vente = [];
     
-    $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
-    $stmtPV->execute(['id' => $user['id_utilisateur']]);
-    $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
-    // Convertir en entiers pour éviter les problèmes de type
-    $permissions_points_vente = array_map('intval', $permissions_points_vente);
+    try {
+        // Essayer de charger depuis les tables de liaison
+        $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+        $stmtE->execute(['id' => $user['id_utilisateur']]);
+        $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
+        // Convertir en entiers pour éviter les problèmes de type
+        $permissions_entrepots = array_map('intval', $permissions_entrepots);
+    } catch (PDOException $e) {
+        // Si la table n'existe pas ou erreur, utiliser un tableau vide
+        error_log("⚠️ [Login] Erreur lors du chargement des permissions entrepôts: " . $e->getMessage());
+        $permissions_entrepots = [];
+    } catch (Exception $e) {
+        error_log("⚠️ [Login] Erreur lors du chargement des permissions entrepôts: " . $e->getMessage());
+        $permissions_entrepots = [];
+    }
+    
+    try {
+        // Essayer de charger depuis les tables de liaison
+        $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+        $stmtPV->execute(['id' => $user['id_utilisateur']]);
+        $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+        // Convertir en entiers pour éviter les problèmes de type
+        $permissions_points_vente = array_map('intval', $permissions_points_vente);
+    } catch (PDOException $e) {
+        // Si la table n'existe pas ou erreur, utiliser un tableau vide
+        error_log("⚠️ [Login] Erreur lors du chargement des permissions points de vente: " . $e->getMessage());
+        $permissions_points_vente = [];
+    } catch (Exception $e) {
+        error_log("⚠️ [Login] Erreur lors du chargement des permissions points de vente: " . $e->getMessage());
+        $permissions_points_vente = [];
+    }
     
     // Si les tables de liaison sont vides, essayer de lire depuis le JSON (fallback)
     if (empty($permissions_entrepots)) {

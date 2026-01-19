@@ -1,5 +1,5 @@
-// src/composables/api/apiCompta.js
-import { apiService } from '../Api/apiService.js'
+// src/composables/Api/apiCompta.js
+import { apiService } from './apiService.js'
 
 // --- Écritures comptables ---
 export function getEcritures(id_entreprise) {

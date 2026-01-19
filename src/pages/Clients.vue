@@ -77,18 +77,20 @@
 
     <!-- Formulaire d'ajout/modification -->
     <div v-if="showAddForm || editingClient" class="modal-overlay" @click.self="closeForm">
-      <div class="modal-content user-modal" @click.stop>
+      <div class="modal-content large" @click.stop>
         <div class="modal-header">
           <h3>{{ editingClient ? 'Modifier' : 'Ajouter' }} un client</h3>
           <button @click="closeForm" class="modal-close">×</button>
         </div>
         <div class="modal-body">
-          <form @submit.prevent="submitForm" class="user-form" style="display: flex; flex-direction: column; height: 100%;">
-            <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;">
-              <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
+          <form @submit.prevent="submitForm" class="modal-form">
+            <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
+
+            <div class="form-section">
+              <h4 class="section-title">👤 Identité</h4>
               <div class="form-group">
                 <label>Type de client *</label>
-                <select v-model="form.type" class="form-input" required>
+                <select v-model="form.type" required>
                   <option value="particulier">Particulier</option>
                   <option value="entreprise">Entreprise</option>
                 </select>
@@ -96,54 +98,63 @@
               <div v-if="form.type === 'particulier'" class="form-row">
                 <div class="form-group">
                   <label>Nom *</label>
-                  <input v-model="form.nom" placeholder="Nom" required class="form-input" />
+                  <input v-model="form.nom" placeholder="Nom" required />
                 </div>
                 <div class="form-group">
                   <label>Prénom *</label>
-                  <input v-model="form.prenom" placeholder="Prénom" required class="form-input" />
+                  <input v-model="form.prenom" placeholder="Prénom" required />
                 </div>
               </div>
               <div v-else class="form-group">
                 <label>Nom de l'entreprise *</label>
-                <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required class="form-input" />
+                <input v-model="form.nom_entreprise" placeholder="Nom de l'entreprise" required />
+                <small class="form-hint">Raison sociale ou nom de l'entreprise</small>
               </div>
+            </div>
+
+            <div class="form-section">
+              <h4 class="section-title">📞 Coordonnées</h4>
               <div class="form-row">
                 <div class="form-group">
                   <label>Email</label>
-                  <input v-model="form.email" type="email" placeholder="email@exemple.com" class="form-input" />
+                  <input v-model="form.email" type="email" placeholder="email@exemple.com" />
                 </div>
                 <div class="form-group">
                   <label>Téléphone</label>
-                  <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" class="form-input" />
+                  <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" />
                 </div>
               </div>
               <div class="form-group">
                 <label>Adresse</label>
-                <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label>Statut</label>
-                <select v-model="form.statut" class="form-input">
-                  <option value="actif">Actif</option>
-                  <option value="inactif">Inactif</option>
-                </select>
+                <input v-model="form.adresse" placeholder="Adresse du client" />
               </div>
             </div>
-            <div class="modal-actions" style="margin-top:auto;">
-              <button type="button" @click="closeForm" class="btn-cancel">Annuler</button>
-              <button type="submit" class="btn-save btn-valider">Valider</button>
+
+            <div class="form-group">
+              <label>Statut</label>
+              <select v-model="form.statut">
+                <option value="actif">Actif</option>
+                <option value="inactif">Inactif</option>
+              </select>
+              <small class="form-hint">Un client inactif n'apparaît pas dans les listes de sélection</small>
             </div>
           </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" @click="closeForm" class="btn-cancel">Annuler</button>
+          <button type="button" @click="submitForm" class="btn-save">Valider</button>
         </div>
       </div>
     </div>
 
-    <!-- Modale de suppression harmonisée (structure identique à Fournisseurs) -->
+    <!-- Modale de suppression -->
     <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-          <h3 style="margin:0;flex:1;">Confirmer la suppression</h3>
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">⚠️</span>
+            <h3>Confirmer la suppression</h3>
+          </div>
           <button @click="closeDeleteModal" class="modal-close">×</button>
         </div>
         <div class="modal-body">
@@ -151,82 +162,24 @@
             <span v-if="clientToDelete?.type === 'entreprise'">Entreprise : <b>{{ clientToDelete.nom_entreprise }}</b></span>
             <span v-else>Client : <b>{{ clientToDelete.nom }} {{ clientToDelete.prenom }}</b></span>
           </p>
-          <p style="color:#dc2626;font-weight:600;">Cette action est irréversible.</p>
+          <p class="modal-warning">Cette action est irréversible.</p>
         </div>
         <div class="modal-actions">
           <button @click="closeDeleteModal" class="btn-cancel">Annuler</button>
-          <button @click="confirmDeleteClient" class="btn-save" style="background:#dc2626;">Supprimer</button>
+          <button @click="confirmDeleteClient" class="btn-danger">Supprimer</button>
         </div>
       </div>
     </div>
   </div>
 </template>
 <style scoped>
-  /* Bouton Valider couleur verte */
-  .btn-valider {
-    background: #22c55e !important;
-    color: #fff !important;
-    border: none;
-    transition: background 0.2s;
-  }
-  .btn-valider:hover {
-    background: #16a34a !important;
-  }
-  /* Modal actions toujours en bas */
-  .modal-content.user-modal {
-    display: flex;
-    flex-direction: column;
-    min-height: 420px;
-  }
-  .modal-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: auto;
-    padding-top: 1.5rem;
-    background: none;
-  }
-  /* ...existing code... */
-  .btn-cancel {
-    background: #e5e7eb;
-    color: #1a1a1a;
-    border: none;
-    border-radius: 8px;
-    padding: 0.5rem 1.25rem;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .btn-cancel:hover {
-    background: #d1d5db;
-  }
-  .btn-danger {
-    background: #dc2626;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 0.5rem 1.25rem;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .btn-danger:hover {
-    background: #991b1b;
-  }
+  /* Styles modale et formulaires : style.css (modal-form, form-section, btn-cancel, btn-save, btn-danger) */
 </style>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { logJournal } from '../composables/useJournal'
-import apiClient from '../composables/api/apiClient'
+import apiClient from '../composables/Api/apiClient.js'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -771,85 +724,7 @@ const getJournalUser = () => {
   color: #1f2937;
 }
 
-.modal-form {
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background: #f9fafb;
-  border-radius: 10px;
-  padding: 1rem 1.2rem;
-  margin-bottom: 1.1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-}
-
-.form-group label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #374151;
-}
-
-.form-input {
-  padding: 0.8rem 1.1rem;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
-  font-size: 1.1rem;
-  background: #fff;
-  transition: border-color 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: #1a5f4a;
-  box-shadow: 0 0 0 3px rgba(26, 95, 74, 0.1);
-}
-
-.user-form .form-group input,
-.user-form .form-group select,
-.user-form .form-group textarea,
-.modal-form .form-group input,
-.modal-form .form-group select,
-.modal-form .form-group textarea {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  font-size: 1.1rem;
-  padding: 0.8rem 1.1rem;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
-  background: #f9fafb;
-  transition: border-color 0.2s;
-}
-/* Focus style unique et correct */
-.user-form .form-group input:focus,
-.user-form .form-group select:focus,
-.user-form .form-group textarea:focus,
-.modal-form .form-group input:focus,
-.modal-form .form-group select:focus,
-.modal-form .form-group textarea:focus {
-  border-color: #1a5f4a;
-  box-shadow: 0 0 0 3px rgba(26, 95, 74, 0.08);
-  outline: none;
-}
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-}
+/* .modal-form, .form-row, .form-group, .modal-footer : style.css (disposition type Produit) */
 
 @media (max-width: 1100px) {
   .main-content {

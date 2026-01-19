@@ -1,7 +1,10 @@
 /**
  * Composable pour gérer le localStorage
  * Gère le stockage et la récupération des données utilisateur et du token
+ * Utilise safeStorage pour éviter les erreurs si "Tracking Prevention" bloque l'accès.
  */
+
+import { getLocalStorage, setLocalStorage, removeLocalStorage } from '../../utils/safeStorage.js'
 
 export function useStorage() {
   const STORAGE_KEYS = {
@@ -15,9 +18,9 @@ export function useStorage() {
    */
   const setToken = (token) => {
     if (token) {
-      localStorage.setItem(STORAGE_KEYS.TOKEN, token)
+      setLocalStorage(STORAGE_KEYS.TOKEN, token)
     } else {
-      localStorage.removeItem(STORAGE_KEYS.TOKEN)
+      removeLocalStorage(STORAGE_KEYS.TOKEN)
     }
   }
 
@@ -25,7 +28,7 @@ export function useStorage() {
    * Récupérer le token d'authentification
    */
   const getToken = () => {
-    return localStorage.getItem(STORAGE_KEYS.TOKEN)
+    return getLocalStorage(STORAGE_KEYS.TOKEN)
   }
 
   /**
@@ -33,9 +36,9 @@ export function useStorage() {
    */
   const setUser = (user) => {
     if (user) {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
+      setLocalStorage(STORAGE_KEYS.USER, JSON.stringify(user))
     } else {
-      localStorage.removeItem(STORAGE_KEYS.USER)
+      removeLocalStorage(STORAGE_KEYS.USER)
     }
   }
 
@@ -43,7 +46,7 @@ export function useStorage() {
    * Récupérer les informations utilisateur
    */
   const getUser = () => {
-    const userStr = localStorage.getItem(STORAGE_KEYS.USER)
+    const userStr = getLocalStorage(STORAGE_KEYS.USER)
     if (userStr) {
       try {
         return JSON.parse(userStr)
@@ -61,9 +64,9 @@ export function useStorage() {
   const setExpiresAt = (expiresIn) => {
     if (expiresIn) {
       const expiresAt = Date.now() + (expiresIn * 1000)
-      localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt.toString())
+      setLocalStorage(STORAGE_KEYS.EXPIRES_AT, expiresAt.toString())
     } else {
-      localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT)
+      removeLocalStorage(STORAGE_KEYS.EXPIRES_AT)
     }
   }
 
@@ -71,7 +74,7 @@ export function useStorage() {
    * Vérifier si le token est expiré
    */
   const isTokenExpired = () => {
-    const expiresAt = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT)
+    const expiresAt = getLocalStorage(STORAGE_KEYS.EXPIRES_AT)
     if (!expiresAt) return true
     return Date.now() > parseInt(expiresAt)
   }
@@ -89,9 +92,9 @@ export function useStorage() {
    * Supprimer toutes les données d'authentification
    */
   const clearAuthData = () => {
-    localStorage.removeItem(STORAGE_KEYS.TOKEN)
-    localStorage.removeItem(STORAGE_KEYS.USER)
-    localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT)
+    removeLocalStorage(STORAGE_KEYS.TOKEN)
+    removeLocalStorage(STORAGE_KEYS.USER)
+    removeLocalStorage(STORAGE_KEYS.EXPIRES_AT)
   }
 
   /**

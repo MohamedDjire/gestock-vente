@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /* --- Boutons modernes Comptabilité --- */
 /* Boutons harmonisés (vert principal, hover bleu) */
 .btn-compta {
@@ -24,48 +23,6 @@
   font-size: 1.2em;
   margin-right: 0.3em;
 }
-.compta-bg {
-  background: linear-gradient(120deg,#f0fdfa 0%,#bbf7d0 100%);
-  min-height: 100vh;
-  padding-bottom: 2rem;
-}
-.compta-hero {
-  background: linear-gradient(90deg,#1a5f4a 0%,#34d399 100%);
-  border-radius: 0 0 32px 32px;
-  box-shadow: 0 4px 24px #bbf7d033;
-  padding: 2.5rem 2rem 2rem 2rem;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 2.5rem;
-}
-.hero-content h1 {
-  font-size: 2.5rem;
-  color: #166534;
-  font-weight: 900;
-  margin: 0;
-  display: flex;
-  align-items: center;
-}
-.hero-icon {
-  font-size: 2.5rem;
-  margin-right: 1rem;
-}
-.hero-desc {
-  color: #34d399;
-  font-size: 1.1rem;
-  margin-top: 0.5rem;
-  font-weight: 500;
-}
-.compta-section {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 2px 12px 0 rgba(52,211,153,0.07);
-  padding: 2.2rem 2.5rem;
-  margin-bottom: 2.5rem;
-  border: 1.5px solid #bbf7d0;
-}
-/* --- Design Comptabilité Modernisé --- */
 .compta-bg {
   background: linear-gradient(120deg,#f0fdfa 0%,#e0f2fe 100%);
   min-height: 100vh;
@@ -131,7 +88,8 @@
   padding: 0;
   position: relative;
   overflow: hidden;
-=======
+}
+
 /* ============================================
    STYLES UNIFIÉS POUR TOUTES LES MODALES
    ============================================ */
@@ -146,7 +104,6 @@
     opacity: 1;
     transform: scale(1) translateY(0);
   }
->>>>>>> fc8e382d3fe4531c524fb054efee767a2da18f2b
 }
 
 @keyframes overlayFadeIn {
@@ -297,6 +254,93 @@
   margin-bottom: 0;
 }
 
+/* Formulaire de modale (disposition type Produit) */
+.modal-form .form-row,
+.product-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-form .form-group,
+.product-form .form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-form .form-group label,
+.product-form .form-group label {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.modal-form .form-group input,
+.modal-form .form-group select,
+.modal-form .form-group textarea,
+.product-form .form-group input,
+.product-form .form-group select,
+.product-form .form-group textarea {
+  padding: 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.modal-form .form-group input:focus,
+.modal-form .form-group select:focus,
+.modal-form .form-group textarea:focus,
+.product-form .form-group input:focus,
+.product-form .form-group select:focus,
+.product-form .form-group textarea:focus {
+  outline: none;
+  border-color: #1a5f4a;
+}
+
+.modal-form .form-section,
+.product-form .form-section {
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  background: #f6faf9;
+  border-radius: 12px;
+  border: 2px solid rgba(26, 95, 74, 0.13);
+}
+
+.modal-form .form-section > .form-group,
+.product-form .form-section > .form-group {
+  margin-bottom: 1rem;
+}
+
+.modal-form .form-section > .form-group:last-child,
+.product-form .form-section > .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.modal-form .section-title,
+.product-form .section-title {
+  margin: 0 0 1rem 0;
+  color: #1a5f4a;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.modal-form .form-hint,
+.product-form .form-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .modal-form .form-row,
+  .product-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Footer/Actions de la modale */
 .modal-footer,
 .modal-actions {
@@ -310,9 +354,10 @@
   background: #ffffff;
 }
 
-/* Styles spécifiques pour modales avec structure header/body/footer */
+/* Styles spécifiques pour modales formulaire (user, point-vente, entrepôt, etc.) */
 .modal-content.user-modal,
-.modal-content.point-vente-modal {
+.modal-content.point-vente-modal,
+.modal-content.entrepot-modal {
   max-width: 500px;
   width: 95vw;
   height: 90vh;
@@ -321,13 +366,15 @@
 }
 
 .modal-content.user-modal .modal-header,
-.modal-content.point-vente-modal .modal-header {
+.modal-content.point-vente-modal .modal-header,
+.modal-content.entrepot-modal .modal-header {
   padding: 1.5rem 2rem;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .modal-content.user-modal .modal-body,
-.modal-content.point-vente-modal .modal-body {
+.modal-content.point-vente-modal .modal-body,
+.modal-content.entrepot-modal .modal-body {
   padding: 1.5rem 2rem;
   overflow-y: auto;
   flex: 1 1 0%;
@@ -337,9 +384,63 @@
 .modal-content.user-modal .modal-footer,
 .modal-content.user-modal .modal-actions,
 .modal-content.point-vente-modal .modal-footer,
-.modal-content.point-vente-modal .modal-actions {
+.modal-content.point-vente-modal .modal-actions,
+.modal-content.entrepot-modal .modal-footer,
+.modal-content.entrepot-modal .modal-actions {
   padding: 1.5rem 2rem;
   border-top: 1px solid #e5e7eb;
+}
+
+/* Boutons de modale (annuler / sauvegarder) */
+.btn-cancel {
+  padding: 0.75rem 1.5rem;
+  border: 1.5px solid #6b7280;
+  background: #fff;
+  color: #374151;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-cancel:hover {
+  background: #f3f4f6;
+  border-color: #4b5563;
+}
+
+.btn-save {
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-save:hover:not(:disabled) {
+  background: #134e3a;
+}
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Message d'avertissement dans les modales */
@@ -352,6 +453,31 @@
   background: #fef2f2;
   border-radius: 8px;
   border-left: 3px solid #dc2626;
+}
+
+/* En-tête de modale avec icône (confirmations, etc.) */
+.modal-header-with-icon .modal-header-start {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.modal-header-with-icon .modal-header-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* Modales de confirmation / dialogue (petit format) */
+.modal-content.confirm-modal,
+.modal-content.confirmation-modal {
+  max-width: 420px;
+  width: 95vw;
+}
+
+/* Modales détails / rapport (grand format) */
+.modal-content.details-modal,
+.modal-content.rapport-modal {
+  max-width: 900px;
+  width: 95vw;
 }
 
 /* Responsive */

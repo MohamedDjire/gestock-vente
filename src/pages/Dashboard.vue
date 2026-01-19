@@ -78,7 +78,7 @@ import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 import { logJournal } from '../composables/useJournal'
 import { apiService } from '../composables/Api/apiService.js'
-import { getEcritures } from '../composables/api/apiCompta'
+import { getEcritures } from '../composables/Api/apiCompta.js'
 import { useCurrency } from '../composables/useCurrency.js'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -114,44 +114,6 @@ const formatNumber = (value) => {
 const loadDashboardData = async () => {
   loading.value = true
   try {
-<<<<<<< HEAD
-    // Récupérer l'id_entreprise
-    let id_entreprise = null
-    const user = localStorage.getItem('prostock_user')
-    if (user) {
-      id_entreprise = JSON.parse(user).id_entreprise
-    }
-    // Charger les produits pour les stats produits/stocks
-    const [productsResponse, ecrituresResponse] = await Promise.all([
-      apiService.get('/api_produit.php?action=all'),
-      id_entreprise ? getEcritures(id_entreprise) : Promise.resolve({ data: [] })
-    ])
-    let venteTotal = 0, venteJour = 0, achatTotal = 0, benefice = 0
-    if (ecrituresResponse && Array.isArray(ecrituresResponse.data)) {
-      const today = new Date().toISOString().slice(0, 10)
-      venteTotal = ecrituresResponse.data.filter(e => e.categorie === 'Vente').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-      venteJour = ecrituresResponse.data.filter(e => e.categorie === 'Vente' && e.date_ecriture === today).reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-      achatTotal = ecrituresResponse.data.filter(e => e.categorie === 'Achat').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-      benefice = venteTotal - achatTotal
-    }
-    let totalProduit = 0, stocksRupture = 0
-    if (productsResponse.success) {
-      const products = productsResponse.data || []
-      totalProduit = products.length
-      stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
-    }
-    stats.value = {
-      venteTotal,
-      venteJour,
-      achatTotal,
-      benefice,
-      totalProduit,
-      stocksRupture,
-      variationVenteTotal: 1.1,
-      variationVenteJour: 0.8,
-      variationProduit: 0.0,
-      variationRupture: -2.1
-=======
     const user = authStore.user
     let pointVenteId = route.query.point_vente
     
@@ -237,7 +199,6 @@ const loadDashboardData = async () => {
         variationProduit: 0,
         variationRupture: 0
       }
->>>>>>> fc8e382d3fe4531c524fb054efee767a2da18f2b
     }
   } catch (error) {
     console.error('Erreur lors du chargement des données:', error)

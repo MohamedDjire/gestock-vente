@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiService } from '../composables/Api/apiService.js'
 import router from '../router'
+import { getLocalStorage, setLocalStorage, removeLocalStorage } from '../utils/safeStorage.js'
 
 /**
  * Store Pinia pour la gestion de l'authentification
@@ -210,7 +211,7 @@ export const useAuthStore = defineStore('auth', () => {
         setAuthData(authToken, userData)
         
         // Vérifier que le token est bien sauvegardé
-        const savedToken = localStorage.getItem('prostock_token')
+        const savedToken = getLocalStorage('prostock_token')
         if (!savedToken) {
           console.error('❌ Token non sauvegardé dans localStorage')
         } else {
@@ -268,9 +269,9 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     
     // Nettoyer le localStorage
-    localStorage.removeItem('prostock_token')
-    localStorage.removeItem('prostock_user')
-    localStorage.removeItem('prostock_expires_at')
+    removeLocalStorage('prostock_token')
+    removeLocalStorage('prostock_user')
+    removeLocalStorage('prostock_expires_at')
     
     // Rediriger vers la page de login (seulement si router est disponible)
     if (router && typeof router.push === 'function') {
@@ -318,8 +319,8 @@ export const useAuthStore = defineStore('auth', () => {
    * Initialiser le store depuis localStorage
    */
   function initFromStorage() {
-    const storedToken = localStorage.getItem('prostock_token')
-    const storedUser = localStorage.getItem('prostock_user')
+    const storedToken = getLocalStorage('prostock_token')
+    const storedUser = getLocalStorage('prostock_user')
     
     if (storedToken && storedUser) {
       try {

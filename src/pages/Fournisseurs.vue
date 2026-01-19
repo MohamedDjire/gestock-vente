@@ -61,141 +61,81 @@
     <!-- Formulaire d'ajout/modification (modale harmonisée) -->
 
     <div v-if="showAddForm || editingFournisseur" class="modal-overlay" @click.self="closeForm">
-      <div class="modal-content user-modal" @click.stop>
+      <div class="modal-content large" @click.stop>
         <div class="modal-header">
           <h3>{{ editingFournisseur ? 'Modifier' : 'Ajouter' }} un fournisseur</h3>
           <button @click="closeForm" class="modal-close">×</button>
         </div>
         <div class="modal-body">
-          <form @submit.prevent="submitForm" class="user-form" style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;">
-            <div v-if="formError" class="form-error">{{ formError }}</div>
-            <div class="form-row">
-              <div class="form-col">
+          <form @submit.prevent="submitForm" class="modal-form">
+            <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
+
+            <div class="form-section">
+              <h4 class="section-title">🏢 Informations fournisseur</h4>
+              <div class="form-row">
                 <div class="form-group">
                   <label>Nom *</label>
-                  <input v-model="form.nom" placeholder="Nom du fournisseur" required class="form-input" />
-                </div>
-                <div class="form-group">
-                  <label>Email</label>
-                  <input v-model="form.email" placeholder="Email" type="email" class="form-input" />
-                </div>
-                <div class="form-group">
-                  <label>Téléphone</label>
-                  <input v-model="form.telephone" placeholder="Téléphone" class="form-input" />
-                </div>
-              </div>
-              <div class="form-col">
-                <div class="form-group">
-                  <label>Adresse</label>
-                  <input v-model="form.adresse" placeholder="Adresse" class="form-input" />
+                  <input v-model="form.nom" placeholder="Nom du fournisseur" required />
+                  <small class="form-hint">Raison sociale ou nom du fournisseur</small>
                 </div>
                 <div class="form-group">
                   <label>Statut</label>
-                  <select v-model="form.statut" class="form-input">
+                  <select v-model="form.statut">
                     <option value="actif">Actif</option>
                     <option value="inactif">Inactif</option>
                   </select>
                 </div>
               </div>
             </div>
-            <div class="modal-actions" style="margin-top:auto;">
-              <button type="button" @click="closeForm" class="btn-cancel">Annuler</button>
-              <button type="submit" class="btn-save btn-valider">Valider</button>
+
+            <div class="form-section">
+              <h4 class="section-title">📞 Coordonnées</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Email</label>
+                  <input v-model="form.email" type="email" placeholder="email@exemple.com" />
+                </div>
+                <div class="form-group">
+                  <label>Téléphone</label>
+                  <input v-model="form.telephone" placeholder="+225 XX XX XX XX XX" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Adresse</label>
+                <input v-model="form.adresse" placeholder="Adresse complète" />
+              </div>
             </div>
           </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" @click="closeForm" class="btn-cancel">Annuler</button>
+          <button type="button" @click="submitForm" class="btn-save">Valider</button>
         </div>
       </div>
     </div>
 
-    <!-- Modale de suppression harmonisée (structure identique à la modale d'ajout) -->
+    <!-- Modale de suppression -->
     <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-          <h3 style="margin:0;flex:1;">Confirmer la suppression</h3>
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">⚠️</span>
+            <h3>Confirmer la suppression</h3>
+          </div>
           <button @click="closeDeleteModal" class="modal-close">×</button>
         </div>
         <div class="modal-body">
           <p>Êtes-vous sûr de vouloir supprimer le fournisseur <b>{{ fournisseurToDelete?.nom }}</b> ?</p>
-          <p style="color:#dc2626;font-weight:600;">Cette action est irréversible.</p>
+          <p class="modal-warning">Cette action est irréversible.</p>
         </div>
         <div class="modal-actions">
           <button @click="closeDeleteModal" class="btn-cancel">Annuler</button>
-          <button @click="confirmDeleteFournisseur" class="btn-save" style="background:#dc2626;">Supprimer</button>
+          <button @click="confirmDeleteFournisseur" class="btn-danger">Supprimer</button>
         </div>
       </div>
     </div>
   </div>
 </template>
-<style scoped>
-  /* Bouton Valider couleur verte */
-  .btn-valider {
-    background: #22c55e !important;
-    color: #fff !important;
-    border: none;
-    transition: background 0.2s;
-  }
-  .btn-valider:hover {
-    background: #16a34a !important;
-  }
-  /* Modal actions toujours en bas */
-  .modal-content.user-modal {
-    display: flex;
-    flex-direction: column;
-    min-height: 420px;
-    max-width: 420px;
-    min-width: 350px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    margin: auto;
-  }
-
-  .modal-overlay {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-  }
-
-  .form-row {
-    display: flex;
-    gap: 24px;
-  }
-  .form-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  @media (max-width: 700px) {
-    .modal-content.user-modal {
-      max-width: 98vw;
-      padding: 1rem 0.5rem;
-    }
-    .form-row {
-      flex-direction: column;
-      gap: 0;
-    }
-  }
-  .modal-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: auto;
-    padding-top: 1.5rem;
-    background: none;
-  }
-</style>
-
-
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
@@ -263,7 +203,7 @@ function closeForm() {
   form.value = { nom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
   formError.value = ''
 }
-import { createEcriture } from '../composables/api/apiCompta'
+import { createEcriture } from '../composables/Api/apiCompta.js'
 async function submitForm() {
   if (!form.value.nom) {
     formError.value = 'Le nom est obligatoire'
@@ -415,35 +355,8 @@ function getJournalUser() {
 </script>
 
 <style scoped>
-    /* ...existing code... */
-.btn-cancel {
-  background: #e5e7eb;
-  color: #1a1a1a;
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem 1.25rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-cancel:hover {
-  background: #d1d5db;
-}
-.btn-danger {
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem 1.25rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-danger:hover {
-  background: #991b1b;
-}
+/* Modale formulaire et suppression : style.css (modal-overlay, modal-content, modal-form, form-section, btn-cancel, btn-save, btn-danger) */
+
 .fournisseurs-page {
   padding: 2rem;
   width: 100%;
@@ -524,115 +437,13 @@ function getJournalUser() {
   font-size: 1.1rem;
   margin: 0 0.25rem;
 }
-.btn-danger {
+/* Icône supprimer dans le tableau : rouge, sans fond (la modale utilise .btn-danger global) */
+.btn-icon.btn-danger {
   color: #dc2626;
 }
-.modal {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-      .modal-content {
-        background: #fff;
-        border-radius: 12px;
-        padding: 2rem;
-        min-width: 380px;
-        width: 420px;
-        max-width: 95vw;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-        position: relative;
-      }
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #64748b;
-  margin-left: 1rem;
-}
-.modal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background: #f9fafb;
-  border-radius: 10px;
-  padding: 1rem 1.2rem;
-  margin-bottom: 1.1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-}
-.form-input {
-  padding: 0.8rem 1.1rem;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
-  font-size: 1.1rem;
-  background: #fff;
-  transition: border-color 0.2s;
-}
-.user-form .form-group input,
-.user-form .form-group select,
-.user-form .form-group textarea,
-.modal-form .form-group input,
-.modal-form .form-group select,
-.modal-form .form-group textarea {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  font-size: 1.1rem;
-  padding: 0.8rem 1.1rem;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
-  background: #f9fafb;
-  transition: border-color 0.2s;
-}
-/* Focus style unique et correct */
-.user-form .form-group input:focus,
-.user-form .form-group select:focus,
-.user-form .form-group textarea:focus,
-.modal-form .form-group input:focus,
-.modal-form .form-group select:focus,
-.modal-form .form-group textarea:focus {
-  border-color: #1a5f4a;
-  box-shadow: 0 0 0 3px rgba(26, 95, 74, 0.08);
-  outline: none;
-}
-.btn-secondary {
-  background: #e5e7eb;
-  color: #1a1a1a;
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem 1.25rem;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-secondary:hover {
-  background: #d1d5db;
-}
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.5rem;
+.btn-icon.btn-danger:hover {
+  color: #b91c1c;
+  background: #fee2e2;
 }
 .form-error {
   color: #dc2626;

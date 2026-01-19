@@ -1,5 +1,3 @@
-
-
 <?php
 // Charger config.php (JWT_SECRET et JWT_EXPIRATION)
 // Sur le serveur: config.php est à la racine de l'API
@@ -149,13 +147,19 @@ function authenticateAndAuthorize($bdd, $enterpriseId = null) {
             throw new Exception("Accès non autorisé à cette entreprise", 403);
         }
     }
-    // Charger les permissions d'accès (entrepôts et points de vente)
-    $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
-    $stmtE->execute(['id' => $user['id_utilisateur']]);
-    $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
-    $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
-    $stmtPV->execute(['id' => $user['id_utilisateur']]);
-    $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+    // Charger les permissions d'accès (entrepôts et points de vente) - tables optionnelles
+    $permissions_entrepots = [];
+    $permissions_points_vente = [];
+    try {
+        $stmtE = $bdd->prepare("SELECT id_entrepot FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id");
+        $stmtE->execute(['id' => $user['id_utilisateur']]);
+        $permissions_entrepots = $stmtE->fetchAll(PDO::FETCH_COLUMN);
+        $stmtPV = $bdd->prepare("SELECT id_point_vente FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id");
+        $stmtPV->execute(['id' => $user['id_utilisateur']]);
+        $permissions_points_vente = $stmtPV->fetchAll(PDO::FETCH_COLUMN);
+    } catch (PDOException $e) {
+        error_log("Middleware: tables permissions absentes ou erreur: " . $e->getMessage());
+    }
 
     // Retourne un tableau structuré cohérent avec la page user
     return [

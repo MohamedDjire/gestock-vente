@@ -30,18 +30,20 @@
       </button>
     </div>
     <div v-if="showLogoutModal" class="modal-overlay" @click.self="showLogoutModal = false">
-      <div class="modal-content user-modal" style="max-width: 350px; min-width: 0; height: auto; min-height: 0;" @click.stop>
-        <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-          <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-          <h3 style="margin:0;flex:1;">Déconnexion</h3>
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">⚠️</span>
+            <h3>Déconnexion</h3>
+          </div>
           <button @click="showLogoutModal = false" class="modal-close">×</button>
         </div>
         <div class="modal-body">
           <p>Êtes-vous sûr de vouloir vous déconnecter&nbsp;?</p>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" @click="showLogoutModal = false">Annuler</button>
-          <button class="btn-primary" style="background:#dc2626;" @click="logout">Se déconnecter</button>
+          <button class="btn-cancel" @click="showLogoutModal = false">Annuler</button>
+          <button class="btn-danger" @click="logout">Se déconnecter</button>
         </div>
       </div>
     </div>
@@ -109,59 +111,7 @@ async function logout() {
 </script>
 
 <style scoped>
-/* Modale de déconnexion */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-logout {
-  background: #fff;
-  color: #1a5f4a;
-  border-radius: 16px;
-  padding: 2.5rem 2rem 2rem 2rem;
-  min-width: 320px;
-  max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.modal-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-}
-.modal-message {
-  font-size: 1.05rem;
-  margin-bottom: 2rem;
-  text-align: center;
-}
-.modal-actions {
-  display: flex;
-  gap: 1.2rem;
-}
-.btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  padding: 0.6em 1.3em;
-  cursor: pointer;
-  transition: background 0.18s;
-}
-.btn-secondary:hover {
-  background: #e5e7eb;
-}
+/* Modale : styles de base dans style.css */
 .btn-primary {
   background: #1a5f4a;
   color: #fff;

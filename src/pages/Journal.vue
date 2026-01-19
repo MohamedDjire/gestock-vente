@@ -124,7 +124,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import apiJournal from '../composables/api/apiJournal';
+import apiJournal from '../composables/Api/apiJournal.js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';

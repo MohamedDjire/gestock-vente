@@ -96,11 +96,12 @@
             </button>
           </div>
         </div>
-        <div v-if="recentMovements.length === 0" class="panel-empty">Enregistrez des entrées/sorties pour voir l'historique.</div>
+        <div v-if="loadingMovements" class="panel-empty">Chargement des mouvements...</div>
+        <div v-else-if="recentMovements.length === 0" class="panel-empty">Enregistrez des entrées/sorties pour voir l'historique.</div>
         <ul v-else class="movement-list">
           <li v-for="m in recentMovements" :key="m.id">
             <div class="movement-top">
-              <span class="movement-type" :class="m.type">{{ m.typeLabel }}</span>
+              <span class="movement-type" :class="[m.type, m.type_sortie]">{{ m.typeLabel }}</span>
               <span class="movement-date">{{ formatShortDate(m.date) }}</span>
             </div>
             <div class="movement-main">
@@ -221,13 +222,6 @@
                       <span :class="['stock-badge', getStockClass(product.statut_stock)]">
                         {{ product.quantite_stock }}
                       </span>
-                      <button 
-                        @click="openStockModal(product)" 
-                        class="btn-stock-edit"
-                        title="Ajuster le stock"
-                      >
-                        📝
-                      </button>
                     </div>
                   </td>
                   <td>
@@ -261,7 +255,7 @@
   </div>
 
   <!-- Modal Entrée de Stock -->
-  <div v-if="showEntreeModal" class="modal-overlay" @click="closeEntreeModal">
+  <div v-if="showEntreeModal" class="modal-overlay" @click.self="closeEntreeModal">
       <div class="modal-content stock-modal" @click.stop>
         <div class="modal-header">
           <h3>Entrée de Stock - {{ stockProduct?.nom }}</h3>
@@ -305,7 +299,7 @@
     </div>
 
   <!-- Modal Sortie de Stock -->
-  <div v-if="showSortieModal" class="modal-overlay" @click="closeSortieModal">
+  <div v-if="showSortieModal" class="modal-overlay" @click.self="closeSortieModal">
     <div class="modal-content stock-modal" @click.stop>
         <div class="modal-header">
           <h3>Sortie de Stock - {{ stockProduct?.nom }}</h3>
@@ -362,7 +356,7 @@
   </div>
 
   <!-- Modal Historique -->
-  <div v-if="showHistoryModal" class="modal-overlay" @click="closeHistoryModal">
+  <div v-if="showHistoryModal" class="modal-overlay" @click.self="closeHistoryModal">
       <div class="modal-content history-modal" @click.stop>
         <div class="modal-header">
           <h3>Historique des Mouvements - {{ historyProduct?.nom }}</h3>
@@ -375,14 +369,14 @@
             <div 
               v-for="movement in productHistory" 
               :key="movement.id_entree || movement.id_sortie"
-              :class="['history-item', movement.type]"
+              :class="['history-item', movement.type, movement.type_sortie]"
             >
               <div class="history-icon">
-                {{ movement.type === 'entree' ? '➕' : '➖' }}
+                {{ movement.type === 'entree' ? '➕' : (movement.type_sortie === 'transfert' ? '↔️' : '➖') }}
               </div>
               <div class="history-details">
                 <div class="history-header">
-                  <strong>{{ movement.type === 'entree' ? 'Entrée' : 'Sortie' }}</strong>
+                  <strong>{{ movement.type === 'entree' ? 'Entrée' : (getSortieTypeLabel(movement.type_sortie) || 'Sortie') }}</strong>
                   <span class="history-date">{{ formatDateTime(movement.date_entree || movement.date_sortie) }}</span>
                 </div>
                 <div class="history-info">
@@ -390,8 +384,11 @@
                   <span v-if="movement.prix_unitaire">
                     Prix: <strong>{{ formatCurrency(movement.prix_unitaire) }}</strong>
                   </span>
-                  <span v-if="movement.type_sortie">
+                  <span v-if="movement.type_sortie && movement.type === 'sortie'">
                     Type: <strong>{{ getSortieTypeLabel(movement.type_sortie) }}</strong>
+                  </span>
+                  <span v-if="movement.entrepot_destination">
+                    → Vers: <strong>{{ movement.entrepot_destination }}</strong>
                   </span>
                 </div>
                 <div v-if="movement.motif || movement.notes" class="history-notes">
@@ -450,7 +447,7 @@
           </div>
           <div class="modal-actions">
             <button type="button" @click="closeStockModal" class="btn-cancel">Annuler</button>
-            <button @click="saveStockAdjustment" class="btn-save" :disabled="saving">
+            <button type="button" @click="saveStockAdjustment" class="btn-save" :disabled="saving || !stockAdjustment.quantity || stockAdjustment.quantity < 0">
               {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
             </button>
           </div>
@@ -459,7 +456,7 @@
   </div>
 
   <!-- Modal de création/édition -->
-  <div v-if="showModal" class="modal-overlay" @click="closeModal">
+  <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
     <div class="modal-content large" @click.stop>
       <div class="modal-header">
         <h3>{{ editingProduct ? 'Modifier le Produit' : 'Nouveau Produit' }}</h3>
@@ -736,7 +733,7 @@
   </div>
 
   <!-- Modal tous les mouvements -->
-  <div v-if="showAllMovementsModal" class="modal-overlay" @click="closeAllMovementsModal">
+  <div v-if="showAllMovementsModal" class="modal-overlay" @click.self="closeAllMovementsModal">
     <div class="modal-content movements-modal" @click.stop>
       <div class="modal-header">
         <h3>Tous les mouvements de stock</h3>
@@ -760,7 +757,7 @@
             <tr v-else v-for="m in allMovements" :key="m.id">
               <td>{{ formatDateTime(m.date) }}</td>
               <td>
-                <span class="movement-type-badge" :class="m.type">{{ m.typeLabel }}</span>
+                <span class="movement-type-badge" :class="[m.type, m.type_sortie]">{{ m.typeLabel }}</span>
               </td>
               <td><strong>{{ m.nom }}</strong></td>
               <td>{{ m.quantite }}</td>
@@ -983,17 +980,19 @@
   </div>
 
   <!-- Modale de confirmation -->
-  <div v-if="confirmation.show" class="modal-overlay confirmation-overlay" @click="closeConfirmation">
+  <div v-if="confirmation.show" class="modal-overlay" @click.self="closeConfirmation">
     <div class="modal-content confirmation-modal" @click.stop>
-      <div class="modal-header" style="display:flex;align-items:center;gap:0.7rem;">
-        <span style="font-size:2rem;color:#f59e0b;">⚠️</span>
-        <h3 style="margin:0;flex:1;">{{ confirmation.title }}</h3>
+      <div class="modal-header modal-header-with-icon">
+        <div class="modal-header-start">
+          <span class="modal-header-icon">{{ confirmation.icon || '⚠️' }}</span>
+          <h3>{{ confirmation.title }}</h3>
+        </div>
         <button @click="closeConfirmation" class="modal-close">×</button>
       </div>
-      <div class="confirmation-body">
+      <div class="modal-body">
         <p>{{ confirmation.message }}</p>
       </div>
-      <div class="confirmation-actions">
+      <div class="modal-actions">
         <button @click="closeConfirmation" class="btn-cancel">Annuler</button>
         <button @click="confirmAction" class="btn-danger">Confirmer</button>
       </div>
@@ -1128,25 +1127,63 @@ const lowStockProducts = computed(() => {
 })
 
 // Tous les mouvements
-const allMovements = computed(() => {
-  return products.value
-    .filter(p => p.date_modification || p.date_creation)
-    .sort((a, b) => new Date(b.date_modification || b.date_creation) - new Date(a.date_modification || a.date_creation))
-    .map((p, idx) => ({
-      id: p.id_produit + '-' + idx,
-      type: p.statut_stock === 'rupture' ? 'sortie' : 'entree',
-      typeLabel: p.statut_stock === 'rupture' ? 'Sortie' : 'Entrée',
-      date: p.date_modification || p.date_creation,
-      nom: p.nom,
-      quantite: p.quantite_stock,
-      details: p.code_produit ? `Code: ${p.code_produit}` : ''
-    }))
-})
+// Mouvements réels (entrées + sorties) depuis api_stock
+const movements = ref([])
+const loadingMovements = ref(false)
+
+const loadAllMovements = async () => {
+  loadingMovements.value = true
+  try {
+    const [entreesRes, sortiesRes] = await Promise.all([
+      apiService.get('/api_stock.php?action=entrees'),
+      apiService.get('/api_stock.php?action=sorties')
+    ])
+    const entrees = (entreesRes?.success && Array.isArray(entreesRes.data)) ? entreesRes.data : []
+    const sorties = (sortiesRes?.success && Array.isArray(sortiesRes.data)) ? sortiesRes.data : []
+    const list = []
+    entrees.forEach(e => {
+      list.push({
+        id: 'e-' + (e.id_entree || e.id),
+        type: 'entree',
+        typeLabel: 'Entrée',
+        type_sortie: null,
+        date: e.date_entree,
+        nom: e.produit_nom || e.nom,
+        quantite: e.quantite,
+        details: [e.code_produit, e.numero_bon, e.notes].filter(Boolean).join(' · ') || (e.code_produit ? `Code: ${e.code_produit}` : '')
+      })
+    })
+    sorties.forEach(s => {
+      const dt = []
+      if (s.code_produit) dt.push(s.code_produit)
+      if (s.type_sortie === 'transfert' && s.entrepot_destination) dt.push('→ ' + s.entrepot_destination)
+      if (s.motif) dt.push(s.motif)
+      list.push({
+        id: 's-' + (s.id_sortie || s.id),
+        type: 'sortie',
+        typeLabel: getSortieTypeLabel(s.type_sortie) || 'Sortie',
+        type_sortie: s.type_sortie,
+        date: s.date_sortie,
+        nom: s.produit_nom || s.nom,
+        quantite: s.quantite,
+        entrepot_destination: s.entrepot_destination || null,
+        details: dt.join(' · ') || (s.code_produit ? `Code: ${s.code_produit}` : '')
+      })
+    })
+    list.sort((a, b) => new Date(b.date) - new Date(a.date))
+    movements.value = list
+  } catch (e) {
+    console.error('Erreur chargement mouvements:', e)
+    movements.value = []
+  } finally {
+    loadingMovements.value = false
+  }
+}
+
+const allMovements = computed(() => movements.value)
 
 // Mouvements récents (limité à 3)
-const recentMovements = computed(() => {
-  return allMovements.value.slice(0, 3)
-})
+const recentMovements = computed(() => movements.value.slice(0, 3))
 
 // Produits filtrés
 const filteredProducts = computed(() => {
@@ -2028,6 +2065,9 @@ const saveEntree = async () => {
         details: `Produit ID: ${stockProduct.value.id_produit}, Quantité: ${entreeData.value.quantite}`
       })
       await loadProducts()
+      await loadAllMovements()
+      await generateAlertes()
+      await loadAlertes()
       closeEntreeModal()
       showNotification('success', 'Succès', 'Entrée de stock enregistrée avec succès')
     }
@@ -2093,6 +2133,9 @@ const saveSortie = async () => {
         details: `Produit ID: ${stockProduct.value.id_produit}, Quantité: ${sortieData.value.quantite}, Type: ${sortieData.value.type_sortie}`
       })
       await loadProducts()
+      await loadAllMovements()
+      await generateAlertes()
+      await loadAlertes()
       closeSortieModal()
       showNotification('success', 'Succès', 'Sortie de stock enregistrée avec succès')
     }
@@ -2222,7 +2265,8 @@ const loadEntrepots = async () => {
 onMounted(() => {
   loadProducts()
   loadEntrepots()
-  
+  loadAllMovements()
+
   // Vérifier si on doit ouvrir le modal d'ajout de produit
   const shouldOpenModal = localStorage.getItem('open_product_modal')
   if (shouldOpenModal === 'true') {
@@ -2863,6 +2907,8 @@ onMounted(() => {
 
 .form-group input,
 .form-group select {
+  max-height: none;
+  overflow-y: visible;
   padding: 0.75rem;
   border: 1.5px solid #10b981;
   border-radius: 8px;

@@ -1,5 +1,13 @@
 <template>
   <div class="ventes-page">
+    <div class="ventes-top-bar">
+      <button @click="$router.push('/dashboard')" class="btn-back">
+        ← Retour
+      </button>
+      <button @click="goToPointVente" class="btn-history" v-if="selectedPointVente">
+        📋 Historique des ventes
+      </button>
+    </div>
     <div class="ventes-container">
       <!-- Colonne gauche : Panier -->
       <div class="cart-column">
@@ -57,9 +65,25 @@
                     {{ item.quantite_stock }}
                   </span>
                 </div>
+                <div class="cart-item-row">
+                  <span class="label">Remise:</span>
+                  <div class="discount-controls">
+                    <input 
+                      type="number" 
+                      v-model.number="item.remise" 
+                      @input="updateCartItem(index)"
+                      min="0"
+                      :max="item.sous_total"
+                      step="0.01"
+                      class="discount-input"
+                      placeholder="0"
+                    />
+                    <span class="discount-currency">F CFA</span>
+                  </div>
+                </div>
                 <div class="cart-item-row total-row">
                   <span class="label">Sous-total:</span>
-                  <span class="value total">{{ formatPrice(item.sous_total) }}</span>
+                  <span class="value total">{{ formatPrice((item.sous_total || 0) - (item.remise || 0)) }}</span>
                 </div>
               </div>
             </div>
@@ -68,20 +92,16 @@
         
         <div class="cart-footer" v-if="cart.length > 0">
           <div class="cart-summary">
-            <div class="summary-row">
-              <span class="summary-label">Nombre d'articles:</span>
-              <span class="summary-value">{{ totalItems }}</span>
-            </div>
-            <div class="summary-row">
-              <span class="summary-label">Sous-total:</span>
-              <span class="summary-value">{{ formatPrice(subtotal) }}</span>
+            <div class="summary-row discount-row" v-if="totalRemisesIndividuelles > 0">
+              <span class="summary-label">Remises produits:</span>
+              <span class="summary-value discount">-{{ formatPrice(totalRemisesIndividuelles) }}</span>
             </div>
             <div class="summary-row discount-row" v-if="discount > 0">
-              <span class="summary-label">Remise:</span>
+              <span class="summary-label">Remise globale:</span>
               <span class="summary-value discount">-{{ formatPrice(discount) }}</span>
             </div>
             <div class="summary-row total-row">
-              <span class="summary-label">Total:</span>
+              <span class="summary-label">Total ({{ totalItems }} article{{ totalItems > 1 ? 's' : '' }}):</span>
               <span class="summary-value total">{{ formatPrice(total) }}</span>
             </div>
           </div>
@@ -103,6 +123,9 @@
           <div class="header-top">
             <div class="point-vente-info" v-if="selectedPointVente">
               <span class="pv-badge">🏪 {{ selectedPointVente.nom_point_vente }}</span>
+              <button @click="goToPointVente" class="btn-history-small" title="Voir l'historique des ventes">
+                📋
+              </button>
             </div>
             <button 
               v-else 
@@ -187,9 +210,12 @@
     
     <!-- Modal Confirmation Vider Panier -->
     <div v-if="showClearCartModal" class="modal-overlay" @click.self="cancelClearCart">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>Vider le panier</h3>
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">⚠️</span>
+            <h3>Vider le panier</h3>
+          </div>
           <button class="modal-close" @click="cancelClearCart">×</button>
         </div>
         <div class="modal-body">
@@ -197,15 +223,15 @@
           <p class="modal-warning">Cette action est irréversible et supprimera tous les produits du panier.</p>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" @click="cancelClearCart">Annuler</button>
-          <button class="btn-primary" style="background: #dc2626;" @click="confirmClearCart">Vider le panier</button>
+          <button class="btn-cancel" @click="cancelClearCart">Annuler</button>
+          <button class="btn-danger" @click="confirmClearCart">Vider le panier</button>
         </div>
       </div>
     </div>
     
     <!-- Modal Remise -->
     <div v-if="showDiscountModal" class="modal-overlay" @click.self="showDiscountModal = false">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content user-modal" @click.stop>
         <div class="modal-header">
           <h3>Appliquer une remise</h3>
           <button class="modal-close" @click="showDiscountModal = false">×</button>
@@ -245,15 +271,15 @@
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" @click="showDiscountModal = false">Annuler</button>
-          <button class="btn-primary" @click="applyDiscount">Appliquer</button>
+          <button class="btn-cancel" @click="showDiscountModal = false">Annuler</button>
+          <button class="btn-save" @click="applyDiscount">Appliquer</button>
         </div>
       </div>
     </div>
     
     <!-- Modal Sélection Point de Vente -->
     <div v-if="showPointVenteModal" class="modal-overlay" @click.self="showPointVenteModal = false">
-      <div class="modal-content" @click.stop>
+      <div class="modal-content user-modal" @click.stop>
         <div class="modal-header">
           <h3>Sélectionner le point de vente</h3>
           <button class="modal-close" @click="showPointVenteModal = false">×</button>
@@ -356,11 +382,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
-import { createEcriture } from '../composables/api/apiCompta'
+import { createEcriture } from '../composables/Api/apiCompta.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useCurrency } from '../composables/useCurrency.js'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const { formatPrice } = useCurrency()
 
@@ -414,17 +442,26 @@ const totalItems = computed(() => {
 })
 
 const subtotal = computed(() => {
-  // Calculer explicitement : prix_unitaire * quantite pour chaque produit
+  // Calculer explicitement : prix_unitaire * quantite pour chaque produit (sans remise individuelle)
   return cart.value.reduce((sum, item) => {
     const itemTotal = (item.prix_unitaire || 0) * (item.quantite || 0)
     return sum + itemTotal
   }, 0)
 })
 
+const totalRemisesIndividuelles = computed(() => {
+  // Somme de toutes les remises individuelles
+  return cart.value.reduce((sum, item) => {
+    return sum + (item.remise || 0)
+  }, 0)
+})
+
 const total = computed(() => {
   const calculatedSubtotal = subtotal.value
+  const remisesIndividuelles = totalRemisesIndividuelles.value
   const calculatedDiscount = discount.value || 0
-  return Math.max(0, calculatedSubtotal - calculatedDiscount)
+  // Total = sous-total - remises individuelles - remise globale
+  return Math.max(0, calculatedSubtotal - remisesIndividuelles - calculatedDiscount)
 })
 
 // Méthodes
@@ -447,11 +484,13 @@ const loadProducts = async () => {
           console.log('✅ [Ventes] Utilisateur rechargé:', userResponse.data)
           // Mettre à jour les permissions dans le store avec setAuthData pour sauvegarder dans localStorage
           if (userResponse.data.permissions_entrepots && Array.isArray(userResponse.data.permissions_entrepots)) {
-            authStore.setAuthData(authStore.token, {
+            const currentToken = authStore.token
+            const updatedUser = {
               ...authStore.user,
               permissions_entrepots: userResponse.data.permissions_entrepots,
               permissions_points_vente: userResponse.data.permissions_points_vente || authStore.user.permissions_points_vente || []
-            })
+            }
+            authStore.setAuthData(currentToken, updatedUser)
             console.log('✅ [Ventes] Permissions mises à jour dans le store:', authStore.user.permissions_entrepots)
           } else {
             console.warn('⚠️ [Ventes] Permissions toujours vides après rechargement')
@@ -600,6 +639,7 @@ const addToCart = (product) => {
       prix_unitaire: prixUnitaire,
       quantite: quantite,
       quantite_stock: product.quantite_stock || 0,
+      remise: 0,
       sous_total: prixUnitaire * quantite
     })
   }
@@ -636,7 +676,15 @@ const updateCartItem = (index) => {
     item.quantite = 1
   }
   // Recalculer le sous-total : prix_unitaire * quantite
-  item.sous_total = (item.prix_unitaire || 0) * (item.quantite || 0)
+  const sousTotalBrut = (item.prix_unitaire || 0) * (item.quantite || 0)
+  item.sous_total = sousTotalBrut
+  // S'assurer que la remise ne dépasse pas le sous-total
+  if (item.remise && item.remise > sousTotalBrut) {
+    item.remise = sousTotalBrut
+  }
+  if (item.remise && item.remise < 0) {
+    item.remise = 0
+  }
 }
 
 const showClearCartModal = ref(false)
@@ -676,6 +724,14 @@ const selectPointVente = (pv) => {
   showPointVenteModal.value = false
 }
 
+const goToPointVente = () => {
+  if (selectedPointVente.value) {
+    router.push(`/point-vente?point_vente=${selectedPointVente.value.id_point_vente}`)
+  } else {
+    router.push('/point-vente')
+  }
+}
+
 const lastSaleReceipt = ref(null)
 const showReceiptModal = ref(false)
 
@@ -696,14 +752,24 @@ const processSale = async () => {
     const produits = cart.value.map(item => ({
       id_produit: item.id_produit,
       quantite: item.quantite,
-      prix_unitaire: item.prix_unitaire
+      prix_unitaire: item.prix_unitaire,
+      remise: item.remise || 0
     }))
+    
+    // Construire les notes avec toutes les remises
+    let notes = []
+    if (totalRemisesIndividuelles.value > 0) {
+      notes.push(`Remises individuelles: ${formatPrice(totalRemisesIndividuelles.value)}`)
+    }
+    if (discount.value > 0) {
+      notes.push(`Remise globale: ${formatPrice(discount.value)}`)
+    }
     
     const saleData = {
       id_point_vente: selectedPointVente.value.id_point_vente,
       produits: produits,
-      remise: discount.value,
-      notes: discount.value > 0 ? `Remise appliquée: ${formatPrice(discount.value)}` : null
+      remise: discount.value + totalRemisesIndividuelles.value,
+      notes: notes.length > 0 ? notes.join(' | ') : null
     }
     
     const response = await apiService.post('/api_vente.php', saleData)
@@ -1007,9 +1073,77 @@ onMounted(async () => {
   overflow: hidden;
   background: #f5f7fa;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ventes-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 2px solid #e5e7eb;
+  z-index: 10;
+}
+
+.btn-back {
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-back:hover {
+  background: #4b5563;
+}
+
+.btn-history {
+  background: #1a5f4a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-history:hover {
+  background: #145040;
+}
+
+.btn-history-small {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: 0.5rem;
+}
+
+.btn-history-small:hover {
+  background: rgba(255,255,255,0.3);
 }
 
 .ventes-container {
+  flex: 1;
+  overflow: hidden;
   display: flex;
   height: 100%;
   gap: 0;
@@ -1017,7 +1151,7 @@ onMounted(async () => {
 
 /* Colonne Panier (Gauche) */
 .cart-column {
-  width: 400px;
+  width: 320px;
   background: white;
   border-right: 2px solid #e5e7eb;
   display: flex;
@@ -1181,6 +1315,34 @@ onMounted(async () => {
   color: #1a5f4a;
 }
 
+.discount-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.discount-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  text-align: right;
+  font-size: 0.9rem;
+  font-weight: 600;
+  max-width: 100px;
+}
+
+.discount-input:focus {
+  outline: none;
+  border-color: #1a5f4a;
+}
+
+.discount-currency {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
 .quantity-controls {
   display: flex;
   align-items: center;
@@ -1223,15 +1385,16 @@ onMounted(async () => {
 }
 
 .cart-summary {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0;
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
-  font-size: 0.95rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
 }
 
 .summary-row .summary-label {
@@ -1248,26 +1411,26 @@ onMounted(async () => {
 }
 
 .summary-row.total-row {
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 2px solid #e5e7eb;
-  font-size: 1.2rem;
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+  font-size: 1rem;
 }
 
 .summary-row.total-row .summary-label {
-  font-weight: 700;
+  font-weight: 600;
   color: #111827;
 }
 
 .summary-row.total-row .summary-value {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   color: #1a5f4a;
   font-weight: 700;
 }
 
 .cart-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 0.75rem;
 }
 

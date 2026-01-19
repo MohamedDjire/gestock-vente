@@ -1,12 +1,16 @@
 import axios from 'axios'
+import { getLocalStorage, setLocalStorage, removeLocalStorage } from '../../utils/safeStorage.js'
 
 /**
  * Service API pour les appels HTTP
  * Configure axios avec l'URL de base et les intercepteurs
+ * Utilise safeStorage pour éviter les erreurs si "Tracking Prevention" bloque l'accès.
  */
 
 // URL de base de l'API - relative en dev pour proxy Vite, distante en prod
-const API_BASE_URL = import.meta.env.DEV ? '/' : (import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock')
+const API_BASE_URL = import.meta.env.DEV 
+  ? (import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock')
+  : (import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock')
 
 // Créer une instance axios
 const apiClient = axios.create({
@@ -20,7 +24,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     // Récupérer le token depuis localStorage (évite la dépendance circulaire)
-    const token = localStorage.getItem('prostock_token')
+    const token = getLocalStorage('prostock_token')
     
     if (token) {
       // Décoder le JWT pour vérifier l'expiration
@@ -31,9 +35,9 @@ apiClient.interceptors.request.use(
           if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
             // Token expiré, nettoyer et rediriger
             console.warn('⚠️ Token expiré, nettoyage automatique')
-            localStorage.removeItem('prostock_token')
-            localStorage.removeItem('prostock_user')
-            localStorage.removeItem('prostock_expires_at')
+            removeLocalStorage('prostock_token')
+            removeLocalStorage('prostock_user')
+            removeLocalStorage('prostock_expires_at')
             
             // Rediriger vers login si on est dans le navigateur
             if (typeof window !== 'undefined' && window.location) {
@@ -47,10 +51,8 @@ apiClient.interceptors.request.use(
         console.error('Erreur lors de la vérification du token:', e)
       }
       
-      // Ajouter le token aux headers
-      // Utiliser Authorization (standard) et X-Auth-Token (fallback pour certains proxies/CDN)
+      // Ajouter le token : Authorization uniquement (évite CORS sur les API qui n’autorisent pas X-Auth-Token)
       config.headers.Authorization = `Bearer ${token}`
-      config.headers['X-Auth-Token'] = token
     }
     
     // Vérifier le forfait pour toutes les requêtes sauf login, signup et vérification du forfait
@@ -60,7 +62,7 @@ apiClient.interceptors.request.use(
     if (!isAuthRoute && token) {
       // Vérifier le statut du forfait depuis localStorage
       try {
-        const forfaitStatus = localStorage.getItem('forfait_status')
+        const forfaitStatus = getLocalStorage('forfait_status')
         if (forfaitStatus) {
           const status = JSON.parse(forfaitStatus)
           // Ne bloquer que si :
@@ -94,12 +96,12 @@ apiClient.interceptors.response.use(
     if (error.message === 'FORFAIT_EXPIRE' || (error.response && error.response.status === 403 && error.response.data?.message?.includes('forfait'))) {
       // Mettre à jour le statut du forfait
       try {
-        const forfaitStatus = localStorage.getItem('forfait_status')
+        const forfaitStatus = getLocalStorage('forfait_status')
         if (forfaitStatus) {
           const status = JSON.parse(forfaitStatus)
           status.expire = true
           status.actif = false
-          localStorage.setItem('forfait_status', JSON.stringify(status))
+          setLocalStorage('forfait_status', JSON.stringify(status))
         }
       } catch (e) {
         console.error('Erreur lors de la mise à jour du statut du forfait:', e)
@@ -124,9 +126,9 @@ apiClient.interceptors.response.use(
       // Si erreur 401 (Unauthorized), le token est probablement invalide ou expiré
       if (status === 401) {
         console.warn('⚠️ Erreur 401 - Token invalide ou expiré, nettoyage automatique...')
-        localStorage.removeItem('prostock_token')
-        localStorage.removeItem('prostock_user')
-        localStorage.removeItem('prostock_expires_at')
+        removeLocalStorage('prostock_token')
+        removeLocalStorage('prostock_user')
+        removeLocalStorage('prostock_expires_at')
         
         // Rediriger vers login si on est dans le navigateur
         if (typeof window !== 'undefined' && window.location) {
