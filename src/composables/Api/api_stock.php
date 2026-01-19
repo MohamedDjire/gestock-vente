@@ -272,6 +272,17 @@ function createSortie($bdd, $data, $enterpriseId, $userId) {
     }
     
     // Vérifier que le stock est suffisant (sauf pour les pertes)
+    
+        // Journaliser l'entrée de stock dans stock_journal
+        $userName = ($entree['user_nom'] ?? '') . ' ' . ($entree['user_prenom'] ?? '');
+        $nomProduit = $entree['produit_nom'] ?? '';
+        $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+        $journalStmt->execute([
+            trim($userName) !== '' ? trim($userName) : 'Utilisateur',
+            'Entrée stock',
+            'Produit : ' . $nomProduit,
+            $enterpriseId
+        ]);
     if ($data['type_sortie'] !== 'perte' && $product['quantite_stock'] < $data['quantite']) {
         throw new Exception("Stock insuffisant. Stock disponible: " . $product['quantite_stock']);
     }

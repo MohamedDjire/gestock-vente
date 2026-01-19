@@ -78,7 +78,6 @@ import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 import { logJournal } from '../composables/useJournal'
 import { apiService } from '../composables/Api/apiService.js'
-import { getEcritures } from '../composables/Api/apiCompta.js'
 import { useCurrency } from '../composables/useCurrency.js'
 import { useAuthStore } from '../stores/auth.js'
 

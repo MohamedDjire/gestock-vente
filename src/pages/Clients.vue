@@ -34,6 +34,7 @@
                   <th>Nom complet</th>
                   <th>Email</th>
                   <th>Téléphone</th>
+                  <th>Point de vente</th>
                   <th>Ajouté par</th>
                   <th>Statut</th>
                   <th class="actions-column">Actions</th>
@@ -50,6 +51,7 @@
                   </td>
                   <td>{{ client.email }}</td>
                   <td>{{ client.telephone }}</td>
+                  <td>{{ client.nom_point_vente || '—' }}</td>
                   <td>{{ client.nom_utilisateur }}</td>
                   <td>
                     <span :class="['status-badge', client.statut === 'actif' ? 'status-active' : 'status-inactive']">
@@ -126,7 +128,27 @@
               </div>
               <div class="form-group">
                 <label>Adresse</label>
+<<<<<<< Updated upstream
                 <input v-model="form.adresse" placeholder="Adresse du client" />
+=======
+                <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>Point de vente</label>
+                <select v-model="form.id_point_vente" class="form-input">
+                  <option :value="null">Aucun</option>
+                  <option v-for="pv in pointsVente" :key="pv.id_point_vente" :value="pv.id_point_vente">
+                    {{ pv.nom_point_vente }}
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Statut</label>
+                <select v-model="form.statut" class="form-input">
+                  <option value="actif">Actif</option>
+                  <option value="inactif">Inactif</option>
+                </select>
+>>>>>>> Stashed changes
               </div>
             </div>
 
@@ -177,9 +199,14 @@
 </style>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { logJournal } from '../composables/useJournal'
+<<<<<<< Updated upstream
 import apiClient from '../composables/Api/apiClient.js'
+=======
+import apiClient from '../composables/api/apiClient'
+import apiPointVente from '../composables/api/api_point_vente'
+>>>>>>> Stashed changes
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -201,7 +228,19 @@ const form = ref({
   telephone: '',
   adresse: '',
   statut: 'actif',
+  id_point_vente: null,
 })
+
+// Watcher pour forcer la conversion du point de vente sélectionné
+watch(() => form.value.id_point_vente, (val) => {
+  if (val === '' || val === undefined || val === 'null') {
+    form.value.id_point_vente = null
+  } else if (val !== null) {
+    form.value.id_point_vente = Number(val)
+    if (isNaN(form.value.id_point_vente)) form.value.id_point_vente = null
+  }
+})
+const pointsVente = ref([])
 
 const getUserId = () => {
   const userStr = localStorage.getItem('prostock_user')
@@ -252,7 +291,18 @@ const fetchClients = async () => {
   }
 }
 
-onMounted(fetchClients)
+const fetchPointsVente = async () => {
+  try {
+    pointsVente.value = await apiPointVente.getAll()
+  } catch (e) {
+    pointsVente.value = []
+  }
+}
+
+onMounted(() => {
+  fetchClients()
+  fetchPointsVente()
+})
 
 const filteredClients = computed(() => {
   if (!search.value) return clients.value
@@ -267,19 +317,25 @@ const submitForm = async () => {
   formError.value = '';
   let response;
   let actionType = '';
-  
+
   const id_utilisateur = getUserId()
   const id_entreprise = getEnterpriseId()
-  
+
   if (!id_utilisateur || !id_entreprise) {
     formError.value = "Erreur: Impossible de récupérer les informations utilisateur. Veuillez vous reconnecter."
     return
   }
-  
+
+  // Correction : conversion explicite du point de vente
+  let id_point_vente = form.value.id_point_vente;
+  if (id_point_vente === '' || id_point_vente === undefined) id_point_vente = null;
+  if (id_point_vente !== null) id_point_vente = Number(id_point_vente);
+
   try {
     if (editingClient.value) {
       const data = {
         ...form.value,
+        id_point_vente,
         id_utilisateur,
         id_entreprise,
         id: editingClient.value.id
@@ -287,7 +343,7 @@ const submitForm = async () => {
       response = await apiClient.post('/clients.php?_method=PUT', data);
       actionType = 'Modification client';
     } else {
-      const data = { ...form.value, id_utilisateur, id_entreprise };
+      const data = { ...form.value, id_point_vente, id_utilisateur, id_entreprise };
       response = await apiClient.post('/clients.php', data);
       actionType = 'Ajout client';
     }
@@ -318,6 +374,7 @@ const editClient = (client) => {
     telephone: client.telephone || '',
     adresse: client.adresse || '',
     statut: client.statut || 'actif',
+    id_point_vente: client.id_point_vente || null,
   }
 }
 

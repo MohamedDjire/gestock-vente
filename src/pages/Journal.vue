@@ -51,7 +51,9 @@
               <span class="action-badge" :class="getActionClass(entry.action)">{{ entry.action || 'Action' }}</span>
             </td>
             <td class="details-cell">
-              <span class="details-text">{{ entry.details || '—' }}</span>
+              <span class="details-text" style="font-weight:600;color:#1a5f4a;background:#e0f7fa;padding:0.2rem 0.5rem;border-radius:6px;">
+                {{ entry.details || '—' }}
+              </span>
               <button class="btn-view" @click="openDetails(entry)" title="Voir détails">
                 <span class="icon-view">👁️</span>
               </button>
@@ -107,7 +109,7 @@
               <span>Détails</span>
             </div>
             <div class="section-content">
-              <div class="details-value details-value-long" style="background:#f8fafc;border-radius:8px;padding:1rem 1.2rem;border:1px solid #e2e8f0;">
+              <div class="details-value details-value-long" style="background:#e0f7fa;border-radius:8px;padding:1rem 1.2rem;border:1px solid #1a5f4a;font-weight:600;color:#1a5f4a;">
                 {{ selectedEntry?.details }}
               </div>
             </div>

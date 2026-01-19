@@ -33,10 +33,11 @@ $pdo = createDatabaseConnection();
 // GET : liste ou détail
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (isset($_GET['id'])) {
-        $stmt = $pdo->prepare('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise 
+        $stmt = $pdo->prepare('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise, pv.nom_point_vente 
                                FROM stock_clients c
                                JOIN stock_utilisateur u ON c.id_utilisateur = u.id_utilisateur
                                JOIN stock_entreprise e ON c.id_entreprise = e.id_entreprise
+                               LEFT JOIN stock_point_vente pv ON c.id_point_vente = pv.id_point_vente
                                WHERE c.id = ?');
         $stmt->execute([$_GET['id']]);
         $client = $stmt->fetch();
@@ -46,10 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         }
         echo json_encode($client);
     } else {
-        $stmt = $pdo->query('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise 
+        $stmt = $pdo->query('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise, pv.nom_point_vente 
                              FROM stock_clients c
                              JOIN stock_utilisateur u ON c.id_utilisateur = u.id_utilisateur
                              JOIN stock_entreprise e ON c.id_entreprise = e.id_entreprise
+                             LEFT JOIN stock_point_vente pv ON c.id_point_vente = pv.id_point_vente
                              ORDER BY c.date_creation DESC');
         $clients = $stmt->fetchAll();
         foreach ($clients as &$client) {
@@ -66,11 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // POST : ajout
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Fusion universelle : récupère toutes les données du POST (JSON et x-www-form-urlencoded)
     $data = json_decode(file_get_contents('php://input'), true);
-    // Fallback : si JSON vide, tente parse_str (x-www-form-urlencoded)
-    if (!$data) {
-        parse_str(file_get_contents('php://input'), $data);
-    }
+    if (!is_array($data)) $data = [];
+    $data = array_merge($_POST, $data);
     // Détection robuste du type de client
     $type = isset($data['type']) ? strtolower(trim($data['type'])) : '';
     // Si nom_entreprise est renseigné et nom/prenom sont vides, on force le type à entreprise
@@ -81,6 +82,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($type === 'entreprise') {
         $data['nom'] = isset($data['nom_entreprise']) ? $data['nom_entreprise'] : '';
         $data['prenom'] = isset($data['nom_entreprise']) ? $data['nom_entreprise'] : '';
+    }
+    // Simplification robuste : id_point_vente doit être un entier ou null
+    if (array_key_exists('id_point_vente', $data)) {
+        $val = $data['id_point_vente'];
+        if ($val === '' || $val === null || $val === 'null' || !is_numeric($val)) {
+            $data['id_point_vente'] = null;
+        } else {
+            $data['id_point_vente'] = (int)$val;
+        }
+    } else {
+        $data['id_point_vente'] = null;
     }
 
     if ($type === 'entreprise') {
@@ -110,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id_entreprise = $pdo->lastInsertId();
         }
         $nomEntreprise = trim($data['nom_entreprise']);
-        $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type, id_point_vente) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $nomEntreprise, // nom = nom de l'entreprise
             $nomEntreprise, // prenom = nom de l'entreprise
@@ -120,7 +132,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             isset($data['telephone']) ? $data['telephone'] : null,
             isset($data['adresse']) ? $data['adresse'] : null,
             isset($data['statut']) ? $data['statut'] : 'actif',
-            'entreprise'
+            'entreprise',
+            isset($data['id_point_vente']) ? $data['id_point_vente'] : null
+        ]);
+        // Journaliser la création du client avec le nom
+        $nomJournal = ($type === 'entreprise') ? $nomEntreprise : ($data['nom'] . ' ' . $data['prenom']);
+        $journalStmt = $pdo->prepare('INSERT INTO stock_journal (date, user, action, details) VALUES (NOW(), ?, ?, ?)');
+        $journalStmt->execute([
+            $data['nom_utilisateur'] ?? 'Utilisateur',
+            'Création client',
+            'Client : ' . $nomJournal
         ]);
         echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
         exit;
@@ -147,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id_entreprise = $pdo->lastInsertId();
             }
         }
-        $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type, id_point_vente) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $data['nom'],
             $data['prenom'],
@@ -157,7 +178,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             isset($data['telephone']) ? $data['telephone'] : null,
             isset($data['adresse']) ? $data['adresse'] : null,
             isset($data['statut']) ? $data['statut'] : 'actif',
-            'particulier'
+            'particulier',
+            isset($data['id_point_vente']) ? $data['id_point_vente'] : null
         ]);
         echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
         exit;
@@ -182,6 +204,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
         exit;
     }
     $type = $data['type'];
+    // Correction stricte : id_point_vente doit être un entier > 0 ou null
+    if (isset($data['id_point_vente']) && $data['id_point_vente'] !== '' && $data['id_point_vente'] !== null && $data['id_point_vente'] !== 'null' && is_numeric($data['id_point_vente'])) {
+        $data['id_point_vente'] = (int)$data['id_point_vente'];
+    } else {
+        $data['id_point_vente'] = null;
+    }
     if ($type === 'entreprise') {
         if (empty($data['nom_entreprise']) || empty($data['id_utilisateur']) || empty($data['id'])) {
             echo json_encode(['error' => 'Champs manquants pour entreprise', 'data' => $data]);
@@ -198,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $stmtInsertE->execute([$data['nom_entreprise']]);
             $id_entreprise = $pdo->lastInsertId();
         }
-        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=? WHERE id=?');
+        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=?, id_point_vente=? WHERE id=?');
         $stmt->execute([
             $data['nom_entreprise'], // nom = nom de l'entreprise
             $data['nom_entreprise'], // prenom = nom de l'entreprise
@@ -209,7 +237,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             isset($data['adresse']) ? $data['adresse'] : null,
             isset($data['statut']) ? $data['statut'] : 'actif',
             'entreprise',
+            isset($data['id_point_vente']) ? $data['id_point_vente'] : null,
             $data['id']
+        ]);
+        // Journaliser la modification du client avec le nom
+        $nomJournal = ($type === 'entreprise') ? ($data['nom_entreprise'] ?? $data['nom']) : ($data['nom'] . ' ' . $data['prenom']);
+        $journalStmt = $pdo->prepare('INSERT INTO stock_journal (date, user, action, details) VALUES (NOW(), ?, ?, ?)');
+        $journalStmt->execute([
+            $data['nom_utilisateur'] ?? 'Utilisateur',
+            'Modification client',
+            'Client : ' . $nomJournal
         ]);
         echo json_encode([
             'success' => true,
@@ -240,7 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 $id_entreprise = $pdo->lastInsertId();
             }
         }
-        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=? WHERE id=?');
+        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=?, id_point_vente=? WHERE id=?');
         $stmt->execute([
             $data['nom'],
             $data['prenom'],
@@ -251,6 +288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             isset($data['adresse']) ? $data['adresse'] : null,
             isset($data['statut']) ? $data['statut'] : 'actif',
             'particulier',
+            isset($data['id_point_vente']) ? $data['id_point_vente'] : null,
             $data['id']
         ]);
         echo json_encode([
@@ -282,7 +320,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         exit;
     }
     $stmt = $pdo->prepare('DELETE FROM stock_clients WHERE id=?');
+    // Récupérer le nom du client avant suppression
+    $stmtNom = $pdo->prepare('SELECT nom, prenom, nom_entreprise, type FROM stock_clients WHERE id=?');
+    $stmtNom->execute([$id]);
+    $client = $stmtNom->fetch(PDO::FETCH_ASSOC);
+    if ($client) {
+        $nomJournal = ($client['type'] === 'entreprise') ? ($client['nom_entreprise'] ?? $client['nom']) : ($client['nom'] . ' ' . $client['prenom']);
+        $nomUtilisateur = $client['nom'] ?? 'Utilisateur';
+    } else {
+        $nomJournal = '(client inconnu)';
+        $nomUtilisateur = 'Utilisateur';
+    }
     $stmt->execute([$id]);
+    // Journaliser la suppression du client avec le nom (jamais l'ID)
+    $journalStmt = $pdo->prepare('INSERT INTO stock_journal (date, user, action, details) VALUES (NOW(), ?, ?, ?)');
+    $journalStmt->execute([
+        $nomUtilisateur,
+        'Suppression client',
+        'Client : ' . $nomJournal
+    ]);
     echo json_encode(['success' => true, 'rowCount' => $stmt->rowCount(), 'id' => $id]);
     exit;
 }

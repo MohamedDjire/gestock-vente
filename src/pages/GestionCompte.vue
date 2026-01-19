@@ -1,4 +1,3 @@
-
 <template>
     <!-- Snackbar notification -->
     <transition name="fade">
@@ -24,6 +23,7 @@
         {{ tab.label }}
       </button>
     </div>
+
 
     <!-- Onglet Forfaits -->
     <div v-if="activeTab === 'forfaits'" class="tab-content">
@@ -167,6 +167,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Onglet Entreprise -->
+    <!-- Onglet Entreprise supprimé : gestion déplacée dans Parametres.vue -->
 
     <!-- Onglet Membres Connectés -->
     <div v-if="activeTab === 'connected'" class="tab-content">
@@ -532,6 +535,55 @@ import apiEntrepot from '../composables/Api/api_entrepot.js'
 import apiPointVente from '../composables/Api/api_point_vente.js'
 import { uploadPhoto } from '../config/cloudinary'
 import { useCurrency } from '../composables/useCurrency.js'
+            // Onglet Entreprise
+            const entrepriseForm = ref({
+              nom_entreprise: '',
+              email: '',
+              telephone: ''
+            })
+            const loadingEntreprise = ref(false)
+            const savingEntreprise = ref(false)
+            const entrepriseId = computed(() => {
+              const user = localStorage.getItem('prostock_user')
+              return user ? JSON.parse(user).id_entreprise : null
+            })
+
+            async function loadEntreprise() {
+              loadingEntreprise.value = true
+              try {
+                const id = entrepriseId.value
+                if (!id) return
+                const data = await apiEntreprise.getEntreprise(id)
+                entrepriseForm.value = {
+                  nom_entreprise: data.nom_entreprise || '',
+                  email: data.email || '',
+                  telephone: data.telephone || ''
+                }
+              } catch (e) {
+                triggerSnackbar('Erreur chargement entreprise', 'error')
+              } finally {
+                loadingEntreprise.value = false
+              }
+            }
+
+            async function saveEntreprise() {
+              savingEntreprise.value = true
+              try {
+                const id = entrepriseId.value
+                if (!id) return
+                await apiEntreprise.updateEntreprise(id, { ...entrepriseForm.value })
+                triggerSnackbar('Entreprise mise à jour !', 'success')
+                await loadEntreprise()
+              } catch (e) {
+                triggerSnackbar('Erreur enregistrement entreprise', 'error')
+              } finally {
+                savingEntreprise.value = false
+              }
+            }
+
+            onMounted(() => {
+              loadEntreprise()
+            })
             const uploadingPhoto = ref(false)
             const photoError = ref('')
             async function onPhotoChange(e) {
@@ -590,10 +642,19 @@ function onUserFormSubmit(e) {
 const activeTab = ref('forfaits')
 const tabs = [
   { id: 'forfaits', label: 'Forfaits', icon: '💳' },
+  { id: 'entreprise', label: 'Entreprise', icon: '🏢' },
   { id: 'connected', label: 'Membres Connectés', icon: '👥' },
   { id: 'users', label: 'Gestion Utilisateurs', icon: '👤' },
   { id: 'ravitaillement', label: 'Ravitaillement PV ↔ Entrepôts', icon: '🔄' }
 ]
+import apiEntreprise from '../composables/api/apiEntreprise.js'
+// Onglet Entreprise
+
+
+
+onMounted(() => {
+  loadEntreprise()
+})
 
 // Forfaits
 const currentForfait = ref(null)

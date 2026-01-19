@@ -51,36 +51,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/api_compta_ecritures.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_compta_factures_clients.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_compta_factures_fournisseurs.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_compta_tresorerie.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_compta_rapports.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_compta_audit.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
       '/api_fournisseur.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,
