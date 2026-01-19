@@ -193,94 +193,86 @@
 
     <!-- Modal Création/Modification Point de Vente -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-content point-vente-modal" @click.stop>
+      <div class="modal-content large" @click.stop>
         <div class="modal-header">
           <h3>{{ isEditMode ? 'Modifier le Point de Vente' : 'Nouveau Point de Vente' }}</h3>
           <button @click="closeModal" class="modal-close">×</button>
         </div>
         <div class="modal-body">
-          <div class="form-group">
-            <label>Nom du Point de Vente *</label>
-            <input
-              v-model="formData.nom_point_vente"
-              type="text"
-              required
-              placeholder="Ex: Boutique Centre-Ville"
-            />
-          </div>
-          <div class="form-group">
-            <label>Entrepôt associé</label>
-            <select v-model="formData.id_entrepot" class="form-input">
-              <option :value="null">Magasin (Par défaut)</option>
-              <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot.id_entrepot">
-                {{ entrepot.nom_entrepot }}
-              </option>
-            </select>
-            <small class="form-hint">Sélectionnez l'entrepôt qui alimente ce point de vente</small>
-          </div>
-          <div class="form-group">
-            <label>Adresse</label>
-            <textarea
-              v-model="formData.adresse"
-              rows="2"
-              placeholder="Adresse complète"
-            ></textarea>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Ville</label>
-              <input
-                v-model="formData.ville"
-                type="text"
-                placeholder="Ville"
-              />
+          <form @submit.prevent="savePointVente" class="modal-form">
+            <div class="form-section">
+              <h4 class="section-title">🏪 Point de vente</h4>
+              <div class="form-group">
+                <label>Nom du Point de Vente *</label>
+                <input
+                  v-model="formData.nom_point_vente"
+                  type="text"
+                  required
+                  placeholder="Ex: Boutique Centre-Ville"
+                />
+              </div>
+              <div class="form-group">
+                <label>Entrepôt associé</label>
+                <select v-model="formData.id_entrepot">
+                  <option :value="null">Magasin (Par défaut)</option>
+                  <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot.id_entrepot">
+                    {{ entrepot.nom_entrepot }}
+                  </option>
+                </select>
+                <small class="form-hint">Sélectionnez l'entrepôt qui alimente ce point de vente</small>
+              </div>
+              <div class="form-group">
+                <label>Adresse</label>
+                <textarea v-model="formData.adresse" rows="2" placeholder="Adresse complète"></textarea>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Pays</label>
-              <input
-                v-model="formData.pays"
-                type="text"
-                placeholder="Pays"
-              />
+
+            <div class="form-section">
+              <h4 class="section-title">📍 Localisation</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Ville</label>
+                  <input v-model="formData.ville" type="text" placeholder="Ville" />
+                </div>
+                <div class="form-group">
+                  <label>Pays</label>
+                  <input v-model="formData.pays" type="text" placeholder="Pays" />
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Téléphone</label>
-              <input
-                v-model="formData.telephone"
-                type="text"
-                placeholder="+225 XX XX XX XX XX"
-              />
+
+            <div class="form-section">
+              <h4 class="section-title">📞 Contact</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Téléphone</label>
+                  <input v-model="formData.telephone" type="text" placeholder="+225 XX XX XX XX XX" />
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <input v-model="formData.email" type="email" placeholder="email@exemple.com" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Responsable</label>
+                  <input v-model="formData.responsable" type="text" placeholder="Nom du responsable" />
+                </div>
+                <div class="form-group">
+                  <label>Statut</label>
+                  <select v-model="formData.actif">
+                    <option :value="1">Actif</option>
+                    <option :value="0">Inactif</option>
+                  </select>
+                  <small class="form-hint">Un point inactif n'apparaît pas dans les listes</small>
+                </div>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Email</label>
-              <input
-                v-model="formData.email"
-                type="email"
-                placeholder="email@exemple.com"
-              />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Responsable</label>
-            <input
-              v-model="formData.responsable"
-              type="text"
-              placeholder="Nom du responsable"
-            />
-          </div>
-          <div class="form-group">
-            <label>Statut</label>
-            <select v-model="formData.actif" class="form-input">
-              <option :value="1">Actif</option>
-              <option :value="0">Inactif</option>
-            </select>
-          </div>
+          </form>
         </div>
         <div class="modal-footer">
-          <button @click="closeModal" class="btn-secondary">Annuler</button>
-          <button @click="savePointVente" class="btn-primary" :disabled="saving">
+          <button type="button" @click="closeModal" class="btn-cancel">Annuler</button>
+          <button type="button" @click="savePointVente" class="btn-save" :disabled="saving">
             {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>

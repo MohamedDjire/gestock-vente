@@ -1,58 +1,66 @@
 
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content user-modal" @click.stop>
+    <div class="modal-content large" @click.stop>
       <div class="modal-header">
         <h3>Ajouter un utilisateur</h3>
         <button class="modal-close" @click="$emit('close')">×</button>
       </div>
       <div class="modal-body">
-        <form @submit.prevent="handleSubmit" class="user-form" id="add-user-form">
-          <div class="form-group">
-            <label>Photo</label>
-            <input type="file" accept="image/*" @change="onPhotoChange" />
-            <div v-if="uploadingPhoto" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
-            <div v-if="photoUrl" style="margin-top:0.5em;"><img :src="photoUrl" alt="Photo utilisateur" style="max-width:80px;border-radius:8px;" /></div>
-            <div v-if="photoError" style="color:#dc2626;font-size:0.95em;">{{ photoError }}</div>
-          </div>
-          <div class="form-row">
-            <div class="form-col">
+        <form @submit.prevent="handleSubmit" class="modal-form">
+          <div class="form-section">
+            <h4 class="section-title">👤 Identité</h4>
+            <div class="form-group">
+              <label>Photo</label>
+              <input type="file" accept="image/*" @change="onPhotoChange" />
+              <div v-if="uploadingPhoto" class="form-hint">Envoi en cours...</div>
+              <div v-if="photoUrl" style="margin-top:0.5em;"><img :src="photoUrl" alt="Photo" style="max-width:80px;border-radius:8px;" /></div>
+              <div v-if="photoError" style="color:#dc2626;font-size:0.9em;">{{ photoError }}</div>
+            </div>
+            <div class="form-row">
               <div class="form-group">
                 <label>Nom *</label>
-                <input v-model="user.nom" placeholder="Nom *" required />
+                <input v-model="user.nom" placeholder="Nom" required />
               </div>
               <div class="form-group">
                 <label>Prénom *</label>
-                <input v-model="user.prenom" placeholder="Prénom *" required />
-              </div>
-              <div class="form-group">
-                <label>Email *</label>
-                <input v-model="user.email" type="email" placeholder="Email *" required />
+                <input v-model="user.prenom" placeholder="Prénom" required />
               </div>
             </div>
-            <div class="form-col">
+            <div class="form-row">
               <div class="form-group">
-                <label>Mot de passe *</label>
-                <input v-model="user.password" type="password" placeholder="Mot de passe *" required />
+                <label>Email *</label>
+                <input v-model="user.email" type="email" placeholder="email@exemple.com" required />
               </div>
               <div class="form-group">
                 <label>Rôle *</label>
                 <select v-model="user.role" required>
-                  <option value="">Rôle *</option>
+                  <option value="">Sélectionner un rôle</option>
                   <option value="admin">Administrateur</option>
                   <option value="utilisateur">Utilisateur</option>
                 </select>
               </div>
             </div>
+            <div class="form-group">
+              <label>Mot de passe *</label>
+              <input v-model="user.password" type="password" placeholder="Mot de passe initial" required />
+              <small class="form-hint">L'utilisateur pourra le modifier après la première connexion</small>
+            </div>
           </div>
+
           <div class="form-section">
-            <h4 class="section-title">Accès & Permissions</h4>
-            <div>
+            <h4 class="section-title">🔗 Accès & Permissions</h4>
+            <small class="form-hint" style="display:block;margin-bottom:0.75rem;">
+              Chaque entrepôt et chaque point de vente ne peut être attribué qu'à un seul utilisateur. Une nouvelle attribution retire l'accès aux autres.
+            </small>
+            <div class="form-group">
               <AccessSelector
                 :items="entrepots"
                 v-model="user.permissions_entrepots"
                 label="entrepôts"
               />
+            </div>
+            <div class="form-group">
               <AccessSelector
                 :items="pointsVente"
                 v-model="user.permissions_points_vente"
@@ -66,24 +74,27 @@
               </label>
             </div>
           </div>
-          <div class="accordion">
-            <div class="accordion-header" @click.stop="showPermissions = !showPermissions">
-              <span>Permissions avancées</span>
-              <span>{{ showPermissions ? '▲' : '▼' }}</span>
-            </div>
 
-            <div v-if="showPermissions" class="accordion-body">
-              <label v-for="perm in permissions" :key="perm.value" class="perm-checkbox">
-                <input type="checkbox" v-model="user.permissions" :value="perm.value" />
-                {{ perm.label }}
-              </label>
+          <div class="form-section">
+            <h4 class="section-title">⚙️ Permissions avancées</h4>
+            <div class="accordion">
+              <div class="accordion-header" @click.stop="showPermissions = !showPermissions">
+                <span>Détail des accès</span>
+                <span>{{ showPermissions ? '▲' : '▼' }}</span>
+              </div>
+              <div v-if="showPermissions" class="accordion-body">
+                <label v-for="perm in permissions" :key="perm.value" class="perm-checkbox">
+                  <input type="checkbox" v-model="user.permissions" :value="perm.value" />
+                  {{ perm.label }}
+                </label>
+              </div>
             </div>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="$emit('close')">Annuler</button>
-            <button type="submit" class="btn-save">Valider</button>
           </div>
         </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" @click="$emit('close')">Annuler</button>
+        <button type="button" class="btn-save" @click="handleSubmit">Valider</button>
       </div>
     </div>
   </div>
@@ -160,32 +171,7 @@ function handleSubmit() {
 </script>
 
 <style scoped>
-/* .modal-overlay, .modal-header, .modal-close, .modal-actions, .btn-cancel, .btn-save : style.css */
-.modal-content.user-modal {
-  max-width: 700px;
-  min-width: 350px;
-}
-
-.form-row {
-  display: flex;
-  gap: 24px;
-}
-.form-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-@media (max-width: 700px) {
-  .modal-content.user-modal {
-    max-width: 98vw;
-  }
-  .form-row {
-    flex-direction: column;
-    gap: 0;
-  }
-}
+/* .modal-form, .form-section, .form-row, .form-group, .modal-footer, .btn-cancel, .btn-save : style.css */
 .modal-row {
   display: flex;
   gap: 1rem;

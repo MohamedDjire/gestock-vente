@@ -306,6 +306,59 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Historique des ventes (admin uniquement, depuis Ventes) -->
+    <div v-if="showHistoriqueModal && selectedPointVente" class="modal-overlay" @click.self="showHistoriqueModal = false">
+      <div class="modal-content details-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Historique des ventes — {{ selectedPointVente.nom_point_vente }}</h3>
+          <button class="modal-close" @click="showHistoriqueModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="loadingHistorique" class="loading">Chargement...</div>
+          <div v-else-if="historiqueVentes.length === 0" class="empty-state">Aucune vente pour ce point.</div>
+          <div v-else class="historique-table-wrap">
+            <table class="historique-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Client</th>
+                  <th>Produits</th>
+                  <th>Qté</th>
+                  <th>Montant</th>
+                  <th>Vendeur</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="v in historiqueVentes" :key="v.id_vente + '_' + (v.date_vente || '')">
+                  <td>{{ formatDate(v.date_vente) }}</td>
+                  <td>
+                    <span v-if="v.client_nom">{{ v.client_nom }} {{ v.client_prenom || '' }}</span>
+                    <span v-else class="text-muted">Client anonyme</span>
+                  </td>
+                  <td>
+                    <div class="produits-list">
+                      <span v-for="(p, i) in (v.produits || [])" :key="i" class="produit-badge">
+                        {{ p.produit_nom || p.nom }} ({{ p.quantite }})
+                      </span>
+                    </div>
+                  </td>
+                  <td>{{ v.nombre_produits || (v.produits?.length || 0) }}</td>
+                  <td class="montant-cell">{{ formatPrice(v.montant_total) }}</td>
+                  <td>
+                    <span v-if="v.user_nom">{{ v.user_nom }} {{ v.user_prenom || '' }}</span>
+                    <span v-else class="text-muted">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="showHistoriqueModal = false">Fermer</button>
+        </div>
+      </div>
+    </div>
     
     <!-- Modal Reçu de Vente -->
     <div v-if="showReceiptModal && lastSaleReceipt" class="modal-overlay receipt-overlay" @click.self="closeReceipt">
@@ -414,6 +467,9 @@ const discountType = ref('percent')
 const discountValue = ref(0)
 const showDiscountModal = ref(false)
 const showPointVenteModal = ref(false)
+const showHistoriqueModal = ref(false)
+const historiqueVentes = ref([])
+const loadingHistorique = ref(false)
 const loadingPointsVente = ref(false)
 const processingSale = ref(false)
 
@@ -724,12 +780,93 @@ const selectPointVente = (pv) => {
   showPointVenteModal.value = false
 }
 
-const goToPointVente = () => {
-  if (selectedPointVente.value) {
-    router.push(`/point-vente?point_vente=${selectedPointVente.value.id_point_vente}`)
-  } else {
-    router.push('/point-vente')
+const formatDate = (dateString) => {
+  if (!dateString) return '—'
+  const date = new Date(dateString)
+  return date.toLocaleString('fr-FR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const loadHistoriqueVentes = async (pv) => {
+  if (!pv || !pv.id_point_vente) return
+  loadingHistorique.value = true
+  historiqueVentes.value = []
+  try {
+    const response = await apiService.get(`/api_vente.php?action=all&id_point_vente=${pv.id_point_vente}`)
+    if (!response || !response.success) return
+    const allVentes = response.data || []
+    const ventesFiltered = allVentes.filter(v => {
+      const type = v.type_vente
+      if (type === 'livraison' || type === 'expedition' || type === 'commande' || type === 'retour') return false
+      return true
+    })
+    const ventesGrouped = {}
+    ventesFiltered.forEach(vente => {
+      const dateKey = new Date(vente.date_vente).toISOString().slice(0, 19)
+      const key = `${dateKey}_${vente.id_user}_${vente.id_point_vente}`
+      if (!ventesGrouped[key]) {
+        ventesGrouped[key] = {
+          id_vente: vente.id_vente,
+          date_vente: vente.date_vente,
+          id_user: vente.id_user,
+          id_point_vente: vente.id_point_vente,
+          id_client: vente.id_client,
+          client_nom: vente.client_nom,
+          client_prenom: vente.client_prenom,
+          user_nom: vente.user_nom,
+          user_prenom: vente.user_prenom,
+          nom_point_vente: vente.nom_point_vente,
+          montant_total: parseFloat(vente.montant_total) || 0,
+          nombre_produits: 1,
+          produits: [{
+            id_produit: vente.id_produit,
+            produit_nom: vente.produit_nom,
+            code_produit: vente.code_produit,
+            quantite: vente.quantite,
+            prix_unitaire: vente.prix_unitaire,
+            montant_total: vente.montant_total
+          }]
+        }
+      } else {
+        ventesGrouped[key].montant_total += parseFloat(vente.montant_total) || 0
+        ventesGrouped[key].nombre_produits += 1
+        ventesGrouped[key].produits.push({
+          id_produit: vente.id_produit,
+          produit_nom: vente.produit_nom,
+          code_produit: vente.code_produit,
+          quantite: vente.quantite,
+          prix_unitaire: vente.prix_unitaire,
+          montant_total: vente.montant_total
+        })
+      }
+    })
+    historiqueVentes.value = Object.values(ventesGrouped).sort((a, b) => new Date(b.date_vente) - new Date(a.date_vente))
+  } catch (e) {
+    console.error('Erreur chargement historique ventes:', e)
+  } finally {
+    loadingHistorique.value = false
   }
+}
+
+const goToPointVente = () => {
+  if (!selectedPointVente.value) {
+    router.push('/point-vente')
+    return
+  }
+  // Admin : afficher l'historique du point dans une modale (sans quitter Ventes)
+  if (isAdmin.value) {
+    showHistoriqueModal.value = true
+    loadHistoriqueVentes(selectedPointVente.value)
+    return
+  }
+  // Non-admin : aller sur Point de vente pour voir son historique (un seul point)
+  router.push(`/point-vente?point_vente=${selectedPointVente.value.id_point_vente}`)
 }
 
 const lastSaleReceipt = ref(null)
@@ -2121,6 +2258,51 @@ onMounted(async () => {
   text-align: center;
   padding: 2rem;
   color: #6b7280;
+}
+
+/* Modal Historique des ventes */
+.historique-table-wrap {
+  overflow-x: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.historique-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.historique-table th,
+.historique-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.historique-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+}
+.historique-table .produits-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.historique-table .produit-badge {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+.historique-table .montant-cell {
+  font-weight: 600;
+  color: #1a5f4a;
+}
+.historique-table .text-muted {
+  color: #9ca3af;
 }
 </style>
 

@@ -404,18 +404,22 @@ function createUser($bdd, $data) {
     
     $userId = $bdd->lastInsertId();
 
-    // Permissions entrepôts
+    // Permissions entrepôts : un entrepôt ne peut être attribué qu'à un seul utilisateur
     if (!empty($data['permissions_entrepots']) && is_array($data['permissions_entrepots'])) {
-        $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_entrepot (id_utilisateur, id_entrepot) VALUES (:id_utilisateur, :id_entrepot)");
+        $stmtDel = $bdd->prepare("DELETE FROM stock_utilisateur_entrepot WHERE id_entrepot = :id_entrepot");
+        $stmtIns = $bdd->prepare("INSERT INTO stock_utilisateur_entrepot (id_utilisateur, id_entrepot) VALUES (:id_utilisateur, :id_entrepot)");
         foreach ($data['permissions_entrepots'] as $id_entrepot) {
-            $stmt->execute(['id_utilisateur' => $userId, 'id_entrepot' => $id_entrepot]);
+            $stmtDel->execute(['id_entrepot' => $id_entrepot]);
+            $stmtIns->execute(['id_utilisateur' => $userId, 'id_entrepot' => $id_entrepot]);
         }
     }
-    // Permissions points de vente
+    // Permissions points de vente : un point de vente ne peut être attribué qu'à un seul utilisateur
     if (!empty($data['permissions_points_vente']) && is_array($data['permissions_points_vente'])) {
-        $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_point_vente (id_utilisateur, id_point_vente) VALUES (:id_utilisateur, :id_point_vente)");
+        $stmtDel = $bdd->prepare("DELETE FROM stock_utilisateur_point_vente WHERE id_point_vente = :id_point_vente");
+        $stmtIns = $bdd->prepare("INSERT INTO stock_utilisateur_point_vente (id_utilisateur, id_point_vente) VALUES (:id_utilisateur, :id_point_vente)");
         foreach ($data['permissions_points_vente'] as $id_pv) {
-            $stmt->execute(['id_utilisateur' => $userId, 'id_point_vente' => $id_pv]);
+            $stmtDel->execute(['id_point_vente' => $id_pv]);
+            $stmtIns->execute(['id_utilisateur' => $userId, 'id_point_vente' => $id_pv]);
         }
     }
     // Accès comptabilité
@@ -500,7 +504,13 @@ function updateUser($bdd, $userId, $data) {
         FILE_APPEND
     );
     if (isset($data['permissions_entrepots'])) {
-        // Toujours supprimer les accès existants si le champ est présent
+        // Un entrepôt ne peut être attribué qu'à un seul utilisateur : d'abord libérer des autres
+        if (is_array($data['permissions_entrepots']) && count($data['permissions_entrepots']) > 0) {
+            $stmtDelE = $bdd->prepare("DELETE FROM stock_utilisateur_entrepot WHERE id_entrepot = :id_entrepot");
+            foreach ($data['permissions_entrepots'] as $id_entrepot) {
+                $stmtDelE->execute(['id_entrepot' => $id_entrepot]);
+            }
+        }
         $bdd->prepare("DELETE FROM stock_utilisateur_entrepot WHERE id_utilisateur = :id")->execute(['id' => $userId]);
         if (is_array($data['permissions_entrepots']) && count($data['permissions_entrepots']) > 0) {
             $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_entrepot (id_utilisateur, id_entrepot) VALUES (:id_utilisateur, :id_entrepot)");
@@ -509,13 +519,18 @@ function updateUser($bdd, $userId, $data) {
             }
         }
     }
-    // 2. Points de vente
+    // 2. Points de vente : un point de vente ne peut être attribué qu'à un seul utilisateur
     file_put_contents(__DIR__ . '/updateUser_debug.log',
         date('Y-m-d H:i:s') . " - permissions_points_vente: " . json_encode($data['permissions_points_vente'] ?? null) . "\n",
         FILE_APPEND
     );
     if (isset($data['permissions_points_vente'])) {
-        // Toujours supprimer les accès existants si le champ est présent
+        if (is_array($data['permissions_points_vente']) && count($data['permissions_points_vente']) > 0) {
+            $stmtDelPv = $bdd->prepare("DELETE FROM stock_utilisateur_point_vente WHERE id_point_vente = :id_point_vente");
+            foreach ($data['permissions_points_vente'] as $id_pv) {
+                $stmtDelPv->execute(['id_point_vente' => $id_pv]);
+            }
+        }
         $bdd->prepare("DELETE FROM stock_utilisateur_point_vente WHERE id_utilisateur = :id")->execute(['id' => $userId]);
         if (is_array($data['permissions_points_vente']) && count($data['permissions_points_vente']) > 0) {
             $stmt = $bdd->prepare("INSERT INTO stock_utilisateur_point_vente (id_utilisateur, id_point_vente) VALUES (:id_utilisateur, :id_point_vente)");

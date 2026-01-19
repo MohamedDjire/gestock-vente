@@ -13,6 +13,7 @@ import Journal from '../pages/Journal.vue'
 import Fournisseurs from '../pages/Fournisseurs.vue'
 import Settings from '../pages/Settings.vue'
 import GestionCompte from '../pages/GestionCompte.vue'
+import PaiementForfait from '../pages/PaiementForfait.vue'
 
 const routes = [
   {
@@ -116,6 +117,12 @@ const routes = [
     name: 'GestionCompte',
     component: GestionCompte,
     meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/paiement-forfait',
+    name: 'PaiementForfait',
+    component: PaiementForfait,
+    meta: { requiresAuth: true }
   },
   {
     path: '/comptabilite',

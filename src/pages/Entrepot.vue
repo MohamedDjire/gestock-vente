@@ -133,97 +133,90 @@
 
     <!-- Modal Création/Modification Entrepôt -->
     <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-content entrepot-modal" @click.stop>
+      <div class="modal-content large" @click.stop>
         <div class="modal-header">
           <h3>{{ isEditMode ? 'Modifier l\'Entrepôt' : 'Nouvel Entrepôt' }}</h3>
           <button @click="closeModal" class="modal-close">×</button>
         </div>
         <div class="modal-body">
-          <div class="form-group">
-            <label>Nom de l'Entrepôt *</label>
-            <input
-              v-model="formData.nom_entrepot"
-              type="text"
-              required
-              placeholder="Ex: Magasin Principal"
-            />
-          </div>
-          <div class="form-group">
-            <label>Adresse</label>
-            <textarea
-              v-model="formData.adresse"
-              rows="2"
-              placeholder="Adresse complète"
-            ></textarea>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Ville</label>
-              <input
-                v-model="formData.ville"
-                type="text"
-                placeholder="Ville"
-              />
+          <form @submit.prevent="saveEntrepot" class="modal-form">
+            <div class="form-section">
+              <h4 class="section-title">🏭 Informations générales</h4>
+              <div class="form-group">
+                <label>Nom de l'Entrepôt *</label>
+                <input
+                  v-model="formData.nom_entrepot"
+                  type="text"
+                  required
+                  placeholder="Ex: Magasin Principal"
+                />
+                <small class="form-hint">Nom d'affichage de l'entrepôt</small>
+              </div>
+              <div class="form-group">
+                <label>Adresse</label>
+                <textarea
+                  v-model="formData.adresse"
+                  rows="2"
+                  placeholder="Adresse complète"
+                ></textarea>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Ville</label>
+                  <input v-model="formData.ville" type="text" placeholder="Ville" />
+                </div>
+                <div class="form-group">
+                  <label>Pays</label>
+                  <input v-model="formData.pays" type="text" placeholder="Pays" />
+                </div>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Pays</label>
-              <input
-                v-model="formData.pays"
-                type="text"
-                placeholder="Pays"
-              />
+
+            <div class="form-section">
+              <h4 class="section-title">📞 Contact</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Téléphone</label>
+                  <input v-model="formData.telephone" type="text" placeholder="+225 XX XX XX XX XX" />
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <input v-model="formData.email" type="email" placeholder="email@exemple.com" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Responsable</label>
+                  <input v-model="formData.responsable" type="text" placeholder="Nom du responsable" />
+                </div>
+                <div class="form-group">
+                  <label>Capacité Maximale</label>
+                  <input
+                    v-model.number="formData.capacite_max"
+                    type="number"
+                    min="0"
+                    placeholder="Capacité en unités"
+                  />
+                  <small class="form-hint">En unités de stock (optionnel)</small>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Téléphone</label>
-              <input
-                v-model="formData.telephone"
-                type="text"
-                placeholder="Téléphone"
-              />
+
+            <div class="form-section">
+              <h4 class="section-title">⚙️ Statut</h4>
+              <div class="form-group">
+                <label>
+                  <input v-model="formData.actif" type="checkbox" />
+                  Entrepôt actif
+                </label>
+                <small class="form-hint">Un entrepôt inactif n'apparaît pas dans les listes de sélection</small>
+              </div>
             </div>
-            <div class="form-group">
-              <label>Email</label>
-              <input
-                v-model="formData.email"
-                type="email"
-                placeholder="Email"
-              />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Responsable</label>
-              <input
-                v-model="formData.responsable"
-                type="text"
-                placeholder="Nom du responsable"
-              />
-            </div>
-            <div class="form-group">
-              <label>Capacité Maximale</label>
-              <input
-                v-model.number="formData.capacite_max"
-                type="number"
-                min="0"
-                placeholder="Capacité en unités"
-              />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>
-              <input
-                v-model="formData.actif"
-                type="checkbox"
-              />
-              Entrepôt actif
-            </label>
-          </div>
+          </form>
         </div>
         <div class="modal-footer">
-          <button @click="closeModal" class="btn-secondary">Annuler</button>
-          <button @click="saveEntrepot" class="btn-primary" :disabled="saving">
+          <button type="button" @click="closeModal" class="btn-cancel">Annuler</button>
+          <button type="button" @click="saveEntrepot" class="btn-save" :disabled="saving">
             {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>
