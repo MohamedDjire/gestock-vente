@@ -1,4 +1,3 @@
-<!-- Bloc dupliqué supprimé : il ne reste qu'un seul <template>, <script setup> et <style> -->
 <template>
   <div class="compta-page compta-bg">
     <section class="compta-hero">
@@ -66,6 +65,15 @@ import {
   getAuditTrail
 } from '../composables/Api/apiCompta.js'
 import { updateEcriture } from '../composables/Api/apiCompta.js'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
+import { useCurrency } from '../composables/useCurrency.js'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { useAuthStore } from '../stores/auth.js'
+import { apiService } from '../composables/Api/apiService.js'
+import StatCard from '../components/StatCard.vue'
 
 function closeDeleteModal() {
             showDeleteModal.value = false

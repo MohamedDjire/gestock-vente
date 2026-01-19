@@ -691,12 +691,12 @@ const subscribeToForfait = async (forfaitId) => {
 const loadConnectedUsers = async () => {
   loadingConnected.value = true
   try {
-    // Récupérer tous les utilisateurs et filtrer ceux connectés récemment (dernières 24h)
-    const response = await apiService.get('/index.php?action=all')
+    const user = localStorage.getItem('prostock_user')
+    const id_entreprise = user ? JSON.parse(user).id_entreprise : null
+    const response = await apiService.get(`/index.php?action=all&enterprise_id=${id_entreprise}`)
     if (response.success && response.data) {
       const now = new Date()
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      
       connectedUsers.value = response.data.filter(user => {
         if (!user.dernier_login) return false
         const lastLogin = new Date(user.dernier_login)
@@ -717,7 +717,9 @@ const loadConnectedUsers = async () => {
 const loadUsers = async () => {
   loadingUsers.value = true
   try {
-    const response = await apiService.get('/index.php?action=all')
+    const user = localStorage.getItem('prostock_user')
+    const id_entreprise = user ? JSON.parse(user).id_entreprise : null
+    const response = await apiService.get(`/index.php?action=all&id_entreprise=${id_entreprise}`)
     if (response.success) {
       users.value = response.data || []
     }
