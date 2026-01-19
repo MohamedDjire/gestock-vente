@@ -414,7 +414,15 @@ try {
             ]);
             
             $idEntrepot = $bdd->lastInsertId();
-            
+            // Journaliser la création de l'entrepôt avec le nom
+            $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+            $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+            $journalStmt->execute([
+                $userName,
+                'Création entrepôt',
+                'Entrepôt : ' . ($data['nom_entrepot'] ?? ''),
+                $enterpriseId
+            ]);
             echo json_encode([
                 'success' => true,
                 'message' => 'Entrepôt créé avec succès',
@@ -491,6 +499,15 @@ try {
                 'id_entreprise' => $enterpriseId
             ]);
             
+            // Journaliser la modification de l'entrepôt avec le nom
+            $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+            $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+            $journalStmt->execute([
+                $userName,
+                'Modification entrepôt',
+                'Entrepôt : ' . ($data['nom_entrepot'] ?? ''),
+                $enterpriseId
+            ]);
             echo json_encode([
                 'success' => true,
                 'message' => 'Entrepôt mis à jour avec succès'
@@ -541,6 +558,15 @@ try {
             $stmt = $bdd->prepare("DELETE FROM stock_entrepot WHERE id_entrepot = :id AND id_entreprise = :id_entreprise");
             $stmt->execute(['id' => $idEntrepot, 'id_entreprise' => $enterpriseId]);
             
+            // Journaliser la suppression de l'entrepôt avec le nom
+            $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+            $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+            $journalStmt->execute([
+                $userName,
+                'Suppression entrepôt',
+                'Entrepôt : ' . ($entrepot['nom_entrepot'] ?? ''),
+                $enterpriseId
+            ]);
             echo json_encode([
                 'success' => true,
                 'message' => 'Entrepôt supprimé avec succès'

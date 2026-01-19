@@ -341,6 +341,24 @@ function createProduct($bdd, $data, $enterpriseId) {
     ]);
     
     $productId = $bdd->lastInsertId();
+    // Journaliser la création du produit avec le nom
+    $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+    $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+    $journalStmt->execute([
+        $userName,
+        'Création produit',
+        'Produit : ' . ($data['nom'] ?? ''),
+        $enterpriseId
+    ]);
+    // Journaliser la modification du produit avec le nom
+    $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+    $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+    $journalStmt->execute([
+        $userName,
+        'Modification produit',
+        'Produit : ' . ($data['nom'] ?? $product['nom']),
+        $enterpriseId
+    ]);
     return getProductById($bdd, $productId, $enterpriseId);
 }
 
@@ -412,6 +430,15 @@ function deleteProduct($bdd, $productId, $enterpriseId) {
     ");
     $stmt->execute(['id' => $productId, 'enterprise_id' => $enterpriseId]);
     
+    // Journaliser la suppression du produit avec le nom
+    $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+    $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+    $journalStmt->execute([
+        $userName,
+        'Suppression produit',
+        'Produit : ' . ($product['nom'] ?? ''),
+        $enterpriseId
+    ]);
     return ['message' => 'Produit désactivé avec succès', 'product_id' => $productId];
 }
 
@@ -427,6 +454,15 @@ function hardDeleteProduct($bdd, $productId, $enterpriseId) {
     ");
     $stmt->execute(['id' => $productId, 'enterprise_id' => $enterpriseId]);
     
+    // Journaliser la suppression définitive du produit avec le nom
+    $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+    $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+    $journalStmt->execute([
+        $userName,
+        'Suppression produit',
+        'Produit : ' . ($product['nom'] ?? ''),
+        $enterpriseId
+    ]);
     return ['message' => 'Produit supprimé définitivement', 'product_id' => $productId];
 }
 

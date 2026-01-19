@@ -78,7 +78,11 @@ import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 import { logJournal } from '../composables/useJournal'
 import { apiService } from '../composables/Api/apiService.js'
+<<<<<<< Updated upstream
 import { getEcritures } from '../composables/Api/apiCompta.js'
+=======
+
+>>>>>>> Stashed changes
 import { useCurrency } from '../composables/useCurrency.js'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -123,7 +127,7 @@ const loadDashboardData = async () => {
     // Charger les produits pour les stats produits/stocks (fallback Overview)
     const [productsResponse, ecrituresResponse] = await Promise.all([
       apiService.get('/api_produit.php?action=all'),
-      id_entreprise ? getEcritures(id_entreprise) : Promise.resolve({ data: [] })
+      id_entreprise ? apiService.get(`/api_compta_ecritures.php?id_entreprise=${id_entreprise}`) : Promise.resolve({ data: [] })
     ])
     let venteTotal = 0, venteJour = 0, achatTotal = 0, benefice = 0
     if (ecrituresResponse && Array.isArray(ecrituresResponse.data)) {

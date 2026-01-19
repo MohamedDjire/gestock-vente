@@ -1,51 +1,9 @@
 <template>
-  <div class="compta-page compta-bg">
-    <section class="compta-hero">
-      <div class="hero-content">
-        <h1><span class="hero-icon">📊</span> Comptabilité</h1>
-        <p class="hero-desc">Suivi en temps réel de la santé financière de votre entreprise</p>
-      </div>
-      <div class="hero-actions">
-        <ComptaHeader
-          @add="openAddModal"
-          @export="exportData"
-          @refresh="refreshData"
-          :period="period"
-          @period-change="setPeriod"
-        />
-      </div>
-    </section>
-    <ComptaModals :show="showModal" :entry="selectedEntry" @close="closeModal" @add="addEntry" @update="updateEntry" />
-    
-    <DeleteConfirmModal :show="showDeleteModal" @close="closeDeleteModal" @confirm="confirmDelete" />
-          
-          <div class="compta-tabs">
-            <button v-for="tab in tabs" :key="tab.key" :class="['compta-tab', {active: activeTab === tab.key}]" @click="activeTab = tab.key">
-              {{ tab.label }}
-            </button>
-          </div>
-          <section class="compta-section" v-if="activeTab === 'kpi'">
-            <ComptaKpi :kpi="kpiData" />
-          </section>
-          <section class="compta-section" v-if="activeTab === 'journal'">
-            <ComptaJournal :entries="journalEntries" :filters="filters" @edit="editEntry" @delete="deleteEntry" />
-          </section>
-          <section class="compta-section" v-if="activeTab === 'ventes'">
-            <ComptaVentes :factures="facturesClients" />
-          </section>
-          <section class="compta-section" v-if="activeTab === 'achats'">
-            <ComptaAchats :factures="facturesFournisseurs" />
-          </section>
-          <section class="compta-section" v-if="activeTab === 'tresorerie'">
-            <ComptaTresorerie :tresorerie="tresorerieData" />
-          </section>
-          <section class="compta-section" v-if="activeTab === 'rapports'">
-            <ComptaRapports :stats="statsData" />
-          </section>
-  </div>
+  <ComingSoon />
 </template>
 
 <script setup>
+<<<<<<< Updated upstream
 import { ref, onMounted } from 'vue'
 import ComptaHeader from '../components/comptabilite/ComptaHeader.vue'
 import ComptaKpi from '../components/comptabilite/ComptaKpi.vue'
@@ -713,3 +671,7 @@ async function confirmDelete() {
   align-items: center;
 }
 </style>
+=======
+import ComingSoon from '@/components/ComingSoon.vue'
+</script>
+>>>>>>> Stashed changes

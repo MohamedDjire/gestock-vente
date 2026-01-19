@@ -118,9 +118,7 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
-    path: '/comptabilite',
-    name: 'Comptabilite',
-    component: () => import('../pages/Comptabilite.vue'),
+    // Route comptabilité supprimée
     meta: { requiresAuth: true }
   }
 ]

@@ -339,7 +339,15 @@ try {
             ]);
             
             $idPointVente = $bdd->lastInsertId();
-            
+            // Journaliser la création du point de vente avec le nom
+            $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+            $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+            $journalStmt->execute([
+                $userName,
+                'Création point de vente',
+                'Point de vente : ' . ($data['nom_point_vente'] ?? ''),
+                $enterpriseId
+            ]);
             echo json_encode([
                 'success' => true,
                 'message' => 'Point de vente créé avec succès',
@@ -416,6 +424,15 @@ try {
                 'id_entreprise' => $enterpriseId
             ]);
             
+            // Journaliser la modification du point de vente avec le nom
+            $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+            $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+            $journalStmt->execute([
+                $userName,
+                'Modification point de vente',
+                'Point de vente : ' . ($data['nom_point_vente'] ?? ''),
+                $enterpriseId
+            ]);
             echo json_encode([
                 'success' => true,
                 'message' => 'Point de vente mis à jour avec succès'
@@ -466,6 +483,15 @@ try {
             $stmt = $bdd->prepare("DELETE FROM stock_point_vente WHERE id_point_vente = :id AND id_entreprise = :id_entreprise");
             $stmt->execute(['id' => $idPointVente, 'id_entreprise' => $enterpriseId]);
             
+            // Journaliser la suppression du point de vente avec le nom
+            $userName = $currentUser['nom'] ?? ($currentUser['email'] ?? 'Utilisateur');
+            $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
+            $journalStmt->execute([
+                $userName,
+                'Suppression point de vente',
+                'Point de vente : ' . ($pointVente['nom_point_vente'] ?? ''),
+                $enterpriseId
+            ]);
             echo json_encode([
                 'success' => true,
                 'message' => 'Point de vente supprimé avec succès'

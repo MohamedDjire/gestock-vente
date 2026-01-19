@@ -1,10 +1,9 @@
-
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
-import apiEntreprise from '../composables/Api/apiEntreprise.js'
-import apiEntrepot from '../composables/Api/api_entrepot.js'
-import apiPointVente from '../composables/Api/api_point_vente.js'
+import apiEntreprise from '../composables/api/apiEntreprise.js'
+import apiEntrepot from '../composables/api/api_entrepot.js'
+import apiPointVente from '../composables/api/api_point_vente.js'
 import ComptaSecurity from '../components/comptabilite/ComptaSecurity.vue'
           const user = ref({})
           const auditTrail = ref([])
@@ -28,7 +27,11 @@ onMounted(async () => {
         entreprise.value = {
           nom: data.nom_entreprise || '',
           adresse: data.adresse || '',
-          devise: data.devise || ''
+          devise: data.devise || '',
+          sigle: data.sigle || '',
+          num: data.num || '',
+          ncc: data.ncc || '',
+          num_banque: data.num_banque || ''
         }
         entrepriseId.value = data.id_entreprise
       } else {
@@ -55,7 +58,19 @@ onMounted(async () => {
 
 
 // --- Entreprise ---
-const entreprise = ref({ nom: '', adresse: '', devise: '' })
+const entreprise = ref({
+  nom: '',
+  adresse: '',
+  devise: '',
+  sigle: '',
+  num: '',
+  ncc: '',
+  num_banque: '',
+  email: '',
+  telephone: '',
+  site_web: '',
+  logo: ''
+})
 const entrepriseId = ref(null)
 const entrepriseError = ref('')
 const loadingEntreprise = ref(false)
@@ -98,8 +113,25 @@ function saveTax() {
 function deleteTax(tax) {
   taxes.value = taxes.value.filter(t => t.id !== tax.id)
 }
-function onLogoChange(e) {
-  // Gestion du logo (à compléter)
+const uploadingLogo = ref(false)
+const logoError = ref('')
+async function onLogoChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  uploadingLogo.value = true
+  logoError.value = ''
+  try {
+    const result = await uploadPhoto(file)
+    if (result.success && (result.data.url || result.data.secure_url)) {
+      entreprise.value.logo = result.data.secure_url || result.data.url
+    } else {
+      logoError.value = result.message || "Erreur lors de l'upload."
+    }
+  } catch (err) {
+    logoError.value = err.message
+  } finally {
+    uploadingLogo.value = false
+  }
 }
 async function saveEntreprise() {
   if (!entrepriseId.value) {
@@ -112,7 +144,15 @@ async function saveEntreprise() {
     const payload = {
       nom_entreprise: entreprise.value.nom,
       adresse: entreprise.value.adresse,
-      devise: entreprise.value.devise
+      devise: entreprise.value.devise,
+      sigle: entreprise.value.sigle,
+      num: entreprise.value.num,
+      ncc: entreprise.value.ncc,
+      num_banque: entreprise.value.num_banque,
+      email: entreprise.value.email,
+      telephone: entreprise.value.telephone,
+      site_web: entreprise.value.site_web,
+      logo: entreprise.value.logo
     }
     await apiEntreprise.updateEntreprise(entrepriseId.value, payload)
     alert('Paramètres enregistrés !')
@@ -145,9 +185,18 @@ function parseAccess(val) {
   return [];
 }
 
+const authStore = useAuthStore()
+// DEBUG : afficher le rôle utilisateur
+console.log('Rôle utilisateur courant :', authStore.userRole, authStore.user?.role)
+const isAdmin = computed(() => {
+  const role = (authStore.userRole || authStore.user?.role || '').toLowerCase();
+  return role === 'admin' || role === 'superadmin';
+})
+
+const showEditModal = ref(false)
 </script>
 <template>
-  <div class="settings-page">
+  <div v-if="isAdmin" class="settings-page">
     <aside class="settings-sidebar">
       <ul>
         <li :class="{active: section==='entreprise'}" @click="section='entreprise'">Entreprise</li>
@@ -156,39 +205,119 @@ function parseAccess(val) {
         <li :class="{active: section==='categories'}" @click="section='categories'">Catégories produits</li>
         <li :class="{active: section==='securite'}" @click="section='securite'">Sécurité & Audit</li>
         <li :class="{active: section==='notifications'}" @click="section='notifications'">Notifications</li>
-        <li :class="{active: section==='sauvegarde'}" @click="section='sauvegarde'">Sauvegarde</li>
+        
       </ul>
     </aside>
     <main class="settings-content">
       <div class="settings-main-panel">
         <template v-if="section==='entreprise'">
-                  <template v-if="section==='securite'">
-                    <ComptaSecurity :user="user" :audit="auditTrail" />
-                  </template>
-          
           <h2>Paramètres de l'entreprise</h2>
-          <form class="settings-form">
-            <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
-            <div class="form-group">
-              <label>Nom de l'entreprise</label>
-              <input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" />
+          <!-- Affichage moderne sous forme de carte -->
+          <div class="entreprise-card-pro">
+            <div v-if="entreprise.logo" class="entreprise-logo-wrapper">
+              <img :src="entreprise.logo" alt="Logo entreprise" class="entreprise-logo" />
             </div>
-            <div class="form-group">
-              <label>Logo</label>
-              <input type="file" @change="onLogoChange" />
+            <h3 class="entreprise-title">{{ entreprise.nom }}</h3>
+            <div class="entreprise-section">
+              <h4 class="entreprise-section-title">Identité</h4>
+              <div class="entreprise-field"><span class="entreprise-label">Sigle</span><span class="entreprise-value">{{ entreprise.sigle }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Numéro d'identification</span><span class="entreprise-value">{{ entreprise.num }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">NCC</span><span class="entreprise-value">{{ entreprise.ncc }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Numéro de banque</span><span class="entreprise-value">{{ entreprise.num_banque }}</span></div>
             </div>
-            <div class="form-group">
-              <label>Adresse</label>
-              <input type="text" v-model="entreprise.adresse" placeholder="Adresse" />
+            <div class="entreprise-section">
+              <h4 class="entreprise-section-title">Coordonnées</h4>
+              <div class="entreprise-field"><span class="entreprise-label">Adresse</span><span class="entreprise-value">{{ entreprise.adresse }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Ville</span><span class="entreprise-value">{{ entreprise.ville }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Pays</span><span class="entreprise-value">{{ entreprise.pays }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Code postal</span><span class="entreprise-value">{{ entreprise.code_postal }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Email</span><span class="entreprise-value">{{ entreprise.email }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Téléphone</span><span class="entreprise-value">{{ entreprise.telephone }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Site web</span><span class="entreprise-value">{{ entreprise.site_web }}</span></div>
             </div>
-            <div class="form-group">
-              <label>Devise</label>
-              <input type="text" v-model="entreprise.devise" placeholder="Devise (ex: XOF, EUR)" />
+            <div class="entreprise-section">
+              <h4 class="entreprise-section-title">Légal</h4>
+              <div class="entreprise-field"><span class="entreprise-label">Registre commerce</span><span class="entreprise-value">{{ entreprise.registre_commerce }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Capital social</span><span class="entreprise-value">{{ entreprise.capital_social }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Forme juridique</span><span class="entreprise-value">{{ entreprise.forme_juridique }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Numéro TVA</span><span class="entreprise-value">{{ entreprise.numero_tva }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Devise</span><span class="entreprise-value">{{ entreprise.devise }}</span></div>
             </div>
-            <button class="btn-primary" @click.prevent="saveEntreprise" :disabled="!entrepriseId">Enregistrer</button>
-            <button v-if="!entrepriseId" class="btn-secondary" style="margin-top:0.5rem;" @click.prevent="createEntreprise">Créer l'entreprise</button>
-          </form>
-        
+            <div class="entreprise-section">
+              <h4 class="entreprise-section-title">Abonnement</h4>
+              <div class="entreprise-field"><span class="entreprise-label">Date abonnement</span><span class="entreprise-value">{{ entreprise.date_abonnement }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Expiration abonnement</span><span class="entreprise-value">{{ entreprise.date_expiration_abonnement }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Statut</span><span class="entreprise-value">{{ entreprise.statut }}</span></div>
+            </div>
+            <div style="text-align:right;margin-top:2rem;">
+              <button class="btn-primary" @click="showEditModal = true">Modifier</button>
+            </div>
+          </div>
+          <!-- Modale d'édition -->
+          <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
+            <div class="modal-content" @click.stop>
+              <div class="modal-header">
+                <h3>Modifier l'entreprise</h3>
+                <button class="modal-close" @click="showEditModal = false">×</button>
+              </div>
+              <div class="modal-body">
+                <form class="settings-form" @submit.prevent="saveEntreprise">
+                  <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
+                  <div class="form-group">
+                    <label>Nom de l'entreprise</label>
+                    <input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" />
+                  </div>
+                  <div class="form-group">
+                    <label>Sigle</label>
+                    <input type="text" v-model="entreprise.sigle" placeholder="Sigle (ex: ABC)" />
+                  </div>
+                  <div class="form-group">
+                    <label>Numéro d'identification (num)</label>
+                    <input type="text" v-model="entreprise.num" placeholder="Numéro d'identification" />
+                  </div>
+                  <div class="form-group">
+                    <label>NCC</label>
+                    <input type="text" v-model="entreprise.ncc" placeholder="NCC" />
+                  </div>
+                  <div class="form-group">
+                    <label>Numéro de banque</label>
+                    <input type="text" v-model="entreprise.num_banque" placeholder="Numéro de banque" />
+                  </div>
+                  <div class="form-group">
+                    <label>Adresse</label>
+                    <input type="text" v-model="entreprise.adresse" placeholder="Adresse" />
+                  </div>
+                  <div class="form-group">
+                    <label>Devise</label>
+                    <input type="text" v-model="entreprise.devise" placeholder="Devise (ex: XOF, EUR)" />
+                  </div>
+                  <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" v-model="entreprise.email" placeholder="Email de l'entreprise" />
+                  </div>
+                  <div class="form-group">
+                    <label>Téléphone</label>
+                    <input type="text" v-model="entreprise.telephone" placeholder="Téléphone de l'entreprise" />
+                  </div>
+                  <div class="form-group">
+                    <label>Site web</label>
+                    <input type="text" v-model="entreprise.site_web" placeholder="Site web de l'entreprise" />
+                  </div>
+                  <div class="form-group">
+                    <label>Logo</label>
+                    <input type="file" accept="image/*" @change="onLogoChange" />
+                    <div v-if="uploadingLogo" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
+                    <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo entreprise" style="max-width:120px;border-radius:8px;" /></div>
+                    <div v-if="logoError" style="color:#dc2626;font-size:0.95em;">{{ logoError }}</div>
+                  </div>
+                  <div class="modal-actions">
+                    <button type="button" class="btn-cancel" @click="showEditModal = false">Annuler</button>
+                    <button type="submit" class="btn-save">Enregistrer</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         </template>
         <!-- Section utilisateurs supprimée, gestion déplacée dans GestionCompte.vue -->
         <template v-else-if="section==='taxes'">
@@ -336,6 +465,7 @@ function parseAccess(val) {
       </div>
     </main>
   </div>
+  <div v-else class="settings-page"><p style="color:#dc2626">Accès réservé à l'administrateur.</p></div>
 </template>
 
 <style scoped>
@@ -703,13 +833,98 @@ input:focus, select:focus {
   flex-direction: column;
   gap: 0.3rem;
 }
-@media (max-width: 900px) {
-  .form-row {
-    flex-wrap: wrap;
-    gap: 0.7rem;
+.entreprise-card {
+  max-width: 480px;
+  margin: 2rem auto 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.entreprise-card-pro {
+  max-width: 520px;
+  margin: 2.5rem auto 0 auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 32px rgba(26,95,74,0.10);
+  padding: 2.5rem 2.5rem 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1.5px solid #e5e7eb;
+}
+.entreprise-logo-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.2rem;
+}
+.entreprise-logo {
+  max-width: 120px;
+  max-height: 80px;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px #e5e7eb;
+  background: #f8fafc;
+  object-fit: contain;
+}
+.entreprise-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a5f4a;
+  margin-bottom: 1.2rem;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+.entreprise-section {
+  width: 100%;
+  margin-bottom: 1.2rem;
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem 0.7rem 1.2rem;
+  box-shadow: 0 1px 6px #f3f4f6;
+}
+.entreprise-section-title {
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: #218c6a;
+  margin-bottom: 0.7rem;
+  margin-top: 0;
+  letter-spacing: 0.01em;
+}
+.entreprise-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f2f2f2;
+}
+.entreprise-field:last-child {
+  border-bottom: none;
+}
+.entreprise-label {
+  font-weight: 600;
+  color: #1a5f4a;
+  min-width: 160px;
+  font-size: 1.04rem;
+}
+.entreprise-value {
+  color: #222;
+  word-break: break-word;
+  text-align: right;
+  flex: 1;
+  font-size: 1.04rem;
+}
+@media (max-width: 600px) {
+  .entreprise-card-pro {
+    padding: 1.2rem 0.5rem 1rem 0.5rem;
   }
-  .form-group {
-    max-width: 100%;
+  .entreprise-label, .entreprise-value {
+    font-size: 0.98rem;
   }
 }
 </style>

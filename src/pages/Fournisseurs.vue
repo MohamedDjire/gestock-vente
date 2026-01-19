@@ -139,7 +139,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { logJournal } from '../composables/useJournal'
 import apiFournisseur from '../composables/Api/apiFournisseur'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
@@ -203,7 +202,11 @@ function closeForm() {
   form.value = { nom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
   formError.value = ''
 }
+<<<<<<< Updated upstream
 import { createEcriture } from '../composables/Api/apiCompta.js'
+=======
+
+>>>>>>> Stashed changes
 async function submitForm() {
   if (!form.value.nom) {
     formError.value = 'Le nom est obligatoire'
@@ -226,23 +229,8 @@ async function submitForm() {
         id_entreprise = JSON.parse(user).id_entreprise
       }
       if (id_entreprise) {
-        await createEcriture({
-          date_ecriture: new Date().toISOString().slice(0, 10),
-          type_ecriture: 'Sortie',
-          montant: form.value.montant || 0,
-          categorie: 'Achat',
-          statut: 'validé',
-          reference: fournisseurCreated?.id || '',
-          details: `Achat fournisseur: ${form.value.nom}`,
-          id_entreprise
-        })
       }
     }
-    await logJournal({
-      user: getJournalUser(),
-      action: actionType,
-      details: `Email: ${form.value.email}`
-    })
     closeForm()
     await fetchFournisseurs()
   } catch (e) {
@@ -253,11 +241,6 @@ async function confirmDeleteFournisseur() {
   if (!fournisseurToDelete.value) return
   try {
     await apiFournisseur.delete(fournisseurToDelete.value.id)
-    await logJournal({
-      user: getJournalUser(),
-      action: 'Suppression fournisseur',
-      details: `ID: ${fournisseurToDelete.value.id}`
-    })
     closeDeleteModal()
     await fetchFournisseurs()
   } catch (e) {
