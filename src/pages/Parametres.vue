@@ -432,8 +432,8 @@ const isAdmin = computed(() => {
         background: #fff;
         border-radius: 12px;
         padding: 2rem;
-        min-width: 380px;
-        width: 420px;
+        min-width: 600px;
+        width: 800px;
         max-width: 95vw;
         box-shadow: 0 4px 24px rgba(0,0,0,0.08);
         position: relative;
