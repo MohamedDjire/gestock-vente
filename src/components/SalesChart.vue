@@ -9,11 +9,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-<<<<<<< Updated upstream
-import { getEcritures } from '../composables/Api/apiCompta.js'
-=======
 
->>>>>>> Stashed changes
 let chartInstance = null
 const chartCanvas = ref(null)
 

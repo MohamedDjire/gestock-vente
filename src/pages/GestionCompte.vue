@@ -34,137 +34,7 @@
             🔄 Actualiser
           </button>
         </div>
-
-        <!-- Statut du forfait actuel -->
-        <div class="current-forfait-section">
-          <h3>Forfait Actuel</h3>
-          <div v-if="loadingForfait" class="loading-state">
-            <p>Chargement...</p>
-          </div>
-          <div v-else-if="currentForfait && currentForfait.actif" class="forfait-status-card active">
-            <div class="status-header">
-              <div class="status-badge active-badge">Actif</div>
-              <div class="jours-restants" v-if="currentForfait.jours_restants !== undefined">
-                {{ currentForfait.jours_restants }} jours restants
-              </div>
-            </div>
-            <div class="forfait-details-grid">
-              <div class="detail-item">
-                <span class="detail-label">Nom du forfait:</span>
-                <span class="detail-value">{{ currentForfait.nom }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Prix:</span>
-                <span class="detail-value">{{ formatPrice(currentForfait.prix) }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Durée:</span>
-                <span class="detail-value">{{ currentForfait.duree_jours }} jours</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Date de début:</span>
-                <span class="detail-value">{{ formatDate(currentForfait.date_debut) }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">Date de fin:</span>
-                <span class="detail-value" :class="getDateClass(currentForfait.date_fin)">
-                  {{ formatDate(currentForfait.date_fin) }}
-                </span>
-              </div>
-              <div class="detail-item" v-if="currentForfait.description">
-                <span class="detail-label">Description:</span>
-                <span class="detail-value">{{ currentForfait.description }}</span>
-              </div>
-            </div>
-          </div>
-          <div v-else class="forfait-status-card expired">
-            <div class="status-header">
-              <div class="status-badge expired-badge">Aucun forfait actif</div>
-            </div>
-            <p class="expired-message">Votre forfait a expiré ou vous n'avez pas encore souscrit à un forfait.</p>
-          </div>
-        </div>
-
-        <!-- Liste des forfaits disponibles -->
-        <div class="available-forfaits-section">
-          <h3>Forfaits Disponibles</h3>
-          <div v-if="loadingForfaits" class="loading-state">
-            <p>Chargement des forfaits...</p>
-          </div>
-          <div v-else-if="availableForfaits.length === 0" class="empty-state">
-            <p>Aucun forfait disponible</p>
-          </div>
-          <div v-else class="forfaits-grid">
-            <div 
-              v-for="forfait in availableForfaits" 
-              :key="forfait.id_forfait"
-              class="forfait-card"
-              :class="{ 'forfait-current': forfait.id_forfait === currentForfait?.id_forfait }"
-            >
-              <div class="forfait-card-header">
-                <h4>{{ forfait.nom_forfait }}</h4>
-                <div class="forfait-price">{{ formatPrice(forfait.prix) }}</div>
-              </div>
-              <div class="forfait-card-body">
-                <div class="forfait-info">
-                  <span class="info-icon">⏱️</span>
-                  <span>{{ forfait.duree_jours }} jours</span>
-                </div>
-                <p class="forfait-description" v-if="forfait.description">
-                  {{ forfait.description }}
-                </p>
-                <p class="forfait-description" v-else>
-                  Forfait standard
-                </p>
-                
-                <!-- Limites du forfait -->
-                <div class="forfait-limits" v-if="forfait.max_utilisateurs !== null || forfait.max_entrepots !== null || forfait.max_points_vente !== null">
-                  <div class="limit-item" v-if="forfait.max_utilisateurs !== null">
-                    <span class="limit-icon">👥</span>
-                    <span class="limit-text">
-                      <strong>{{ forfait.max_utilisateurs }}</strong> utilisateur{{ forfait.max_utilisateurs > 1 ? 's' : '' }} + admin
-                    </span>
-                  </div>
-                  <div class="limit-item" v-if="forfait.max_entrepots !== null">
-                    <span class="limit-icon">🏭</span>
-                    <span class="limit-text">
-                      <strong>{{ forfait.max_entrepots }}</strong> entrepôt{{ forfait.max_entrepots > 1 ? 's' : '' }}
-                    </span>
-                  </div>
-                  <div class="limit-item" v-if="forfait.max_points_vente !== null">
-                    <span class="limit-icon">🏪</span>
-                    <span class="limit-text">
-                      <strong>{{ forfait.max_points_vente }}</strong> point{{ forfait.max_points_vente > 1 ? 's' : '' }} de vente
-                    </span>
-                  </div>
-                  <div class="limit-item" v-if="forfait.peut_nommer_admin == 1">
-                    <span class="limit-icon">👑</span>
-                    <span class="limit-text">Peut nommer un autre admin</span>
-                  </div>
-                </div>
-                
-                <!-- Fonctionnalités avancées -->
-                <div class="forfait-features" v-if="forfait.fonctionnalites_avancees">
-                  <div class="features-title">Fonctionnalités incluses :</div>
-                  <ul class="features-list">
-                    <li v-for="feature in parseFeatures(forfait.fonctionnalites_avancees)" :key="feature">
-                      ✓ {{ feature }}
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              <div class="forfait-card-footer">
-                <button 
-                  @click="goToPaiementForfait(forfait)"
-                  class="btn-subscribe"
-                  :disabled="forfait.id_forfait === currentForfait?.id_forfait"
-                >
-                  {{ forfait.id_forfait === currentForfait?.id_forfait ? '✓ Actif' : 'S\'abonner' }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- ... contenu forfaits existant ... -->
       </div>
     </div>
 
@@ -323,111 +193,50 @@
       </div>
     </div>
 
-    <!-- Onglet Ravitaillement PV ↔ Entrepôts -->
-    <div v-if="activeTab === 'ravitaillement'" class="tab-content">
-      <div class="section-card">
-        <div class="card-header">
-          <h2>Ravitaillement des points de vente</h2>
-          <p class="subtitle" style="margin:0;font-size:0.95rem;">Un point de vente peut se ravitailler dans plusieurs entrepôts. Un entrepôt peut servir plusieurs points de vente.</p>
-        </div>
-        <div v-if="loadingRavitaillement" class="loading-state"><p>Chargement...</p></div>
-        <div v-else-if="ravitaillementList.length === 0" class="empty-state">
-          <p>Aucun point de vente. Ajoutez des points de vente dans la page Points de vente.</p>
-        </div>
-        <div v-else class="ravitaillement-table-wrap">
-          <table class="users-table">
-            <thead>
-              <tr>
-                <th>Point de vente</th>
-                <th>Entrepôts d'approvisionnement</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in ravitaillementList" :key="r.id_point_vente">
-                <td><strong>{{ r.nom_point_vente }}</strong></td>
-                <td>
-                  <span v-if="(r.id_entrepots || []).length === 0" class="text-muted">Aucun</span>
-                  <span v-else>{{ (r.id_entrepots || []).map(eid => entrepots.find(e => e.id === eid)?.nom).filter(Boolean).join(', ') || '—' }}</span>
-                </td>
-                <td>
-                  <button type="button" class="btn-action btn-edit" @click="openRavitaillementModal(r)" title="Modifier">✏️</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Modifier ravitaillement (entrepôts pour un point de vente) -->
-    <div v-if="showRavitaillementModal && editingRavitaillementPv" class="modal-overlay" @click.self="showRavitaillementModal = false">
-      <div class="modal-content large" @click.stop>
-        <div class="modal-header">
-          <h3>Entrepôts d'approvisionnement — {{ editingRavitaillementPv.nom_point_vente }}</h3>
-          <button class="modal-close" @click="showRavitaillementModal = false">×</button>
-        </div>
-        <div class="modal-body">
-          <p class="form-hint" style="margin-bottom:1rem;">Sélectionnez les entrepôts depuis lesquels ce point de vente peut se ravitailler.</p>
-          <div class="access-list" style="max-height:280px;overflow-y:auto;">
-            <label v-for="e in entrepots" :key="e.id" class="access-checkbox" style="display:flex;align-items:center;gap:0.5em;margin-bottom:0.5rem;">
-              <input type="checkbox" v-model="selectedEntrepotsRavitaillement" :value="e.id" />
-              {{ e.nom }}
-            </label>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-cancel" @click="showRavitaillementModal = false">Annuler</button>
-          <button type="button" class="btn-save" @click="saveRavitaillement" :disabled="savingRavitaillement">
-            {{ savingRavitaillement ? 'Enregistrement...' : 'Enregistrer' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- Modal Ajouter/Modifier Utilisateur -->
     <div v-if="showUserModal" class="modal-overlay" @click.self="closeUserModal">
-      <div class="modal-content large" @click.stop>
+      <div class="modal-content user-modal" @click.stop>
         <div class="modal-header">
           <h3>{{ editingUser ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur' }}</h3>
           <button class="modal-close" @click="closeUserModal">×</button>
         </div>
         <div class="modal-body">
-          <form @submit.prevent="onUserFormSubmit" class="modal-form">
+          <form @submit.prevent="onUserFormSubmit" class="user-form">
             <div class="form-section">
-              <h4 class="section-title">👤 Identité</h4>
+              <h4 class="section-title">🖼️ Photo</h4>
               <div class="form-group">
                 <label>Photo</label>
                 <input type="file" accept="image/*" @change="onPhotoChange" />
-                <div v-if="uploadingPhoto" class="form-hint">Envoi en cours...</div>
-                <div v-if="userForm.photo" style="margin-top:0.5em;"><img :src="userForm.photo" alt="Photo" style="max-width:80px;border-radius:8px;" /></div>
-                <div v-if="photoError" style="color:#dc2626;font-size:0.9em;">{{ photoError }}</div>
+                <div v-if="uploadingPhoto" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
+                <div v-if="userForm.photo" style="margin-top:0.5em;"><img :src="userForm.photo" alt="Photo utilisateur" style="max-width:80px;border-radius:8px;" /></div>
+                <div v-if="photoError" style="color:#dc2626;font-size:0.95em;">{{ photoError }}</div>
               </div>
+            </div>
+            <div class="form-section">
+              <h4 class="section-title">👤 Identité</h4>
               <div class="form-row">
                 <div class="form-group">
                   <label>Nom *</label>
-                  <input v-model="userForm.nom" type="text" required placeholder="Nom" />
+                  <input v-model="userForm.nom" type="text" required />
                 </div>
                 <div class="form-group">
                   <label>Prénom *</label>
-                  <input v-model="userForm.prenom" type="text" required placeholder="Prénom" />
+                  <input v-model="userForm.prenom" type="text" required />
                 </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
                   <label>Email *</label>
-                  <input v-model="userForm.email" type="email" required placeholder="email@exemple.com" />
+                  <input v-model="userForm.email" type="email" required />
                 </div>
                 <div class="form-group">
                   <label>Nom d'utilisateur *</label>
-                  <input v-model="userForm.username" type="text" required placeholder="Identifiant de connexion" />
-                  <small class="form-hint">Utilisé pour la connexion</small>
+                  <input v-model="userForm.username" type="text" required />
                 </div>
               </div>
             </div>
-
             <div class="form-section">
-              <h4 class="section-title">🔐 Compte</h4>
+              <h4 class="section-title">🔒 Sécurité & Rôle</h4>
               <div class="form-row">
                 <div class="form-group">
                   <label>Rôle *</label>
@@ -437,36 +246,33 @@
                     <option value="Agent">Agent</option>
                   </select>
                 </div>
+                <div class="form-group" v-if="!editingUser">
+                  <label>Mot de passe *</label>
+                  <input v-model="userForm.password" type="password" required />
+                </div>
                 <div class="form-group">
                   <label>Téléphone</label>
-                  <input v-model="userForm.telephone" type="tel" placeholder="+225 XX XX XX XX XX" />
+                  <input v-model="userForm.telephone" type="tel" />
                 </div>
               </div>
-              <div class="form-group" v-if="!editingUser">
-                <label>Mot de passe *</label>
-                <input v-model="userForm.password" type="password" required placeholder="Mot de passe initial" />
-                <small class="form-hint">L'utilisateur pourra le modifier après la première connexion</small>
-              </div>
             </div>
-
             <div class="form-section">
-              <h4 class="section-title">🔗 Accès & Permissions</h4>
-              <small class="form-hint" style="display:block;margin-bottom:0.75rem;">
-                Chaque entrepôt et chaque point de vente ne peut être attribué qu'à un seul utilisateur. Une nouvelle attribution retire l'accès aux autres.
-              </small>
-              <div class="form-group">
-                <AccessSelector
-                  :items="entrepots"
-                  v-model="userForm.permissions_entrepots"
-                  label="entrepôts"
-                />
-              </div>
-              <div class="form-group">
-                <AccessSelector
-                  :items="pointsVente"
-                  v-model="userForm.permissions_points_vente"
-                  label="points de vente"
-                />
+              <h4 class="section-title">🔑 Accès</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <AccessSelector
+                    :items="entrepots"
+                    v-model="userForm.permissions_entrepots"
+                    label="entrepôts"
+                  />
+                </div>
+                <div class="form-group">
+                  <AccessSelector
+                    :items="pointsVente"
+                    v-model="userForm.permissions_points_vente"
+                    label="points de vente"
+                  />
+                </div>
               </div>
               <div class="form-group">
                 <label>
@@ -474,17 +280,17 @@
                   Accès à la comptabilité
                 </label>
               </div>
-              <div v-if="userForm.permissions_entrepots.length === 0 || userForm.permissions_points_vente.length === 0" class="form-warning" style="color:#c0392b;margin-top:0.5rem;">
+              <div v-if="userForm.permissions_entrepots.length === 0 || userForm.permissions_points_vente.length === 0" class="form-warning" style="color:#c0392b;margin-bottom:1rem;">
                 Veuillez sélectionner au moins un entrepôt et un point de vente.
               </div>
             </div>
+            <div class="modal-footer">
+              <button type="button" class="btn-cancel" @click="closeUserModal">Annuler</button>
+              <button type="submit" class="btn-save" :disabled="savingUser || userForm.permissions_entrepots.length === 0 || userForm.permissions_points_vente.length === 0">
+                {{ savingUser ? 'Enregistrement...' : 'Enregistrer' }}
+              </button>
+            </div>
           </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-cancel" @click="closeUserModal">Annuler</button>
-          <button type="button" class="btn-save" @click="onUserFormSubmit" :disabled="savingUser || userForm.permissions_entrepots.length === 0 || userForm.permissions_points_vente.length === 0">
-            {{ savingUser ? 'Enregistrement...' : 'Enregistrer' }}
-          </button>
         </div>
       </div>
     </div>
@@ -516,8 +322,7 @@
 
 <script setup>
 // --- Notification Snackbar ---
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
 const showSnackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarType = ref('success') // success | error
@@ -644,8 +449,7 @@ const tabs = [
   { id: 'forfaits', label: 'Forfaits', icon: '💳' },
   { id: 'entreprise', label: 'Entreprise', icon: '🏢' },
   { id: 'connected', label: 'Membres Connectés', icon: '👥' },
-  { id: 'users', label: 'Gestion Utilisateurs', icon: '👤' },
-  { id: 'ravitaillement', label: 'Ravitaillement PV ↔ Entrepôts', icon: '🔄' }
+  { id: 'users', label: 'Gestion Utilisateurs', icon: '👤' }
 ]
 import apiEntreprise from '../composables/api/apiEntreprise.js'
 // Onglet Entreprise
@@ -661,6 +465,7 @@ const currentForfait = ref(null)
 const availableForfaits = ref([])
 const loadingForfait = ref(false)
 const loadingForfaits = ref(false)
+const subscribing = ref(false)
 
 // Utilisateurs connectés
 const connectedUsers = ref([])
@@ -678,14 +483,6 @@ const savingUser = ref(false)
 const showDeleteModal = ref(false)
 const userToDelete = ref(null)
 const deletingUser = ref(false)
-
-// Ravitaillement PV ↔ Entrepôts
-const ravitaillementList = ref([])
-const loadingRavitaillement = ref(false)
-const showRavitaillementModal = ref(false)
-const editingRavitaillementPv = ref(null)
-const selectedEntrepotsRavitaillement = ref([])
-const savingRavitaillement = ref(false)
 
 const currentUserId = computed(() => authStore.user?.id || authStore.user?.id_utilisateur)
 
@@ -814,17 +611,27 @@ const loadAvailableForfaits = async () => {
   }
 }
 
-const router = useRouter()
-const goToPaiementForfait = (forfait) => {
-  router.push({
-    path: '/paiement-forfait',
-    query: {
-      id_forfait: forfait.id_forfait,
-      nom_forfait: forfait.nom_forfait || '',
-      prix: forfait.prix,
-      duree_jours: forfait.duree_jours
+const subscribeToForfait = async (forfaitId) => {
+  if (!confirm('Voulez-vous vraiment renouveler votre forfait ?')) return
+  
+  subscribing.value = true
+  try {
+    const response = await apiService.post('/api_forfait.php', {
+      id_forfait: forfaitId
+    })
+    if (response.success) {
+      alert('Forfait renouvelé avec succès !')
+      await loadForfaitStatus()
+      await loadAvailableForfaits()
+    } else {
+      alert('Erreur lors du renouvellement du forfait')
     }
-  })
+  } catch (error) {
+    console.error('Erreur lors de la souscription:', error)
+    alert('Erreur lors de la souscription au forfait')
+  } finally {
+    subscribing.value = false
+  }
 }
 
 const loadConnectedUsers = async () => {
@@ -988,53 +795,6 @@ const deleteUser = async () => {
   }
 }
 
-// Ravitaillement PV ↔ Entrepôts
-async function loadRavitaillementList() {
-  loadingRavitaillement.value = true
-  try {
-    const res = await apiService.get('/api_ravitaillement.php?list=1')
-    ravitaillementList.value = Array.isArray(res.data) ? res.data : []
-  } catch (e) {
-    console.error('loadRavitaillementList', e)
-    ravitaillementList.value = []
-  } finally {
-    loadingRavitaillement.value = false
-  }
-}
-function openRavitaillementModal(row) {
-  editingRavitaillementPv.value = row
-  selectedEntrepotsRavitaillement.value = [...(row.id_entrepots || [])]
-  showRavitaillementModal.value = true
-}
-async function saveRavitaillement() {
-  if (!editingRavitaillementPv.value) return
-  savingRavitaillement.value = true
-  try {
-    const res = await apiService.post('/api_ravitaillement.php', {
-      id_point_vente: editingRavitaillementPv.value.id_point_vente,
-      id_entrepots: selectedEntrepotsRavitaillement.value
-    })
-    const ok = res && res.success
-    if (ok) {
-      triggerSnackbar('Ravitaillement enregistré', 'success')
-      await loadRavitaillementList()
-      showRavitaillementModal.value = false
-      editingRavitaillementPv.value = null
-    } else {
-      triggerSnackbar(res?.message || 'Erreur', 'error')
-    }
-  } catch (e) {
-    console.error('saveRavitaillement', e)
-    triggerSnackbar('Erreur lors de l\'enregistrement', 'error')
-  } finally {
-    savingRavitaillement.value = false
-  }
-}
-
-watch(activeTab, (v) => {
-  if (v === 'ravitaillement') loadRavitaillementList()
-})
-
 // Initialisation
 onMounted(async () => {
   await loadForfaitStatus()
@@ -1155,16 +915,17 @@ onMounted(async () => {
 }
 
 .btn-refresh {
-  background: #f3f4f6;
-  color: #374151;
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
+  min-width: 600px;
+  width: 800px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
 }
-
 .btn-refresh:hover:not(:disabled) {
   background: #e5e7eb;
 }
@@ -1188,16 +949,16 @@ onMounted(async () => {
 }
 
 .forfait-status-card.active {
-  background: #f0fdf4;
-  border-color: #22c55e;
-}
-
-.forfait-status-card.expired {
-  background: #fef2f2;
-  border-color: #ef4444;
-}
-
-.status-header {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
+  padding: 2rem 2.5rem 1.5rem 2.5rem;
+  min-width: 600px;
+  width: 800px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1622,15 +1383,6 @@ onMounted(async () => {
   font-size: 0.9rem;
 }
 
-.text-muted {
-  color: #6b7280;
-  font-style: italic;
-}
-
-.ravitaillement-table-wrap {
-  overflow-x: auto;
-}
-
 .action-buttons {
   display: flex;
   gap: 0.5rem;
@@ -1660,13 +1412,14 @@ onMounted(async () => {
 .user-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.2rem;
 }
 
 .form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: nowrap;
+  justify-content: space-between;
 }
 
 .form-group {
@@ -1735,6 +1488,28 @@ onMounted(async () => {
   text-align: center;
   padding: 3rem;
   color: #6b7280;
+}
+
+/* Harmonisation couleur modale utilisateur */
+.form-section {
+  background: #f6faf9;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  border: 2px solid rgba(26, 95, 74, 0.13);
+}
+
+.section-title {
+  margin: 0 0 1rem 0;
+  color: #1a5f4a;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Augmentation de la largeur de la modale utilisateur */
+.modal-content.user-modal {
+  max-width: 700px;
+  width: 98vw;
 }
 </style>
 

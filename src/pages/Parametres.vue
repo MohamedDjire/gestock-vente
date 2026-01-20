@@ -4,7 +4,6 @@ import { useAuthStore } from '../stores/auth.js'
 import apiEntreprise from '../composables/api/apiEntreprise.js'
 import apiEntrepot from '../composables/api/api_entrepot.js'
 import apiPointVente from '../composables/api/api_point_vente.js'
-import ComptaSecurity from '../components/comptabilite/ComptaSecurity.vue'
           const user = ref({})
           const auditTrail = ref([])
 
@@ -255,66 +254,78 @@ const showEditModal = ref(false)
           </div>
           <!-- Modale d'édition -->
           <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
-            <div class="modal-content" @click.stop>
+            <div class="modal-content large" @click.stop>
               <div class="modal-header">
                 <h3>Modifier l'entreprise</h3>
                 <button class="modal-close" @click="showEditModal = false">×</button>
               </div>
               <div class="modal-body">
-                <form class="settings-form" @submit.prevent="saveEntreprise">
-                  <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
-                  <div class="form-group">
-                    <label>Nom de l'entreprise</label>
-                    <input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" />
+                <form @submit.prevent="saveEntreprise" class="modal-form">
+                  <div v-if="entrepriseError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ entrepriseError }}</div>
+
+                  <div class="form-section">
+                    <h4 class="section-title">🏢 Identité</h4>
+                    <div class="form-group">
+                      <label>Nom de l'entreprise *</label>
+                      <input v-model="entreprise.nom" placeholder="Nom de l'entreprise" required />
+                    </div>
+                    <div class="form-group">
+                      <label>Sigle</label>
+                      <input v-model="entreprise.sigle" placeholder="Sigle (ex: ABC)" />
+                    </div>
+                    <div class="form-group">
+                      <label>Numéro d'identification</label>
+                      <input v-model="entreprise.num" placeholder="Numéro d'identification" />
+                    </div>
+                    <div class="form-group">
+                      <label>NCC</label>
+                      <input v-model="entreprise.ncc" placeholder="NCC" />
+                    </div>
+                    <div class="form-group">
+                      <label>Numéro de banque</label>
+                      <input v-model="entreprise.num_banque" placeholder="Numéro de banque" />
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label>Sigle</label>
-                    <input type="text" v-model="entreprise.sigle" placeholder="Sigle (ex: ABC)" />
+
+                  <div class="form-section">
+                    <h4 class="section-title">📞 Coordonnées</h4>
+                    <div class="form-group">
+                      <label>Adresse</label>
+                      <input v-model="entreprise.adresse" placeholder="Adresse" />
+                    </div>
+                    <div class="form-group">
+                      <label>Devise</label>
+                      <input v-model="entreprise.devise" placeholder="Devise (ex: XOF, EUR)" />
+                    </div>
+                    <div class="form-group">
+                      <label>Email</label>
+                      <input v-model="entreprise.email" type="email" placeholder="Email de l'entreprise" />
+                    </div>
+                    <div class="form-group">
+                      <label>Téléphone</label>
+                      <input v-model="entreprise.telephone" placeholder="Téléphone de l'entreprise" />
+                    </div>
+                    <div class="form-group">
+                      <label>Site web</label>
+                      <input v-model="entreprise.site_web" placeholder="Site web de l'entreprise" />
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label>Numéro d'identification (num)</label>
-                    <input type="text" v-model="entreprise.num" placeholder="Numéro d'identification" />
-                  </div>
-                  <div class="form-group">
-                    <label>NCC</label>
-                    <input type="text" v-model="entreprise.ncc" placeholder="NCC" />
-                  </div>
-                  <div class="form-group">
-                    <label>Numéro de banque</label>
-                    <input type="text" v-model="entreprise.num_banque" placeholder="Numéro de banque" />
-                  </div>
-                  <div class="form-group">
-                    <label>Adresse</label>
-                    <input type="text" v-model="entreprise.adresse" placeholder="Adresse" />
-                  </div>
-                  <div class="form-group">
-                    <label>Devise</label>
-                    <input type="text" v-model="entreprise.devise" placeholder="Devise (ex: XOF, EUR)" />
-                  </div>
-                  <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" v-model="entreprise.email" placeholder="Email de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Téléphone</label>
-                    <input type="text" v-model="entreprise.telephone" placeholder="Téléphone de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Site web</label>
-                    <input type="text" v-model="entreprise.site_web" placeholder="Site web de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Logo</label>
-                    <input type="file" accept="image/*" @change="onLogoChange" />
-                    <div v-if="uploadingLogo" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
-                    <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo entreprise" style="max-width:120px;border-radius:8px;" /></div>
-                    <div v-if="logoError" style="color:#dc2626;font-size:0.95em;">{{ logoError }}</div>
-                  </div>
-                  <div class="modal-actions">
-                    <button type="button" class="btn-cancel" @click="showEditModal = false">Annuler</button>
-                    <button type="submit" class="btn-save">Enregistrer</button>
+
+                  <div class="form-section">
+                    <h4 class="section-title">🖼️ Logo</h4>
+                    <div class="form-group">
+                      <label>Logo</label>
+                      <input type="file" accept="image/*" @change="onLogoChange" />
+                      <div v-if="uploadingLogo" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
+                      <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo entreprise" style="max-width:120px;border-radius:8px;" /></div>
+                      <div v-if="logoError" style="color:#dc2626;font-size:0.95em;">{{ logoError }}</div>
+                    </div>
                   </div>
                 </form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" @click="showEditModal = false" class="btn-cancel">Annuler</button>
+                <button type="button" @click="saveEntreprise" class="btn-save">Enregistrer</button>
               </div>
             </div>
           </div>
@@ -595,8 +606,8 @@ const showEditModal = ref(false)
         background: #fff;
         border-radius: 12px;
         padding: 2rem;
-        min-width: 380px;
-        width: 420px;
+        min-width: 600px;
+        width: 800px;
         max-width: 95vw;
         box-shadow: 0 4px 24px rgba(0,0,0,0.08);
         position: relative;

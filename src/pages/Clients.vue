@@ -128,9 +128,7 @@
               </div>
               <div class="form-group">
                 <label>Adresse</label>
-<<<<<<< Updated upstream
                 <input v-model="form.adresse" placeholder="Adresse du client" />
-=======
                 <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
               </div>
               <div class="form-group">
@@ -148,7 +146,7 @@
                   <option value="actif">Actif</option>
                   <option value="inactif">Inactif</option>
                 </select>
->>>>>>> Stashed changes
+
               </div>
             </div>
 
@@ -201,12 +199,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { logJournal } from '../composables/useJournal'
-<<<<<<< Updated upstream
-import apiClient from '../composables/Api/apiClient.js'
-=======
 import apiClient from '../composables/api/apiClient'
 import apiPointVente from '../composables/api/api_point_vente'
->>>>>>> Stashed changes
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'

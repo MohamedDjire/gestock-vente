@@ -78,6 +78,8 @@ import SalesTable from '../components/SalesTable.vue'
 import SalesChart from '../components/SalesChart.vue'
 import { logJournal } from '../composables/useJournal'
 import { apiService } from '../composables/Api/apiService.js'
+
+
 import { useCurrency } from '../composables/useCurrency.js'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -113,21 +115,58 @@ const formatNumber = (value) => {
 const loadDashboardData = async () => {
   loading.value = true
   try {
+    // Récupérer l'id_entreprise
+    let id_entreprise = null
+    const userStr = localStorage.getItem('prostock_user')
+    if (userStr) {
+      id_entreprise = JSON.parse(userStr).id_entreprise
+    }
+    // Charger les produits pour les stats produits/stocks (fallback Overview)
+    const [productsResponse, ecrituresResponse] = await Promise.all([
+      apiService.get('/api_produit.php?action=all'),
+      id_entreprise ? apiService.get(`/api_compta_ecritures.php?id_entreprise=${id_entreprise}`) : Promise.resolve({ data: [] })
+    ])
+    let venteTotal = 0, venteJour = 0, achatTotal = 0, benefice = 0
+    if (ecrituresResponse && Array.isArray(ecrituresResponse.data)) {
+      const today = new Date().toISOString().slice(0, 10)
+      venteTotal = ecrituresResponse.data.filter(e => e.categorie === 'Vente').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+      venteJour = ecrituresResponse.data.filter(e => e.categorie === 'Vente' && e.date_ecriture === today).reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+      achatTotal = ecrituresResponse.data.filter(e => e.categorie === 'Achat').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+      benefice = venteTotal - achatTotal
+    }
+    let totalProduit = 0, stocksRupture = 0
+    if (productsResponse.success) {
+      const products = productsResponse.data || []
+      totalProduit = products.length
+      stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
+    }
+    stats.value = {
+      venteTotal,
+      venteJour,
+      achatTotal,
+      benefice,
+      totalProduit,
+      stocksRupture,
+      variationVenteTotal: 1.1,
+      variationVenteJour: 0.8,
+      variationProduit: 0.0,
+      variationRupture: -2.1
+    }
     const userAuth = authStore.user
     let pointVenteId = route.query.point_vente
-
-    // Pour un non-admin : prendre par défaut son point de vente connecté (et son nom + données)
+    // Si pas de point de vente dans l'URL, utiliser celui de l'utilisateur par défaut
     if (!pointVenteId && userAuth) {
       const isAdmin = userAuth.role && ['admin', 'superadmin'].includes(String(userAuth.role).toLowerCase())
-      const perms = userAuth.permissions_points_vente
-      if (!isAdmin && perms && Array.isArray(perms) && perms.length > 0) {
-        pointVenteId = perms[0]
-        if (route.query.point_vente !== String(pointVenteId)) {
+      // Pour les non-admins, utiliser leur premier point de vente (obligatoire)
+      if (!isAdmin && user.permissions_points_vente && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
+        pointVenteId = userAuth.permissions_points_vente[0]
+        // Mettre à jour l'URL sans recharger la page
+        if (route.query.point_vente !== pointVenteId) {
           router.replace({ query: { ...route.query, point_vente: pointVenteId } })
         }
       }
     }
-
+    
     if (pointVenteId) {
       // Charger les données du point de vente spécifique
       const [pointVenteResponse, statsResponse, productsResponse] = await Promise.all([
@@ -184,44 +223,17 @@ const loadDashboardData = async () => {
         }
       }
     } else {
-      // Pas de point de vente : Overview (compta + produits) pour admin ou absence de point
+      // Pas de point de vente disponible
       currentPointVente.value = null
-      let id_entreprise = userAuth?.id_entreprise || null
-      if (!id_entreprise && typeof localStorage !== 'undefined') {
-        try {
-          const u = localStorage.getItem('prostock_user')
-          if (u) id_entreprise = JSON.parse(u).id_entreprise
-        } catch (_) {}
-      }
-      const [productsResponse, ecrituresResponse] = await Promise.all([
-        apiService.get('/api_produit.php?action=all'),
-        id_entreprise ? getEcritures(id_entreprise) : Promise.resolve({ data: [] })
-      ])
-      let venteTotal = 0, venteJour = 0, achatTotal = 0, benefice = 0
-      if (ecrituresResponse && Array.isArray(ecrituresResponse.data)) {
-        const today = new Date().toISOString().slice(0, 10)
-        venteTotal = ecrituresResponse.data.filter(e => e.categorie === 'Vente').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-        venteJour = ecrituresResponse.data.filter(e => e.categorie === 'Vente' && e.date_ecriture === today).reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-        achatTotal = ecrituresResponse.data.filter(e => e.categorie === 'Achat').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-        benefice = venteTotal - achatTotal
-      }
-      let totalProduit = 0, stocksRupture = 0
-      if (productsResponse && productsResponse.success) {
-        const products = productsResponse.data || []
-        totalProduit = products.length
-        stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
-      }
       stats.value = {
-        venteTotal,
-        venteJour,
-        achatTotal,
-        benefice,
-        totalProduit,
-        stocksRupture,
-        variationVenteTotal: 1.1,
-        variationVenteJour: 0.8,
-        variationProduit: 0.0,
-        variationRupture: -2.1
+        venteTotal: 0,
+        venteJour: 0,
+        totalProduit: 0,
+        stocksRupture: 0,
+        variationVenteTotal: 0,
+        variationVenteJour: 0,
+        variationProduit: 0,
+        variationRupture: 0
       }
     }
   } catch (error) {

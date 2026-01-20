@@ -47,6 +47,7 @@
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>
               </button>
+<!-- Fin du template principal -->
               <button @click="openDeleteModal(fournisseur)" class="btn-icon btn-danger" title="Supprimer" aria-label="Supprimer">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"></polyline>
@@ -62,10 +63,8 @@
 
     <div v-if="showAddForm || editingFournisseur" class="modal-overlay" @click.self="closeForm">
       <div class="modal-content large" @click.stop>
-        <div class="modal-header">
           <h3>{{ editingFournisseur ? 'Modifier' : 'Ajouter' }} un fournisseur</h3>
           <button @click="closeForm" class="modal-close">×</button>
-        </div>
         <div class="modal-body">
           <form @submit.prevent="submitForm" class="modal-form">
             <div v-if="formError" class="form-error" style="color: #dc2626; font-weight: 600; margin-bottom: 1rem;">{{ formError }}</div>
@@ -202,11 +201,8 @@ function closeForm() {
   form.value = { nom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
   formError.value = ''
 }
-<<<<<<< Updated upstream
-import { createEcriture } from '../composables/Api/apiCompta.js'
-=======
 
->>>>>>> Stashed changes
+
 async function submitForm() {
   if (!form.value.nom) {
     formError.value = 'Le nom est obligatoire'
@@ -266,7 +262,7 @@ function exportPDF() {
   const doc = new jsPDF();
 
   // Header chic : logo rond + nom entreprise + fond
-  doc.setFillColor(26, 95, 74);
+  doc.setFillColor(26,95,74);
   doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
   doc.setFillColor(255,255,255);
   doc.circle(22, 15, 8, 'F');
@@ -376,28 +372,50 @@ function getJournalUser() {
 .table-container {
   background: #fff;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  overflow: auto;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 .fournisseurs-table {
   width: 100%;
   border-collapse: collapse;
 }
-.fournisseurs-table th, .fournisseurs-table td {
-  padding: 0.75rem 0.875rem;
-  border-bottom: 1px solid #f1f5f9;
-  text-align: left;
+.fournisseurs-table thead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
 }
 .fournisseurs-table th {
-  background: #f8fafc;
-  font-size: 0.85rem;
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: #6b7280;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.fournisseurs-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+}
+.fournisseurs-table tbody tr {
+  transition: background 0.2s;
+}
+.fournisseurs-table tbody tr:hover {
+  background: #f9fafb;
+}
+.fournisseurs-table tr:last-child td {
+  border-bottom: none;
 }
 .actions-column {
   width: 120px;
   text-align: center;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 .btn-primary {
   background: #1a5f4a;
@@ -436,5 +454,25 @@ function getJournalUser() {
 .error {
   color: #dc2626;
   font-weight: 600;
+}
+.form-section {
+  background: #f6faf9;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  border: 2px solid rgba(26, 95, 74, 0.13);
+}
+.section-title {
+  margin: 0 0 1rem 0;
+  color: #1a5f4a;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.modal-content.large {
+  max-width: 700px;
+  width: 98vw;
+}
+.fournisseurs-table tr:last-child td {
+  border-bottom: none;
 }
 </style>
