@@ -8,7 +8,8 @@ export default {
   async getAll() {
     try {
       const response = await apiClient.get(ENDPOINT + '?action=all');
-      return response.data;
+      const body = response.data;
+      return Array.isArray(body) ? body : (body?.data || []);
     } catch (error) {
       console.error('Erreur lors du chargement des entrepôts :', error);
       return [];

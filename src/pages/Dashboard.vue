@@ -193,16 +193,16 @@ const loadDashboardData = async () => {
           if (u) id_entreprise = JSON.parse(u).id_entreprise
         } catch (_) {}
       }
-      const [productsResponse, ecrituresResponse] = await Promise.all([
+      const [productsResponse, ventesResponse] = await Promise.all([
         apiService.get('/api_produit.php?action=all'),
-        id_entreprise ? getEcritures(id_entreprise) : Promise.resolve({ data: [] })
+        id_entreprise ? apiService.get('/api_vente.php?action=all') : Promise.resolve({ data: [] })
       ])
       let venteTotal = 0, venteJour = 0, achatTotal = 0, benefice = 0
-      if (ecrituresResponse && Array.isArray(ecrituresResponse.data)) {
+      const list = Array.isArray(ventesResponse?.data) ? ventesResponse.data : (ventesResponse?.data?.data && Array.isArray(ventesResponse.data.data)) ? ventesResponse.data.data : []
+      if (list.length) {
         const today = new Date().toISOString().slice(0, 10)
-        venteTotal = ecrituresResponse.data.filter(e => e.categorie === 'Vente').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-        venteJour = ecrituresResponse.data.filter(e => e.categorie === 'Vente' && e.date_ecriture === today).reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
-        achatTotal = ecrituresResponse.data.filter(e => e.categorie === 'Achat').reduce((acc, e) => acc + (parseFloat(e.montant) || 0), 0)
+        venteTotal = list.reduce((acc, e) => acc + (parseFloat(e.montant) || parseFloat(e.total) || parseFloat(e.chiffre_affaires) || 0), 0)
+        venteJour = list.filter(e => (e.date_vente || e.date || '').toString().slice(0, 10) === today).reduce((acc, e) => acc + (parseFloat(e.montant) || parseFloat(e.total) || parseFloat(e.chiffre_affaires) || 0), 0)
         benefice = venteTotal - achatTotal
       }
       let totalProduit = 0, stocksRupture = 0

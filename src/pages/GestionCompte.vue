@@ -168,8 +168,78 @@
       </div>
     </div>
 
-    <!-- Onglet Entreprise -->
-    <!-- Onglet Entreprise supprimé : gestion déplacée dans Parametres.vue -->
+    <!-- Onglet Entreprise : Paramètres de l'entreprise -->
+    <div v-if="activeTab === 'entreprise'" class="tab-content">
+      <div class="section-card">
+        <div class="card-header">
+          <h2>Paramètres de l'entreprise</h2>
+          <button @click="loadEntreprise" class="btn-refresh" :disabled="loadingEntreprise">🔄 Actualiser</button>
+        </div>
+        <div v-if="loadingEntreprise" class="loading-state"><p>Chargement...</p></div>
+        <div v-else class="entreprise-params-block">
+          <div class="entreprise-card-pro" v-if="entreprise.nom || entreprise.sigle">
+            <div v-if="entreprise.logo" class="entreprise-logo-wrapper">
+              <img :src="entreprise.logo" alt="Logo" class="entreprise-logo" />
+            </div>
+            <h3 class="entreprise-title">{{ entreprise.nom || '—' }}</h3>
+            <div class="entreprise-section">
+              <h4 class="entreprise-section-title">Identité</h4>
+              <div class="entreprise-field"><span class="entreprise-label">Sigle</span><span class="entreprise-value">{{ entreprise.sigle || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Numéro d'identification</span><span class="entreprise-value">{{ entreprise.num || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">NCC</span><span class="entreprise-value">{{ entreprise.ncc || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Numéro de banque</span><span class="entreprise-value">{{ entreprise.num_banque || '—' }}</span></div>
+            </div>
+            <div class="entreprise-section">
+              <h4 class="entreprise-section-title">Coordonnées</h4>
+              <div class="entreprise-field"><span class="entreprise-label">Adresse</span><span class="entreprise-value">{{ entreprise.adresse || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Email</span><span class="entreprise-value">{{ entreprise.email || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Téléphone</span><span class="entreprise-value">{{ entreprise.telephone || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Site web</span><span class="entreprise-value">{{ entreprise.site_web || '—' }}</span></div>
+              <div class="entreprise-field"><span class="entreprise-label">Devise</span><span class="entreprise-value">{{ entreprise.devise || '—' }}</span></div>
+            </div>
+            <div style="text-align:right;margin-top:1.5rem;">
+              <button class="btn-primary" @click="showEditModalEntrep = true">Modifier</button>
+            </div>
+          </div>
+          <div v-else class="empty-state"><p>Aucune entreprise chargée. Vérifiez votre compte.</p></div>
+        </div>
+        <!-- Modale Modifier l'entreprise -->
+        <div v-if="showEditModalEntrep" class="modal-overlay" @click.self="showEditModalEntrep = false">
+          <div class="modal-content large" @click.stop>
+            <div class="modal-header">
+              <h3>Modifier l'entreprise</h3>
+              <button class="modal-close" @click="showEditModalEntrep = false">×</button>
+            </div>
+            <div class="modal-body">
+              <form class="settings-form" @submit.prevent="saveEntreprise">
+                <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
+                <div class="form-group"><label>Nom</label><input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" /></div>
+                <div class="form-group"><label>Sigle</label><input type="text" v-model="entreprise.sigle" placeholder="Sigle" /></div>
+                <div class="form-group"><label>Numéro d'identification</label><input type="text" v-model="entreprise.num" placeholder="Num" /></div>
+                <div class="form-group"><label>NCC</label><input type="text" v-model="entreprise.ncc" placeholder="NCC" /></div>
+                <div class="form-group"><label>Numéro de banque</label><input type="text" v-model="entreprise.num_banque" placeholder="Numéro de banque" /></div>
+                <div class="form-group"><label>Adresse</label><input type="text" v-model="entreprise.adresse" placeholder="Adresse" /></div>
+                <div class="form-group"><label>Devise</label><input type="text" v-model="entreprise.devise" placeholder="XOF, EUR..." /></div>
+                <div class="form-group"><label>Email</label><input type="email" v-model="entreprise.email" placeholder="Email" /></div>
+                <div class="form-group"><label>Téléphone</label><input type="text" v-model="entreprise.telephone" placeholder="Téléphone" /></div>
+                <div class="form-group"><label>Site web</label><input type="text" v-model="entreprise.site_web" placeholder="Site web" /></div>
+                <div class="form-group">
+                  <label>Logo</label>
+                  <input type="file" accept="image/*" @change="onEntrepriseLogoChange" />
+                  <div v-if="uploadingLogoEntrep" class="form-hint">Envoi en cours...</div>
+                  <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo" style="max-width:100px;border-radius:8px;" /></div>
+                  <div v-if="logoErrorEntrep" style="color:#dc2626;font-size:0.9em;">{{ logoErrorEntrep }}</div>
+                </div>
+                <div class="modal-actions">
+                  <button type="button" class="btn-cancel" @click="showEditModalEntrep = false">Annuler</button>
+                  <button type="submit" class="btn-save" :disabled="savingEntreprise">{{ savingEntreprise ? 'Enregistrement...' : 'Enregistrer' }}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Onglet Membres Connectés -->
     <div v-if="activeTab === 'connected'" class="tab-content">
@@ -535,14 +605,17 @@ import apiEntrepot from '../composables/Api/api_entrepot.js'
 import apiPointVente from '../composables/Api/api_point_vente.js'
 import { uploadPhoto } from '../config/cloudinary'
 import { useCurrency } from '../composables/useCurrency.js'
-            // Onglet Entreprise
-            const entrepriseForm = ref({
-              nom_entreprise: '',
-              email: '',
-              telephone: ''
+            // Onglet Entreprise — Paramètres de l'entreprise
+            const entreprise = ref({
+              nom: '', adresse: '', devise: '', sigle: '', num: '', ncc: '', num_banque: '',
+              email: '', telephone: '', site_web: '', logo: ''
             })
             const loadingEntreprise = ref(false)
             const savingEntreprise = ref(false)
+            const entrepriseError = ref('')
+            const showEditModalEntrep = ref(false)
+            const uploadingLogoEntrep = ref(false)
+            const logoErrorEntrep = ref('')
             const entrepriseId = computed(() => {
               const user = localStorage.getItem('prostock_user')
               return user ? JSON.parse(user).id_entreprise : null
@@ -550,16 +623,28 @@ import { useCurrency } from '../composables/useCurrency.js'
 
             async function loadEntreprise() {
               loadingEntreprise.value = true
+              entrepriseError.value = ''
               try {
                 const id = entrepriseId.value
                 if (!id) return
                 const data = await apiEntreprise.getEntreprise(id)
-                entrepriseForm.value = {
-                  nom_entreprise: data.nom_entreprise || '',
-                  email: data.email || '',
-                  telephone: data.telephone || ''
+                if (data && data.id_entreprise) {
+                  entreprise.value = {
+                    nom: data.nom_entreprise || '',
+                    adresse: data.adresse || '',
+                    devise: data.devise || '',
+                    sigle: data.sigle || '',
+                    num: data.num || '',
+                    ncc: data.ncc || '',
+                    num_banque: data.num_banque || '',
+                    email: data.email || '',
+                    telephone: data.telephone || '',
+                    site_web: data.site_web || '',
+                    logo: data.logo || ''
+                  }
                 }
               } catch (e) {
+                entrepriseError.value = e.message || 'Erreur chargement'
                 triggerSnackbar('Erreur chargement entreprise', 'error')
               } finally {
                 loadingEntreprise.value = false
@@ -567,23 +652,55 @@ import { useCurrency } from '../composables/useCurrency.js'
             }
 
             async function saveEntreprise() {
+              const id = entrepriseId.value
+              if (!id) { entrepriseError.value = "ID entreprise introuvable"; return }
               savingEntreprise.value = true
+              entrepriseError.value = ''
               try {
-                const id = entrepriseId.value
-                if (!id) return
-                await apiEntreprise.updateEntreprise(id, { ...entrepriseForm.value })
+                await apiEntreprise.updateEntreprise(id, {
+                  nom_entreprise: entreprise.value.nom,
+                  adresse: entreprise.value.adresse,
+                  devise: entreprise.value.devise,
+                  sigle: entreprise.value.sigle,
+                  num: entreprise.value.num,
+                  ncc: entreprise.value.ncc,
+                  num_banque: entreprise.value.num_banque,
+                  email: entreprise.value.email,
+                  telephone: entreprise.value.telephone,
+                  site_web: entreprise.value.site_web,
+                  logo: entreprise.value.logo
+                })
                 triggerSnackbar('Entreprise mise à jour !', 'success')
+                showEditModalEntrep.value = false
                 await loadEntreprise()
               } catch (e) {
+                entrepriseError.value = e.message || 'Erreur enregistrement'
                 triggerSnackbar('Erreur enregistrement entreprise', 'error')
               } finally {
                 savingEntreprise.value = false
               }
             }
 
-            onMounted(() => {
-              loadEntreprise()
-            })
+            async function onEntrepriseLogoChange(e) {
+              const file = e.target.files[0]
+              if (!file) return
+              uploadingLogoEntrep.value = true
+              logoErrorEntrep.value = ''
+              try {
+                const result = await uploadPhoto(file)
+                if (result.success && (result.data?.url || result.data?.secure_url)) {
+                  entreprise.value.logo = result.data.secure_url || result.data.url
+                } else {
+                  logoErrorEntrep.value = result.message || "Erreur upload"
+                }
+              } catch (err) {
+                logoErrorEntrep.value = err.message
+              } finally {
+                uploadingLogoEntrep.value = false
+              }
+            }
+
+            onMounted(() => { loadEntreprise() })
             const uploadingPhoto = ref(false)
             const photoError = ref('')
             async function onPhotoChange(e) {
@@ -615,8 +732,8 @@ import { useCurrency } from '../composables/useCurrency.js'
         onMounted(async () => {
           // ...chargements existants...
           try {
-            const resEntrepots = await apiEntrepot.getAllEntrepots ? await apiEntrepot.getAllEntrepots() : await apiEntrepot.getAll()
-            const data = resEntrepots && Array.isArray(resEntrepots.data) ? resEntrepots.data : []
+            const resEntrepots = await apiEntrepot.getAll()
+            const data = Array.isArray(resEntrepots) ? resEntrepots : (resEntrepots?.data || [])
             entrepots.value = data.map(e => ({ id: e.id_entrepot, nom: e.nom_entrepot }))
           } catch {}
           try {
@@ -647,7 +764,7 @@ const tabs = [
   { id: 'users', label: 'Gestion Utilisateurs', icon: '👤' },
   { id: 'ravitaillement', label: 'Ravitaillement PV ↔ Entrepôts', icon: '🔄' }
 ]
-import apiEntreprise from '../composables/api/apiEntreprise.js'
+import apiEntreprise from '../composables/Api/apiEntreprise.js'
 // Onglet Entreprise
 
 
@@ -1626,6 +1743,22 @@ onMounted(async () => {
   color: #6b7280;
   font-style: italic;
 }
+
+.entreprise-params-block { margin-top: 0.5rem; }
+.entreprise-card-pro {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+.entreprise-logo-wrapper { margin-bottom: 1rem; }
+.entreprise-logo { max-width: 80px; height: auto; border-radius: 8px; }
+.entreprise-title { margin: 0 0 1rem 0; font-size: 1.25rem; color: #1a5f4a; }
+.entreprise-section { margin-bottom: 1.25rem; }
+.entreprise-section-title { font-size: 0.95rem; color: #64748b; margin: 0 0 0.5rem 0; }
+.entreprise-field { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; font-size: 0.95rem; }
+.entreprise-label { color: #64748b; }
+.entreprise-value { font-weight: 500; color: #1e293b; }
 
 .ravitaillement-table-wrap {
   overflow-x: auto;

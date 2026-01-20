@@ -202,11 +202,6 @@ function closeForm() {
   form.value = { nom: '', email: '', telephone: '', adresse: '', statut: 'actif' }
   formError.value = ''
 }
-<<<<<<< Updated upstream
-import { createEcriture } from '../composables/Api/apiCompta.js'
-=======
-
->>>>>>> Stashed changes
 async function submitForm() {
   if (!form.value.nom) {
     formError.value = 'Le nom est obligatoire'

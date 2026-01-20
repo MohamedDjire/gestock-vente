@@ -56,6 +56,26 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/api_vente.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_forfait.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_entrepot.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_entreprise.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api_utilisateur.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,

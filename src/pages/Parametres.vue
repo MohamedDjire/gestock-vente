@@ -1,81 +1,24 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
-import apiEntreprise from '../composables/api/apiEntreprise.js'
-import apiEntrepot from '../composables/api/api_entrepot.js'
-import apiPointVente from '../composables/api/api_point_vente.js'
-import ComptaSecurity from '../components/comptabilite/ComptaSecurity.vue'
-          const user = ref({})
-          const auditTrail = ref([])
+import apiEntrepot from '../composables/Api/api_entrepot.js'
+import apiPointVente from '../composables/Api/api_point_vente.js'
 
-// --- Entrepôts et points de vente (mock, à remplacer par API si besoin) ---
+// --- Entrepôts et points de vente ---
 const entrepots = ref([])
 const pointsVente = ref([])
-// Charger les infos de l'entreprise au montage (exemple, à adapter selon l'API)
 onMounted(async () => {
   try {
-    // Essayer de récupérer l'ID entreprise depuis le store ou le backend (à adapter selon votre logique)
-    let id = null
-    // Par exemple, récupérer depuis le store d'authentification si disponible
-    const authStore = useAuthStore()
-    if (authStore && authStore.user && authStore.user.id_entreprise) {
-      id = authStore.user.id_entreprise
-    }
-    if (id) {
-      const data = await apiEntreprise.getEntreprise(id)
-      if (data && data.id_entreprise) {
-        entreprise.value = {
-          nom: data.nom_entreprise || '',
-          adresse: data.adresse || '',
-          devise: data.devise || '',
-          sigle: data.sigle || '',
-          num: data.num || '',
-          ncc: data.ncc || '',
-          num_banque: data.num_banque || ''
-        }
-        entrepriseId.value = data.id_entreprise
-      } else {
-        entrepriseId.value = null
-      }
-    } else {
-      entrepriseId.value = null
-    }
-    // Charger entrepôts
-    try {
-      const entrepotList = await apiEntrepot.getAllEntrepots()
-      entrepots.value = Array.isArray(entrepotList) ? entrepotList : []
-    } catch {}
-    // Charger points de vente
-    try {
-      const pvList = await apiPointVente.getAllPointsVente()
-      pointsVente.value = Array.isArray(pvList) ? pvList : []
-    } catch {}
-  } catch (e) {
-    entrepriseError.value = 'Impossible de charger les infos de l\'entreprise'
-    entrepriseId.value = null
-  }
+    const entrepotList = await apiEntrepot.getAll()
+    entrepots.value = Array.isArray(entrepotList) ? entrepotList : []
+  } catch {}
+  try {
+    const pvList = await apiPointVente.getAll()
+    pointsVente.value = Array.isArray(pvList) ? pvList : []
+  } catch {}
 })
 
-
-// --- Entreprise ---
-const entreprise = ref({
-  nom: '',
-  adresse: '',
-  devise: '',
-  sigle: '',
-  num: '',
-  ncc: '',
-  num_banque: '',
-  email: '',
-  telephone: '',
-  site_web: '',
-  logo: ''
-})
-const entrepriseId = ref(null)
-const entrepriseError = ref('')
-const loadingEntreprise = ref(false)
-
-const section = ref('entreprise')
+const section = ref('taxes')
 // --- Taxes demo ---
 const taxes = ref([
   { id: 1, nom: 'TVA', taux: 18 },
@@ -192,14 +135,11 @@ const isAdmin = computed(() => {
   const role = (authStore.userRole || authStore.user?.role || '').toLowerCase();
   return role === 'admin' || role === 'superadmin';
 })
-
-const showEditModal = ref(false)
 </script>
 <template>
   <div v-if="isAdmin" class="settings-page">
     <aside class="settings-sidebar">
       <ul>
-        <li :class="{active: section==='entreprise'}" @click="section='entreprise'">Entreprise</li>
         <!-- <li :class="{active: section==='utilisateurs'}" @click="section='utilisateurs'">Utilisateurs</li> -->
         <li :class="{active: section==='taxes'}" @click="section='taxes'">Taxes</li>
         <li :class="{active: section==='categories'}" @click="section='categories'">Catégories produits</li>
@@ -210,117 +150,8 @@ const showEditModal = ref(false)
     </aside>
     <main class="settings-content">
       <div class="settings-main-panel">
-        <template v-if="section==='entreprise'">
-          <h2>Paramètres de l'entreprise</h2>
-          <!-- Affichage moderne sous forme de carte -->
-          <div class="entreprise-card-pro">
-            <div v-if="entreprise.logo" class="entreprise-logo-wrapper">
-              <img :src="entreprise.logo" alt="Logo entreprise" class="entreprise-logo" />
-            </div>
-            <h3 class="entreprise-title">{{ entreprise.nom }}</h3>
-            <div class="entreprise-section">
-              <h4 class="entreprise-section-title">Identité</h4>
-              <div class="entreprise-field"><span class="entreprise-label">Sigle</span><span class="entreprise-value">{{ entreprise.sigle }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Numéro d'identification</span><span class="entreprise-value">{{ entreprise.num }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">NCC</span><span class="entreprise-value">{{ entreprise.ncc }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Numéro de banque</span><span class="entreprise-value">{{ entreprise.num_banque }}</span></div>
-            </div>
-            <div class="entreprise-section">
-              <h4 class="entreprise-section-title">Coordonnées</h4>
-              <div class="entreprise-field"><span class="entreprise-label">Adresse</span><span class="entreprise-value">{{ entreprise.adresse }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Ville</span><span class="entreprise-value">{{ entreprise.ville }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Pays</span><span class="entreprise-value">{{ entreprise.pays }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Code postal</span><span class="entreprise-value">{{ entreprise.code_postal }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Email</span><span class="entreprise-value">{{ entreprise.email }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Téléphone</span><span class="entreprise-value">{{ entreprise.telephone }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Site web</span><span class="entreprise-value">{{ entreprise.site_web }}</span></div>
-            </div>
-            <div class="entreprise-section">
-              <h4 class="entreprise-section-title">Légal</h4>
-              <div class="entreprise-field"><span class="entreprise-label">Registre commerce</span><span class="entreprise-value">{{ entreprise.registre_commerce }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Capital social</span><span class="entreprise-value">{{ entreprise.capital_social }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Forme juridique</span><span class="entreprise-value">{{ entreprise.forme_juridique }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Numéro TVA</span><span class="entreprise-value">{{ entreprise.numero_tva }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Devise</span><span class="entreprise-value">{{ entreprise.devise }}</span></div>
-            </div>
-            <div class="entreprise-section">
-              <h4 class="entreprise-section-title">Abonnement</h4>
-              <div class="entreprise-field"><span class="entreprise-label">Date abonnement</span><span class="entreprise-value">{{ entreprise.date_abonnement }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Expiration abonnement</span><span class="entreprise-value">{{ entreprise.date_expiration_abonnement }}</span></div>
-              <div class="entreprise-field"><span class="entreprise-label">Statut</span><span class="entreprise-value">{{ entreprise.statut }}</span></div>
-            </div>
-            <div style="text-align:right;margin-top:2rem;">
-              <button class="btn-primary" @click="showEditModal = true">Modifier</button>
-            </div>
-          </div>
-          <!-- Modale d'édition -->
-          <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
-            <div class="modal-content" @click.stop>
-              <div class="modal-header">
-                <h3>Modifier l'entreprise</h3>
-                <button class="modal-close" @click="showEditModal = false">×</button>
-              </div>
-              <div class="modal-body">
-                <form class="settings-form" @submit.prevent="saveEntreprise">
-                  <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
-                  <div class="form-group">
-                    <label>Nom de l'entreprise</label>
-                    <input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Sigle</label>
-                    <input type="text" v-model="entreprise.sigle" placeholder="Sigle (ex: ABC)" />
-                  </div>
-                  <div class="form-group">
-                    <label>Numéro d'identification (num)</label>
-                    <input type="text" v-model="entreprise.num" placeholder="Numéro d'identification" />
-                  </div>
-                  <div class="form-group">
-                    <label>NCC</label>
-                    <input type="text" v-model="entreprise.ncc" placeholder="NCC" />
-                  </div>
-                  <div class="form-group">
-                    <label>Numéro de banque</label>
-                    <input type="text" v-model="entreprise.num_banque" placeholder="Numéro de banque" />
-                  </div>
-                  <div class="form-group">
-                    <label>Adresse</label>
-                    <input type="text" v-model="entreprise.adresse" placeholder="Adresse" />
-                  </div>
-                  <div class="form-group">
-                    <label>Devise</label>
-                    <input type="text" v-model="entreprise.devise" placeholder="Devise (ex: XOF, EUR)" />
-                  </div>
-                  <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" v-model="entreprise.email" placeholder="Email de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Téléphone</label>
-                    <input type="text" v-model="entreprise.telephone" placeholder="Téléphone de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Site web</label>
-                    <input type="text" v-model="entreprise.site_web" placeholder="Site web de l'entreprise" />
-                  </div>
-                  <div class="form-group">
-                    <label>Logo</label>
-                    <input type="file" accept="image/*" @change="onLogoChange" />
-                    <div v-if="uploadingLogo" style="color:#218c6a;font-size:0.95em;">Envoi en cours...</div>
-                    <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo entreprise" style="max-width:120px;border-radius:8px;" /></div>
-                    <div v-if="logoError" style="color:#dc2626;font-size:0.95em;">{{ logoError }}</div>
-                  </div>
-                  <div class="modal-actions">
-                    <button type="button" class="btn-cancel" @click="showEditModal = false">Annuler</button>
-                    <button type="submit" class="btn-save">Enregistrer</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </template>
-        <!-- Section utilisateurs supprimée, gestion déplacée dans GestionCompte.vue -->
-        <template v-else-if="section==='taxes'">
+        <!-- Section Entreprise déplacée dans Gestion du compte > Onglet Entreprise -->
+        <template v-if="section==='taxes'">
           <h2>Gestion des taxes</h2>
           <button class="btn-primary" style="margin-bottom:1rem;" @click="openAddTaxModal">Ajouter une taxe</button>
           <div class="table-container">
@@ -465,7 +296,13 @@ const showEditModal = ref(false)
       </div>
     </main>
   </div>
-  <div v-else class="settings-page"><p style="color:#dc2626">Accès réservé à l'administrateur.</p></div>
+  <div v-else class="parametres-acces-refuse">
+    <div class="acces-refuse-card">
+      <span class="acces-refuse-icon">🔒</span>
+      <h2>Accès réservé à l'administrateur</h2>
+      <p>Les paramètres (entreprise, taxes, catégories, etc.) ne sont accessibles qu'aux comptes administrateur. Contactez votre administrateur pour toute modification.</p>
+    </div>
+  </div>
 </template>
 
 <style scoped>

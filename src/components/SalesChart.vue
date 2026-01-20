@@ -9,11 +9,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-<<<<<<< Updated upstream
-import { getEcritures } from '../composables/Api/apiCompta.js'
-=======
-
->>>>>>> Stashed changes
+import { apiService } from '../composables/Api/apiService.js'
 let chartInstance = null
 const chartCanvas = ref(null)
 
@@ -33,17 +29,23 @@ onMounted(async () => {
   let labels = []
   let dataVentes = []
   if (id_entreprise) {
-    const res = await getEcritures(id_entreprise)
-    if (res && Array.isArray(res.data)) {
-      // Grouper les ventes par mois
-      const ventes = res.data.filter(e => e.categorie === 'Vente')
+    try {
+      const res = await apiService.get('/api_vente.php?action=all')
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data && Array.isArray(res.data.data)) ? res.data.data : []
       const ventesParMois = {}
-      ventes.forEach(e => {
-        const mois = getMonthLabel(e.date_ecriture)
-        ventesParMois[mois] = (ventesParMois[mois] || 0) + (parseFloat(e.montant) || 0)
+      list.forEach(e => {
+        const d = e.date_vente || e.date
+        if (d) {
+          const m = getMonthLabel(d)
+          const montant = parseFloat(e.montant ?? e.total ?? e.chiffre_affaires ?? 0) || 0
+          ventesParMois[m] = (ventesParMois[m] || 0) + montant
+        }
       })
       labels = Object.keys(ventesParMois).sort()
-      dataVentes = labels.map(mois => ventesParMois[mois])
+      dataVentes = labels.map(m => ventesParMois[m])
+    } catch (_) {
+      labels = []
+      dataVentes = []
     }
   }
   if (chartInstance) chartInstance.destroy()

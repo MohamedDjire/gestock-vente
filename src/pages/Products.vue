@@ -804,158 +804,98 @@
                 <h4>Format attendu</h4>
                 <p>Votre fichier Excel peut contenir les colonnes suivantes (certaines sont optionnelles) :</p>
                 <ul class="column-list">
-                  <li><strong>Code Produit</strong> (ou Code) - Optionnel</li>
-                  <li><strong>Nom</strong> - Requis</li>
-                  <li><strong>Prix Achat</strong> (ou prix_achat) - Optionnel</li>
-                  <li><strong>Prix Vente</strong> (ou prix_vente) - Optionnel</li>
-                  <li><strong>Stock</strong> (ou Quantité) - Optionnel</li>
-                  <li><strong>Seuil Minimum</strong> (ou Seuil) - Optionnel</li>
-                  <li><strong>Entrepôt</strong> - Optionnel (défaut: Magasin)</li>
-                  <li><strong>Unité</strong> - Optionnel (défaut: unité)</li>
+                  <li><strong>Code Produit</strong> (ou Code) — optionnel</li>
+                  <li><strong>Nom</strong> — requis</li>
+                  <li><strong>Prix Achat</strong>, <strong>Prix Vente</strong>, <strong>Stock</strong>, <strong>Seuil Minimum</strong> — optionnels</li>
+                  <li><strong>Entrepôt</strong>, <strong>Unité</strong> — optionnels</li>
+                  <li><strong>Image</strong> (ou Photo, Fichier_image) — nom du fichier image (ex: riz_basmati.jpg). À associer via la zone « Images » ci‑dessous.</li>
                 </ul>
-                <p class="import-note">💡 <strong>Note:</strong> Vous pourrez compléter les informations manquantes après l'import.</p>
+                <p class="import-note">💡 Renseignez les noms d’images dans l’Excel, puis téléchargez le fichier Excel et toutes les images. Chaque image sera répartie dans le bon produit selon son nom.</p>
               </div>
             </div>
           </div>
           <div class="form-group">
-            <label class="file-label">
-              <span class="file-label-icon">📁</span>
-              <span>Choisir un fichier Excel</span>
-            </label>
-            <input 
-              type="file" 
-              accept=".xlsx,.xls"
-              @change="handleFileSelect"
-              class="file-input"
-              id="excel-file-input"
-            />
+            <label class="file-label"><span class="file-label-icon">📁</span> Fichier Excel</label>
+            <input type="file" accept=".xlsx,.xls" @change="handleFileSelect" class="file-input" id="excel-file-input" />
             <div v-if="importFile" class="file-selected">
               <span class="file-icon">✅</span>
               <span class="file-name">{{ importFile.name }}</span>
               <span class="file-size">({{ formatFileSize(importFile.size) }})</span>
             </div>
-            <div v-else class="file-placeholder">
-              <span>Aucun fichier sélectionné</span>
+            <div v-else class="file-placeholder">Aucun fichier sélectionné</div>
+          </div>
+          <div class="form-group">
+            <label class="file-label"><span class="file-label-icon">🖼️</span> Images des produits</label>
+            <div class="import-images-one">
+              <div class="import-images-drop" @dragover.prevent @drop.prevent="onImportImagesDrop">Glissez-déposez des fichiers ou un dossier</div>
+              <p class="form-hint-inline">ou</p>
+              <div class="import-images-buttons">
+                <label class="import-images-btn" for="import-img-files">Sélectionner des fichiers</label>
+                <input id="import-img-files" type="file" accept="image/*" multiple class="import-input-hidden" @change="handleImageFilesSelect" />
+                <label class="import-images-btn" for="import-img-folder">Sélectionner un dossier</label>
+                <input id="import-img-folder" type="file" webkitdirectory multiple class="import-input-hidden" @change="handleFolderSelect" />
+              </div>
             </div>
+            <div v-if="importImageFiles.length" class="file-selected">
+              <span class="file-icon">✅</span>
+              <span>{{ importImageFiles.length }} image(s) — réparties par nom (colonnes Image de l’Excel)</span>
+            </div>
+            <div v-else class="file-placeholder">Aucune image. Fichiers ou dossier.</div>
           </div>
         </div>
-        
-        <!-- Tableau de complétion manuelle -->
         <div v-else class="import-step-2">
           <div class="import-table-header">
             <h4>Compléter les informations des produits importés</h4>
-            <p class="import-table-note">Veuillez compléter les champs manquants (marqués en rouge) avant de sauvegarder.</p>
+            <p class="import-table-note">Complétez les champs manquants (marqués en rouge) puis sauvegardez.</p>
+          </div>
+          <div class="import-step2-images">
+            <label class="file-label"><span class="file-label-icon">🖼️</span> Images des produits</label>
+            <div class="import-images-one">
+              <div class="import-images-drop" @dragover.prevent @drop.prevent="onImportImagesDrop">Glissez-déposez des fichiers ou un dossier</div>
+              <p class="form-hint-inline">ou</p>
+              <div class="import-images-buttons">
+                <label class="import-images-btn" for="import-img-files-2">Sélectionner des fichiers</label>
+                <input id="import-img-files-2" type="file" accept="image/*" multiple class="import-input-hidden" @change="handleImageFilesSelect" />
+                <label class="import-images-btn" for="import-img-folder-2">Sélectionner un dossier</label>
+                <input id="import-img-folder-2" type="file" webkitdirectory multiple class="import-input-hidden" @change="handleFolderSelect" />
+              </div>
+            </div>
+            <div v-if="importImageFiles.length" class="file-selected">{{ importImageFiles.length }} image(s)</div>
+            <div v-else class="file-placeholder">Aucune image</div>
           </div>
           <div class="import-table-container">
             <table class="import-table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Nom *</th>
-                  <th>Prix Achat</th>
-                  <th>Prix Vente</th>
-                  <th>Stock</th>
-                  <th>Seuil Min.</th>
-                  <th>Date Exp.</th>
-                  <th>Entrepôt</th>
-                  <th>Unité</th>
-                  <th>Actions</th>
+                  <th>Code</th><th>Nom *</th><th>Prix Achat</th><th>Prix Vente</th><th>Stock</th><th>Seuil Min.</th><th>Date Exp.</th><th>Entrepôt</th><th>Unité</th><th>Image</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(product, index) in importedProducts" :key="index" :class="{ 'has-errors': hasImportErrors(product) }">
-                  <td>
-                    <input 
-                      v-model="product.code_produit" 
-                      type="text" 
-                      class="import-input"
-                      placeholder="Auto-généré"
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      v-model="product.nom" 
-                      type="text" 
-                      class="import-input"
-                      :class="{ 'error': !product.nom || product.nom.trim() === '' }"
-                      required
-                      placeholder="Nom du produit *"
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      v-model.number="product.prix_achat" 
-                      type="number" 
-                      step="0.01"
-                      min="0"
-                      class="import-input"
-                      placeholder="0.00"
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      v-model.number="product.prix_vente" 
-                      type="number" 
-                      step="0.01"
-                      min="0"
-                      class="import-input"
-                      placeholder="0.00"
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      v-model.number="product.quantite_stock" 
-                      type="number" 
-                      min="0"
-                      class="import-input"
-                      placeholder="0"
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      v-model.number="product.seuil_minimum" 
-                      type="number" 
-                      min="0"
-                      class="import-input"
-                      placeholder="0"
-                    />
-                  </td>
-                  <td>
-                    <input 
-                      v-model="product.date_expiration" 
-                      type="date"
-                      class="import-input"
-                      placeholder="Date d'expiration"
-                    />
-                  </td>
+                  <td><input v-model="product.code_produit" type="text" class="import-input" placeholder="Auto" /></td>
+                  <td><input v-model="product.nom" type="text" class="import-input" :class="{ 'error': !product.nom || !product.nom.trim() }" placeholder="Nom *" /></td>
+                  <td><input v-model.number="product.prix_achat" type="number" step="0.01" min="0" class="import-input" placeholder="0" /></td>
+                  <td><input v-model.number="product.prix_vente" type="number" step="0.01" min="0" class="import-input" placeholder="0" /></td>
+                  <td><input v-model.number="product.quantite_stock" type="number" min="0" class="import-input" placeholder="0" /></td>
+                  <td><input v-model.number="product.seuil_minimum" type="number" min="0" class="import-input" placeholder="0" /></td>
+                  <td><input v-model="product.date_expiration" type="date" class="import-input" /></td>
                   <td>
                     <select v-model="product.entrepot" class="import-input">
                       <option value="Magasin">Magasin</option>
-                      <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot.nom_entrepot">
-                        {{ entrepot.nom_entrepot }}
-                      </option>
+                      <option v-for="entrepot in entrepots" :key="entrepot.id_entrepot" :value="entrepot.nom_entrepot">{{ entrepot.nom_entrepot }}</option>
                     </select>
                   </td>
                   <td>
                     <select v-model="product.unite" class="import-input">
                       <option value="unité">Unité</option>
-                      <option value="paquet">Paquet</option>
-                      <option value="boîte">Boîte</option>
-                      <option value="carton">Carton</option>
-                      <option value="casier">Casier</option>
-                      <option value="palette">Palette</option>
-                      <option value="lot">Lot</option>
-                      <option value="sac">Sac</option>
-                      <option value="sachet">Sachet</option>
-                      <option value="pièce">Pièce</option>
-                      <option value="bouteille">Bouteille</option>
-                      <option value="caisse">Caisse</option>
-                      <option value="pack">Pack</option>
+                      <option value="paquet">Paquet</option><option value="boîte">Boîte</option><option value="carton">Carton</option><option value="casier">Casier</option><option value="palette">Palette</option><option value="lot">Lot</option><option value="sac">Sac</option><option value="sachet">Sachet</option><option value="pièce">Pièce</option><option value="bouteille">Bouteille</option><option value="caisse">Caisse</option><option value="pack">Pack</option>
                     </select>
                   </td>
                   <td>
-                    <button @click="removeImportedProduct(index)" class="btn-remove-import" title="Supprimer">🗑️</button>
+                    <span v-if="product.fichier_image" class="import-image-cell">{{ product.fichier_image }}<span v-if="getImageFileForProduct(product)" class="match-badge">✓</span></span>
+                    <span v-else class="text-muted">—</span>
                   </td>
+                  <td><button @click="removeImportedProduct(index)" class="btn-remove-import" title="Supprimer">🗑️</button></td>
                 </tr>
               </tbody>
             </table>
@@ -964,17 +904,9 @@
       </div>
       <div class="modal-footer">
         <button v-if="!showImportTable" @click="closeImportModal" class="btn-secondary">Annuler</button>
-        <button v-if="!showImportTable" @click="parseImportFile" class="btn-primary" :disabled="!importFile || importing">
-          <span v-if="importing">⏳</span>
-          <span v-else>📥</span>
-          {{ importing ? 'Analyse en cours...' : 'Analyser le fichier' }}
-        </button>
+        <button v-if="!showImportTable" @click="parseImportFile" class="btn-primary" :disabled="!importFile || importing">{{ importing ? 'Analyse…' : 'Analyser le fichier' }}</button>
         <button v-if="showImportTable" @click="showImportTable = false" class="btn-secondary">Retour</button>
-        <button v-if="showImportTable" @click="saveImportedProducts" class="btn-primary" :disabled="savingImported || !canSaveImported">
-          <span v-if="savingImported">⏳</span>
-          <span v-else>💾</span>
-          {{ savingImported ? 'Sauvegarde...' : `Sauvegarder (${importedProducts.length})` }}
-        </button>
+        <button v-if="showImportTable" @click="saveImportedProducts" class="btn-primary" :disabled="savingImported || !canSaveImported">{{ savingImported ? 'Sauvegarde…' : 'Sauvegarder (' + importedProducts.length + ')' }}</button>
       </div>
     </div>
   </div>
@@ -1029,6 +961,7 @@ const editingProduct = ref(null)
 const viewingProduct = ref(null)
 const stockProduct = ref(null)
 const importFile = ref(null)
+const importImageFiles = ref([])
 const importing = ref(false)
 const showImportTable = ref(false)
 const importedProducts = ref([])
@@ -1368,22 +1301,89 @@ const handleEditFromView = async () => {
 const openImportModal = () => {
   showImportModal.value = true
   importFile.value = null
+  importImageFiles.value = []
 }
 
 // Fermer modal d'import
 const closeImportModal = () => {
   showImportModal.value = false
   importFile.value = null
+  importImageFiles.value = []
   showImportTable.value = false
   importedProducts.value = []
 }
 
-// Gérer la sélection de fichier
+// Gérer la sélection de fichier Excel
 const handleFileSelect = (event) => {
   const file = event.target.files[0]
   if (file) {
     importFile.value = file
   }
+}
+
+// Gérer la sélection des fichiers images (multiple)
+const handleImageFilesSelect = (event) => {
+  const files = event.target.files
+  importImageFiles.value = files ? Array.from(files) : []
+}
+
+// Sélectionner un dossier : toutes les images du dossier sont chargées
+const handleFolderSelect = (event) => {
+  const files = event.target.files
+  if (!files || !files.length) { importImageFiles.value = []; return }
+  const isImage = (f) => (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name || '')
+  importImageFiles.value = Array.from(files).filter(isImage)
+  event.target.value = ''
+}
+
+const isImageFile = (f) => (f && f.type && f.type.startsWith('image/')) || (f && /\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name || ''))
+
+async function readFilesFromEntry (entry) {
+  const out = []
+  if (entry.isFile) {
+    const f = await new Promise(r => entry.file(r))
+    if (isImageFile(f)) out.push(f)
+    return out
+  }
+  const reader = entry.createReader()
+  let list = []
+  do {
+    list = await new Promise(r => reader.readEntries(r))
+    for (const e of list) { out.push(...await readFilesFromEntry(e)) }
+  } while (list.length > 0)
+  return out
+}
+
+async function onImportImagesDrop (e) {
+  e.preventDefault()
+  const items = e.dataTransfer.items
+  if (!items || !items.length) return
+  const files = []
+  for (let i = 0; i < items.length; i++) {
+    const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null
+    if (!entry) {
+      const f = items[i].getAsFile()
+      if (f && isImageFile(f)) files.push(f)
+    } else {
+      files.push(...await readFilesFromEntry(entry))
+    }
+  }
+  importImageFiles.value = files
+}
+
+// Extraire le nom de fichier sans chemin
+const getBasename = (path) => {
+  const s = String(path || '').trim()
+  const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'))
+  return i >= 0 ? s.slice(i + 1) : s
+}
+
+// Retourne le File correspondant au champ fichier_image du produit (match par nom, insensible à la casse)
+const getImageFileForProduct = (product) => {
+  const name = (product.fichier_image || '').trim()
+  if (!name) return null
+  const key = getBasename(name).toLowerCase()
+  return importImageFiles.value.find(f => getBasename(f.name).toLowerCase() === key) || null
 }
 
 // Formater la taille du fichier
@@ -1512,6 +1512,8 @@ const parseImportFile = async () => {
             }
           }
           
+          const fichierImage = findColumnValue(row, ['Image', 'Photo', 'Fichier_image', 'image', 'photo', 'fichier_image', 'Image produit', 'Nom image'])
+          
           // Générer un code produit si nécessaire
           const finalCode = code || (nom ? generateProductCode(nom) : `PROD-${Date.now()}-${index}`)
           
@@ -1525,6 +1527,7 @@ const parseImportFile = async () => {
             entrepot: entrepot || 'Magasin',
             unite: uniteNormalized || 'unité',
             date_expiration: dateExpFormatted || '',
+            fichier_image: fichierImage || '',
             actif: 1,
             _rowIndex: index + 1
           }
@@ -1606,6 +1609,20 @@ const saveImportedProducts = async () => {
   try {
     for (const product of importedProducts.value) {
       try {
+        // Upload image si un fichier correspondant est sélectionné
+        let imageUrl = null
+        const imgFile = getImageFileForProduct(product)
+        if (imgFile && (product.fichier_image || '').trim()) {
+          try {
+            const result = await uploadPhoto(imgFile, null, product.nom || 'Produit')
+            if (result.success && (result.data?.secure_url || result.data?.url)) {
+              imageUrl = result.data.secure_url || result.data.url
+            }
+          } catch (err) {
+            errors.push(`${product.nom || 'Produit'}: échec upload image (${err.message || 'erreur inconnue'})`)
+          }
+        }
+
         // Générer le code si vide
         const productData = {
           code_produit: product.code_produit || generateProductCode(product.nom),
@@ -1617,7 +1634,8 @@ const saveImportedProducts = async () => {
           entrepot: product.entrepot || 'Magasin',
           unite: product.unite || 'unité',
           date_expiration: product.date_expiration || null,
-          actif: 1
+          actif: 1,
+          image: imageUrl || null
         }
         
         // Validation finale
@@ -3083,6 +3101,11 @@ onMounted(() => {
   font-size: 0.75rem;
   color: #6b7280;
 }
+.form-hint-inline {
+  margin: 0.35rem 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
 
 .stock-status-preview {
   margin-top: 1rem;
@@ -3428,6 +3451,32 @@ onMounted(() => {
   color: #6b7280;
 }
 
+.import-images-one { margin-bottom: 0.5rem; }
+.import-images-drop {
+  padding: 0.75rem 1rem; border: 2px dashed #cbd5e1; border-radius: 8px; background: #f8fafc;
+  text-align: center; color: #64748b; font-size: 0.9rem; cursor: pointer; transition: all 0.2s;
+}
+.import-images-drop:hover { border-color: #1a5f4a; background: #f0fdf4; color: #166534; }
+.import-images-buttons { display: flex; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.import-images-btn {
+  padding: 0.5rem 0.75rem; background: #e2e8f0; color: #475569; border-radius: 6px; font-size: 0.85rem;
+  cursor: pointer; transition: all 0.2s;
+}
+.import-images-btn:hover { background: #cbd5e1; color: #1e293b; }
+.import-input-hidden { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+
+.import-step2-images {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+.import-step2-images .file-label { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+.import-step2-images .file-input { margin-bottom: 0.5rem; }
+.import-step2-images .file-selected, .import-step2-images .file-placeholder { font-size: 0.875rem; color: #166534; }
+.import-step2-images .file-placeholder { color: #6b7280; }
+
 .import-table-container {
   max-height: 60vh;
   overflow-y: auto;
@@ -3513,6 +3562,18 @@ onMounted(() => {
 .btn-remove-import:hover {
   background: #fecaca;
   transform: scale(1.1);
+}
+
+.import-image-cell {
+  font-size: 0.85rem;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.import-image-cell .match-badge {
+  color: #059669;
+  font-weight: 700;
 }
 
 .btn-mark-vue {
