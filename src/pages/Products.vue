@@ -1906,8 +1906,9 @@ const confirmDelete = (product) => {
 // Supprimer produit
 const deleteProduct = async (productId) => {
   try {
-    const response = await apiService.delete(`/api_produit.php?id=${productId}`)
-    if (response.success) {
+    const response = await apiService.delete(`/api_produit.php?id=${productId}&hard=true`)
+    if (response && response.success) {
+      products.value = products.value.filter(p => p.id_produit !== productId)
       await logJournal({
         user: getJournalUser(),
         action: 'Suppression produit',
@@ -1915,6 +1916,8 @@ const deleteProduct = async (productId) => {
       })
       await loadProducts()
       showNotification('success', 'Succès', 'Produit supprimé avec succès')
+    } else {
+      showNotification('error', 'Erreur', response?.message || 'Erreur lors de la suppression')
     }
   } catch (error) {
     console.error('Erreur lors de la suppression:', error)

@@ -117,8 +117,9 @@
           <h3 class="plan-name">{{ forfait.nom_forfait }}</h3>
           <div class="plan-price">{{ formatPrice(forfait.prix) }} <span class="plan-duree">/ {{ forfait.duree_jours != null ? forfait.duree_jours + ' jours' : '—' }}</span></div>
           <ul class="plan-features">
-            <li>Forfait actif dès validation</li>
+            <li>Forfait actif dès validation du paiement</li>
             <li>Accès selon votre forfait</li>
+            <li v-if="isRenouvellement">La durée s'ajoute au temps restant</li>
           </ul>
         </div>
       </div>
@@ -194,6 +195,8 @@ const forfaitValid = computed(() => {
   return f.id_forfait > 0 && f.nom_forfait && f.prix != null && f.prix >= 0
 })
 
+const isRenouvellement = computed(() => route.query.renouvellement === '1')
+
 function showToast(msg, type = 'info') {
   toastMessage.value = msg
   toastType.value = type
@@ -233,7 +236,8 @@ async function validerPaiement() {
   }
   validating.value = true
   try {
-    // TODO: appeler l'API selon selectedMethod (données carte : cardEmail, cardNumber, cardExpiry, cardCvv)
+    // TODO: appeler l'API de paiement selon selectedMethod (Wave, OM, MTN, etc.). Après succès
+    // du paiement, appeler : apiService.post('/api_forfait.php', { id_forfait: forfait.value.id_forfait, renouvellement: isRenouvellement.value || undefined })
     showToast('Intégration des APIs de paiement en cours.', 'info')
   } catch (e) {
     submitError.value = 'Une erreur est survenue.'

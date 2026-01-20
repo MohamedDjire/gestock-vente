@@ -34,7 +34,117 @@
             🔄 Actualiser
           </button>
         </div>
-        <!-- ... contenu forfaits existant ... -->
+        <div v-if="loadingForfait" class="loading-state"><p>Chargement...</p></div>
+        <template v-else>
+          <!-- Statut du forfait actuel -->
+          <div class="current-forfait-section">
+            <h3>Forfait Actuel</h3>
+            <div v-if="currentForfait && currentForfait.actif" class="forfait-status-card active">
+              <div class="status-header">
+                <div class="status-badge active-badge">Actif</div>
+                <div class="jours-restants" v-if="currentForfait.jours_restants !== undefined && currentForfait.jours_restants !== null">
+                  {{ currentForfait.jours_restants }} jours restants
+                </div>
+              </div>
+              <div class="forfait-details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Nom du forfait</span>
+                  <span class="detail-value">{{ currentForfait.nom || '—' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Prix</span>
+                  <span class="detail-value">{{ formatPrice(currentForfait.prix) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Durée</span>
+                  <span class="detail-value">{{ currentForfait.duree_jours }} jours</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Date de début</span>
+                  <span class="detail-value">{{ formatDate(currentForfait.date_debut) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Date de fin</span>
+                  <span class="detail-value" :class="getDateClass(currentForfait.date_fin)">
+                    {{ formatDate(currentForfait.date_fin) }}
+                  </span>
+                </div>
+                <div class="detail-item" v-if="currentForfait.description">
+                  <span class="detail-label">Description</span>
+                  <span class="detail-value">{{ currentForfait.description }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="forfait-status-card expired">
+              <div class="status-header">
+                <div class="status-badge expired-badge">Aucun forfait actif</div>
+              </div>
+              <p class="expired-message">Votre forfait a expiré ou vous n'avez pas encore souscrit à un forfait.</p>
+            </div>
+          </div>
+
+          <!-- Liste des forfaits disponibles -->
+          <div class="available-forfaits-section">
+            <h3>Forfaits Disponibles</h3>
+            <div v-if="loadingForfaits" class="loading-state"><p>Chargement des forfaits...</p></div>
+            <div v-else-if="availableForfaits.length === 0" class="empty-state"><p>Aucun forfait disponible</p></div>
+            <div v-else class="forfaits-grid">
+              <div
+                v-for="forfait in availableForfaits"
+                :key="forfait.id_forfait"
+                class="forfait-card"
+                :class="{ 'forfait-current': forfait.id_forfait === currentForfait?.id_forfait }"
+              >
+                <div class="forfait-card-header">
+                  <h4>{{ forfait.nom_forfait }}</h4>
+                  <div class="forfait-price">{{ formatPrice(forfait.prix) }}</div>
+                </div>
+                <div class="forfait-card-body">
+                  <div class="forfait-info">
+                    <span class="info-icon">⏱️</span>
+                    <span>{{ forfait.duree_jours }} jours</span>
+                  </div>
+                  <p class="forfait-description" v-if="forfait.description">{{ forfait.description }}</p>
+                  <p class="forfait-description" v-else>Forfait standard</p>
+
+                  <div class="forfait-limits" v-if="forfait.max_utilisateurs != null || forfait.max_entrepots != null || forfait.max_points_vente != null || forfait.peut_nommer_admin == 1">
+                    <div class="limit-item" v-if="forfait.max_utilisateurs != null">
+                      <span class="limit-icon">👥</span>
+                      <span class="limit-text"><strong>{{ forfait.max_utilisateurs }}</strong> utilisateur{{ forfait.max_utilisateurs > 1 ? 's' : '' }} + admin</span>
+                    </div>
+                    <div class="limit-item" v-if="forfait.max_entrepots != null">
+                      <span class="limit-icon">🏭</span>
+                      <span class="limit-text"><strong>{{ forfait.max_entrepots }}</strong> entrepôt{{ forfait.max_entrepots > 1 ? 's' : '' }}</span>
+                    </div>
+                    <div class="limit-item" v-if="forfait.max_points_vente != null">
+                      <span class="limit-icon">🏪</span>
+                      <span class="limit-text"><strong>{{ forfait.max_points_vente }}</strong> point{{ forfait.max_points_vente > 1 ? 's' : '' }} de vente</span>
+                    </div>
+                    <div class="limit-item" v-if="forfait.peut_nommer_admin == 1">
+                      <span class="limit-icon">👑</span>
+                      <span class="limit-text">Peut nommer un autre admin</span>
+                    </div>
+                  </div>
+
+                  <div class="forfait-features" v-if="parseFeatures(forfait.fonctionnalites_avancees).length">
+                    <div class="features-title">Fonctionnalités incluses</div>
+                    <ul class="features-list">
+                      <li v-for="(feature, i) in parseFeatures(forfait.fonctionnalites_avancees)" :key="i">✓ {{ feature }}</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="forfait-card-footer">
+                  <button
+                    @click="forfait.id_forfait === currentForfait?.id_forfait && currentForfait?.actif ? openRenouvelerForfaitModal(forfait) : goToPaiementForfait(forfait)"
+                    class="btn-subscribe"
+                  >
+                    {{ forfait.id_forfait === currentForfait?.id_forfait && currentForfait?.actif ? 'Renouveler' : "S'abonner" }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -387,12 +497,34 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Confirmation Renouvellement forfait -->
+    <div v-if="showRenouvelerForfaitModal" class="modal-overlay" @click.self="closeRenouvelerForfaitModal">
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header modal-header-with-icon">
+          <div class="modal-header-start">
+            <span class="modal-header-icon">💳</span>
+            <h3>Renouveler l'abonnement</h3>
+          </div>
+          <button class="modal-close" @click="closeRenouvelerForfaitModal">×</button>
+        </div>
+        <div class="modal-body">
+          <p>Voulez-vous vraiment renouveler votre forfait ?</p>
+          <p class="modal-hint">La nouvelle durée s'ajoutera au temps restant de votre abonnement. Vous serez redirigé vers la page de paiement.</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" @click="closeRenouvelerForfaitModal">Annuler</button>
+          <button class="btn-save" @click="confirmRenouvelerForfait">Aller au paiement</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 // --- Notification Snackbar ---
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 const showSnackbar = ref(false)
 const snackbarMessage = ref('')
 const snackbarType = ref('success') // success | error
@@ -549,6 +681,7 @@ import { useCurrency } from '../composables/useCurrency.js'
         })
 
 const authStore = useAuthStore()
+const router = useRouter()
 // Empêche la soumission automatique du formulaire utilisateur sauf par clic explicite
 function onUserFormSubmit(e) {
   // Log pour debug
@@ -583,6 +716,8 @@ const availableForfaits = ref([])
 const loadingForfait = ref(false)
 const loadingForfaits = ref(false)
 const subscribing = ref(false)
+const showRenouvelerForfaitModal = ref(false)
+const forfaitToSubscribe = ref(null)
 
 // Utilisateurs connectés
 const connectedUsers = ref([])
@@ -728,27 +863,32 @@ const loadAvailableForfaits = async () => {
   }
 }
 
-const subscribeToForfait = async (forfaitId) => {
-  if (!confirm('Voulez-vous vraiment renouveler votre forfait ?')) return
-  
-  subscribing.value = true
-  try {
-    const response = await apiService.post('/api_forfait.php', {
-      id_forfait: forfaitId
-    })
-    if (response.success) {
-      alert('Forfait renouvelé avec succès !')
-      await loadForfaitStatus()
-      await loadAvailableForfaits()
-    } else {
-      alert('Erreur lors du renouvellement du forfait')
-    }
-  } catch (error) {
-    console.error('Erreur lors de la souscription:', error)
-    alert('Erreur lors de la souscription au forfait')
-  } finally {
-    subscribing.value = false
+const openRenouvelerForfaitModal = (forfait) => {
+  forfaitToSubscribe.value = forfait
+  showRenouvelerForfaitModal.value = true
+}
+
+const closeRenouvelerForfaitModal = () => {
+  showRenouvelerForfaitModal.value = false
+  forfaitToSubscribe.value = null
+}
+
+const goToPaiementForfait = (forfait, isRenewal = false) => {
+  const query = {
+    id_forfait: forfait.id_forfait,
+    nom_forfait: forfait.nom_forfait || forfait.nom || '',
+    prix: forfait.prix,
+    duree_jours: forfait.duree_jours
   }
+  if (isRenewal) query.renouvellement = '1'
+  router.push({ name: 'PaiementForfait', query })
+}
+
+const confirmRenouvelerForfait = () => {
+  const f = forfaitToSubscribe.value
+  if (!f) return
+  closeRenouvelerForfaitModal()
+  goToPaiementForfait(f, true)
 }
 
 const loadConnectedUsers = async () => {
@@ -1032,19 +1172,21 @@ onMounted(async () => {
 }
 
 .btn-refresh {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
-  padding: 2rem 2.5rem 1.5rem 2.5rem;
-  min-width: 600px;
-  width: 800px;
-  max-width: 95vw;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 .btn-refresh:hover:not(:disabled) {
   background: #e5e7eb;
+}
+.btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Forfait Status */
@@ -1066,20 +1208,25 @@ onMounted(async () => {
 }
 
 .forfait-status-card.active {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 6px 24px 0 rgba(26,95,74,0.12);
-  padding: 2rem 2.5rem 1.5rem 2.5rem;
-  min-width: 600px;
-  width: 800px;
-  max-width: 95vw;
+  background: #f0fdf4;
+  border-color: #22c55e;
+  margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 1rem;
+}
+
+.forfait-status-card .status-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.forfait-status-card.expired {
+  background: #fef2f2;
+  border-color: #ef4444;
 }
 
 .status-badge {
@@ -1577,6 +1724,12 @@ onMounted(async () => {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 1rem;
+}
+
+.modal-hint {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
 }
 
 /* Les styles .modal-actions sont définis dans style.css */
