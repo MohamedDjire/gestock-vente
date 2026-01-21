@@ -8,12 +8,11 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 const props = defineProps({
   ecritures: { type: Array, default: () => [] },
   activeTab: { type: String, default: 'tout' }
 })
-import { onMounted, ref } from 'vue'
 import { apiService } from '../composables/Api/apiService.js'
 let chartInstance = null
 const chartCanvas = ref(null)

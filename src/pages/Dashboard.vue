@@ -158,7 +158,7 @@ const loadDashboardData = async () => {
     if (!pointVenteId && userAuth) {
       const isAdmin = userAuth.role && ['admin', 'superadmin'].includes(String(userAuth.role).toLowerCase())
       // Pour les non-admins, utiliser leur premier point de vente (obligatoire)
-      if (!isAdmin && user.permissions_points_vente && Array.isArray(user.permissions_points_vente) && user.permissions_points_vente.length > 0) {
+      if (!isAdmin && userAuth.permissions_points_vente && Array.isArray(userAuth.permissions_points_vente) && userAuth.permissions_points_vente.length > 0) {
         pointVenteId = userAuth.permissions_points_vente[0]
         // Mettre à jour l'URL sans recharger la page
         if (route.query.point_vente !== pointVenteId) {

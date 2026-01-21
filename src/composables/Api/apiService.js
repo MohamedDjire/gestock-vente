@@ -7,10 +7,12 @@ import { getLocalStorage, setLocalStorage, removeLocalStorage } from '../../util
  * Utilise safeStorage pour éviter les erreurs si "Tracking Prevention" bloque l'accès.
  */
 
-// URL de base de l'API - relative en dev pour proxy Vite, distante en prod
-const API_BASE_URL = import.meta.env.DEV 
-  ? (import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock')
-  : (import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock')
+
+// URL de base de l'API - toujours proxy local en dev
+let API_BASE_URL = '';
+if (!import.meta.env.DEV) {
+  API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock';
+}
 
 // Créer une instance axios
 const apiClient = axios.create({
