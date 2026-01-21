@@ -50,7 +50,7 @@ try {
     }
 
     if ($method === 'PUT') {
-        parse_str(file_get_contents('php://input'), $data);
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $id = $_GET['id'] ?? null;
         if (!$id) { echo json_encode(['success' => false, 'message' => 'ID manquant']); exit; }
         $sql = "UPDATE  stock_fournisseurs SET nom=:nom, email=:email, telephone=:telephone, adresse=:adresse, statut=:statut WHERE id=:id";

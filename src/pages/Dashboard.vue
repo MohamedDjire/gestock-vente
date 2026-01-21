@@ -225,11 +225,35 @@ const loadDashboardData = async () => {
     } else {
       // Pas de point de vente disponible
       currentPointVente.value = null
+      let id_entreprise = userAuth?.id_entreprise || null
+      if (!id_entreprise && typeof localStorage !== 'undefined') {
+        try {
+          const u = localStorage.getItem('prostock_user')
+          if (u) id_entreprise = JSON.parse(u).id_entreprise
+        } catch (_) {}
+      }
+      const [productsResponse, ventesResponse] = await Promise.all([
+        apiService.get('/api_produit.php?action=all'),
+        id_entreprise ? apiService.get('/api_vente.php?action=all') : Promise.resolve({ data: [] })
+      ])
+      let venteTotal = 0, venteJour = 0, achatTotal = 0
+      const list = Array.isArray(ventesResponse?.data) ? ventesResponse.data : (ventesResponse?.data?.data && Array.isArray(ventesResponse.data.data)) ? ventesResponse.data.data : []
+      if (list.length) {
+        const today = new Date().toISOString().slice(0, 10)
+        venteTotal = list.reduce((acc, e) => acc + (parseFloat(e.montant) || parseFloat(e.total) || parseFloat(e.chiffre_affaires) || 0), 0)
+        venteJour = list.filter(e => (e.date_vente || e.date || '').toString().slice(0, 10) === today).reduce((acc, e) => acc + (parseFloat(e.montant) || parseFloat(e.total) || parseFloat(e.chiffre_affaires) || 0), 0)
+      }
+      let totalProduit = 0, stocksRupture = 0
+      if (productsResponse && productsResponse.success) {
+        const products = productsResponse.data || []
+        totalProduit = products.length
+        stocksRupture = products.filter(p => p.statut_stock === 'rupture').length
+      }
       stats.value = {
-        venteTotal: 0,
-        venteJour: 0,
-        totalProduit: 0,
-        stocksRupture: 0,
+        venteTotal,
+        venteJour,
+        totalProduit,
+        stocksRupture,
         variationVenteTotal: 0,
         variationVenteJour: 0,
         variationProduit: 0,

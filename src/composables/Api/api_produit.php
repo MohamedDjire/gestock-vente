@@ -133,6 +133,7 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots 
             END AS statut_stock
         FROM stock_produit p
         WHERE p.id_entreprise = ?
+        AND (p.actif IS NULL OR p.actif = 1)
     ";
     
     $params = [$enterpriseId];
@@ -278,6 +279,7 @@ function searchProducts($bdd, $query, $enterpriseId) {
             END AS statut_stock
         FROM stock_produit p
         WHERE p.id_entreprise = :enterprise_id
+        AND (p.actif IS NULL OR p.actif = 1)
         AND (p.nom LIKE :query OR p.code_produit LIKE :query)
         ORDER BY p.nom
     ");

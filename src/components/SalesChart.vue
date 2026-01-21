@@ -13,6 +13,8 @@ const props = defineProps({
   ecritures: { type: Array, default: () => [] },
   activeTab: { type: String, default: 'tout' }
 })
+import { onMounted, ref } from 'vue'
+import { apiService } from '../composables/Api/apiService.js'
 let chartInstance = null
 const chartCanvas = ref(null)
 
@@ -49,6 +51,38 @@ const chartData = computed(() => {
     labels: allLabels,
     revenus: allLabels.map(l => revenus[l] || 0),
     depenses: allLabels.map(l => depenses[l] || 0)
+  }
+})
+
+onMounted(async () => {
+  const Chart = (await import('chart.js/auto')).default
+  // Récupérer l'id_entreprise
+  let id_entreprise = null
+  const user = localStorage.getItem('prostock_user')
+  if (user) {
+    id_entreprise = JSON.parse(user).id_entreprise
+  }
+  let labels = []
+  let dataVentes = []
+  if (id_entreprise) {
+    try {
+      const res = await apiService.get('/api_vente.php?action=all')
+      const list = Array.isArray(res?.data) ? res.data : (res?.data?.data && Array.isArray(res.data.data)) ? res.data.data : []
+      const ventesParMois = {}
+      list.forEach(e => {
+        const d = e.date_vente || e.date
+        if (d) {
+          const m = getMonthLabel(d)
+          const montant = parseFloat(e.montant ?? e.total ?? e.chiffre_affaires ?? 0) || 0
+          ventesParMois[m] = (ventesParMois[m] || 0) + montant
+        }
+      })
+      labels = Object.keys(ventesParMois).sort()
+      dataVentes = labels.map(m => ventesParMois[m])
+    } catch (_) {
+      labels = []
+      dataVentes = []
+    }
   }
 })
 

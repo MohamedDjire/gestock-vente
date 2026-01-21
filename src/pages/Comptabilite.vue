@@ -627,4 +627,3 @@ async function submitEcriture() {
 }
 </style>
 
-

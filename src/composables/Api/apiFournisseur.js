@@ -4,8 +4,9 @@ import { apiService } from './apiService.js';
 export default {
   async getAll() {
     const response = await apiService.get('/api_fournisseur.php?action=all');
+    if (Array.isArray(response)) return response;
     if (response && response.success) {
-      return response.data || [];
+      return Array.isArray(response.data) ? response.data : (response.data || []);
     }
     throw new Error(response?.message || 'Erreur lors du chargement des fournisseurs');
   },

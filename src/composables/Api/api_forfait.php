@@ -389,6 +389,37 @@ try {
                 ], JSON_UNESCAPED_UNICODE);
                 exit;
             }
+
+            $isRenouvellement = !empty($data['renouvellement']) && ($data['renouvellement'] === true || $data['renouvellement'] === '1' || $data['renouvellement'] === 1);
+            if ($isRenouvellement && $enterpriseId) {
+                // Renouvellement : ajouter la durée au temps restant si abonnement actif au même forfait
+                $stmtAb = $bdd->prepare("
+                    SELECT id_abonnement, date_fin FROM stock_abonnement
+                    WHERE id_entreprise = :id_entreprise AND id_forfait = :id_forfait AND statut = 'actif'
+                    ORDER BY date_fin DESC LIMIT 1
+                ");
+                $stmtAb->execute(['id_entreprise' => $enterpriseId, 'id_forfait' => (int)$data['id_forfait']]);
+                $ab = $stmtAb->fetch(PDO::FETCH_ASSOC);
+                if ($ab) {
+                    $dateFinExistante = new DateTime($ab['date_fin']);
+                    if ($dateFinExistante > new DateTime()) {
+                        $duree = (int)($forfait['duree_jours'] ?? 0);
+                        if ($duree > 0) {
+                            $stmtUp = $bdd->prepare("UPDATE stock_abonnement SET date_fin = DATE_ADD(date_fin, INTERVAL :duree DAY) WHERE id_abonnement = :id");
+                            $stmtUp->execute(['duree' => $duree, 'id' => $ab['id_abonnement']]);
+                            $stmtUp = $bdd->prepare("SELECT date_fin FROM stock_abonnement WHERE id_abonnement = :id");
+                            $stmtUp->execute(['id' => $ab['id_abonnement']]);
+                            $row = $stmtUp->fetch(PDO::FETCH_ASSOC);
+                            echo json_encode([
+                                'success' => true,
+                                'message' => 'Forfait renouvelé. La durée a été ajoutée au temps restant.',
+                                'data' => ['id_abonnement' => (int)$ab['id_abonnement'], 'date_fin' => $row['date_fin'] ?? null]
+                            ], JSON_UNESCAPED_UNICODE);
+                            exit;
+                        }
+                    }
+                }
+            }
             
             // Calculer la date de fin
             $dateDebut = new DateTime();

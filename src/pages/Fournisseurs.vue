@@ -202,7 +202,6 @@ function closeForm() {
   formError.value = ''
 }
 
-
 async function submitForm() {
   if (!form.value.nom) {
     formError.value = 'Le nom est obligatoire'

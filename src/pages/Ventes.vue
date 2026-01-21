@@ -437,7 +437,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
-import { createEcriture } from '../composables/Api/apiCompta.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useCurrency } from '../composables/useCurrency.js'
 
@@ -926,18 +925,7 @@ const processSale = async () => {
           id_entreprise = JSON.parse(user).id_entreprise
         }
       }
-      if (id_entreprise) {
-        await createEcriture({
-          date_ecriture: new Date().toISOString().slice(0, 10),
-          type_ecriture: 'Entrée',
-          montant: total.value,
-          categorie: 'Vente',
-          statut: 'validé',
-          reference: idVente,
-          details: `Vente au point de vente ${selectedPointVente.value?.nom_point_vente || ''}`,
-          id_entreprise
-        })
-      }
+      // Écriture comptable désactivée (api_compta supprimée)
 
       // Créer le reçu avec toutes les informations
       lastSaleReceipt.value = {
