@@ -734,16 +734,6 @@ const saveUser = async () => {
       }
       const response = await apiService.put(`/index.php?action=update&id=${editingUser.value.id_utilisateur}`, updateData)
       if (response.success) {
-        // Si l'utilisateur modifié est l'utilisateur courant, mettre à jour le store et le localStorage
-        const updatedUser = response.data;
-        if (
-          updatedUser &&
-          authStore.user &&
-          (updatedUser.id_utilisateur === authStore.user.id_utilisateur || updatedUser.id === authStore.user.id)
-        ) {
-          authStore.user = { ...authStore.user, ...updatedUser };
-          localStorage.setItem('prostock_user', JSON.stringify(authStore.user));
-        }
         triggerSnackbar('Utilisateur modifié avec succès !', 'success')
         await loadUsers()
         closeUserModal()

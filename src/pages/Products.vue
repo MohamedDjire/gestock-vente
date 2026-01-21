@@ -1007,6 +1007,9 @@ import { apiService } from '../composables/Api/apiService.js'
 import StatCard from '../components/StatCard.vue'
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
+import apiCompta from '../composables/Api/apiCompta.js'
+import { useAuthStore } from '../stores/auth.js'
+const authStore = useAuthStore()
 import * as XLSX from 'xlsx'
 import { uploadPhoto } from '../config/cloudinary'
 
@@ -2064,6 +2067,32 @@ const saveEntree = async () => {
         action: 'Entrée de stock',
         details: `Produit ID: ${stockProduct.value.id_produit}, Quantité: ${entreeData.value.quantite}`
       })
+      // === Écriture comptable automatique ===
+      try {
+        const now = new Date();
+        const ecriture = {
+          date_ecriture: now.toISOString().slice(0, 19).replace('T', ' '),
+          type_ecriture: 'entrée_stock',
+          montant: (stockProduct.value.prix_achat || 0) * (entreeData.value.quantite || 0),
+          debit: (stockProduct.value.prix_achat || 0) * (entreeData.value.quantite || 0),
+          credit: 0,
+          user: authStore.user?.nom || authStore.user?.email || 'utilisateur inconnu',
+          categorie: 'Stock',
+          moyen_paiement: 'N/A',
+          statut: 'valide',
+          reference: `entree-${stockProduct.value.id_produit}`,
+          commentaire: entreeData.value.notes || '',
+          details: JSON.stringify({ produit: stockProduct.value.nom, quantite: entreeData.value.quantite, prix_unitaire: stockProduct.value.prix_achat }),
+          id_entreprise: authStore.user?.id_entreprise || null,
+          id_utilisateur: authStore.user?.id_utilisateur || authStore.user?.id || null,
+          id_point_vente: null,
+          nom_client: null
+        }
+        await apiCompta.addEcriture(ecriture)
+      } catch (err) {
+        console.error('Erreur écriture comptable entrée stock:', err)
+      }
+      // === Fin écriture comptable ===
       await loadProducts()
       await loadAllMovements()
       await generateAlertes()
@@ -2132,6 +2161,33 @@ const saveSortie = async () => {
         action: 'Sortie de stock',
         details: `Produit ID: ${stockProduct.value.id_produit}, Quantité: ${sortieData.value.quantite}, Type: ${sortieData.value.type_sortie}`
       })
+      // === Écriture comptable automatique ===
+      try {
+        const now = new Date();
+        const montant = (stockProduct.value.prix_vente || 0) * (sortieData.value.quantite || 0);
+        const ecriture = {
+          date_ecriture: now.toISOString().slice(0, 19).replace('T', ' '),
+          type_ecriture: 'sortie_stock',
+          montant: montant,
+          debit: 0,
+          credit: montant,
+          user: authStore.user?.nom || authStore.user?.email || 'utilisateur inconnu',
+          categorie: 'Stock',
+          moyen_paiement: 'N/A',
+          statut: 'valide',
+          reference: `sortie-${stockProduct.value.id_produit}`,
+          commentaire: sortieData.value.motif || '',
+          details: JSON.stringify({ produit: stockProduct.value.nom, quantite: sortieData.value.quantite, prix_unitaire: stockProduct.value.prix_vente, type_sortie: sortieData.value.type_sortie }),
+          id_entreprise: authStore.user?.id_entreprise || null,
+          id_utilisateur: authStore.user?.id_utilisateur || authStore.user?.id || null,
+          id_point_vente: null,
+          nom_client: null
+        }
+        await apiCompta.addEcriture(ecriture)
+      } catch (err) {
+        console.error('Erreur écriture comptable sortie stock:', err)
+      }
+      // === Fin écriture comptable ===
       await loadProducts()
       await loadAllMovements()
       await generateAlertes()

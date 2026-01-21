@@ -1008,13 +1008,16 @@
 
 <script setup>
 import { ref, computed, onMounted, onActivated, watch, inject } from 'vue'
-import { useAuthStore } from '../stores/auth'
-const authStore = useAuthStore()
 import { useRouter, useRoute } from 'vue-router'
 import StatCard from '../components/StatCard.vue'
 import { apiService } from '../composables/Api/apiService.js'
+import apiCompta from '../composables/Api/apiCompta.js'
+
 import { useCurrency } from '../composables/useCurrency.js'
 import { logJournal } from '../composables/useJournal'
+
+import { useAuthStore } from '../stores/auth.js'
+const authStore = useAuthStore()
 
 const router = useRouter()
 const route = useRoute()
@@ -1746,6 +1749,7 @@ const clearSaleCart = () => {
 }
 
 const processSaleFromModal = async () => {
+  const authStore = useAuthStore();
   console.log('=== processSaleFromModal DÉBUT ===')
   console.log('Panier:', saleCart.value)
   console.log('Point de vente actuel:', currentPointVente.value)
@@ -1805,11 +1809,11 @@ const processSaleFromModal = async () => {
       console.log('Vente réussie!')
       // Récupérer l'ID de la vente depuis la réponse
       const idVente = response.data?.id_vente || response.data?.ventes?.[0]?.id_vente || Date.now()
-      
+
       // Calculer le total avant de vider le panier
       const totalVente = saleCart.value.reduce((sum, item) => sum + (item.sous_total || 0), 0)
       const totalItems = saleCart.value.reduce((sum, item) => sum + (item.quantite || 0), 0)
-      
+
       // Créer le reçu avec toutes les informations
       lastSaleReceipt.value = {
         id_vente: idVente,
@@ -1833,23 +1837,51 @@ const processSaleFromModal = async () => {
         remise: 0,
         total: totalVente
       }
-      
+
+      // === AJOUT AUTOMATIQUE ÉCRITURE COMPTABLE ===
+      try {
+        const now = new Date();
+        const ecriture = {
+          date_ecriture: now.toISOString().slice(0, 19).replace('T', ' '),
+          type_ecriture: 'vente',
+          montant: totalVente,
+          debit: 0,
+          credit: totalVente,
+          user: authStore.user?.nom || authStore.user?.email || 'utilisateur inconnu',
+          categorie: 'Vente',
+          moyen_paiement: 'inconnu',
+          statut: 'valide',
+          reference: idVente,
+          commentaire: '',
+          details: JSON.stringify(saleCart.value.map(item => ({ nom: item.nom, quantite: item.quantite, prix_unitaire: item.prix_unitaire }))),
+          id_entreprise: authStore.user?.id_entreprise || null,
+          id_utilisateur: authStore.user?.id_utilisateur || authStore.user?.id || null,
+          id_point_vente: currentPointVente.value.id_point_vente,
+          nom_client: saleCart.value[0]?.client_nom || null
+        }
+        await apiCompta.addEcriture(ecriture)
+        console.log('Écriture comptable créée avec succès')
+      } catch (err) {
+        console.error('Erreur lors de la création de l\'écriture comptable:', err)
+      }
+      // === FIN ÉCRITURE COMPTABLE ===
+
       // Vider le panier automatiquement après vente réussie (sans confirmation)
       saleCart.value = []
-      
+
       // Fermer la modale de vente
       showSaleModal.value = false
-      
+
       // Afficher le reçu (pas d'alerte de succès, le reçu suffit)
       showReceiptModal.value = true
-      
+
       // Recharger les produits pour mettre à jour les stocks
       await loadSaleProducts()
-      
+
       // Recharger les autres données en arrière-plan
       await loadAgentVentes()
       await loadAgentPointVente()
-      
+
       // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
       console.log('=== processSaleFromModal SUCCÈS ===')
     } else {

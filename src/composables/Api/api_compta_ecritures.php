@@ -1,0 +1,151 @@
+
+
+<?php
+// Autoriser CORS pour le développement local (toujours AVANT tout output)
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+  http_response_code(200);
+  exit;
+}
+// API de gestion des écritures comptables
+// Endpoint: /api_compta_ecritures.php
+require_once 'config.php';
+$dbPath = __DIR__ . '/config/database.php';
+if (!file_exists($dbPath)) $dbPath = dirname(__DIR__) . '/api/config/database.php';
+require_once $dbPath;
+if (!function_exists('createDatabaseConnection')) {
+    echo json_encode([
+        'success'=>false,
+        'message'=>'database.php non trouvé ou fonction absente',
+        'dbPath'=>$dbPath,
+        'file'=>__FILE__,
+        'line'=>__LINE__,
+        'included_files'=>get_included_files()
+    ]);
+    exit;
+}
+try {
+    $bdd = createDatabaseConnection();
+    if (!$bdd || !($bdd instanceof PDO)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Connexion PDO échouée ou objet non valide',
+            'dbPath' => $dbPath,
+            'pdo_type' => gettype($bdd),
+            'pdo_dump' => print_r($bdd, true),
+            'file' => __FILE__,
+            'line' => __LINE__
+        ]);
+        exit;
+    }
+} catch (Exception $e) {
+    echo json_encode([
+        'success'=>false,
+        'message'=>'Erreur PDO: ' . $e->getMessage(),
+        'dbPath'=>$dbPath,
+        'file' => __FILE__,
+        'line' => __LINE__
+    ]);
+    exit;
+}
+
+
+header('Content-Type: application/json');
+
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Champs de la table stock_compta_ecritures
+$fields = [
+  'date_ecriture', 'type_ecriture', 'montant', 'debit', 'credit', 'user', 'categorie', 'moyen_paiement', 'statut',
+  'reference', 'piece_jointe', 'commentaire', 'details', 'id_entreprise', 'id_utilisateur', 'id_client', 'id_fournisseur', 'id_point_vente', 'nom_client'
+];
+
+switch ($method) {
+  case 'GET':
+    $id_entreprise = $_GET['id_entreprise'] ?? null;
+    $sql = $id_entreprise ?
+      "SELECT * FROM stock_compta_ecritures WHERE id_entreprise = :id_entreprise ORDER BY date_ecriture DESC" :
+      "SELECT * FROM stock_compta_ecritures ORDER BY date_ecriture DESC";
+    $stmt = $bdd->prepare($sql);
+    if ($id_entreprise) $stmt->bindParam(':id_entreprise', $id_entreprise, PDO::PARAM_INT);
+    $stmt->execute();
+    $ecritures = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode($ecritures);
+    break;
+
+  case 'POST':
+    $data = json_decode(file_get_contents('php://input'), true);
+    // Mapping automatique des champs frontend vers backend
+    if (isset($data['date']) && empty($data['date_ecriture'])) {
+      $data['date_ecriture'] = $data['date'];
+    }
+    if (isset($data['type']) && empty($data['type_ecriture'])) {
+      $data['type_ecriture'] = $data['type'];
+    }
+    if (isset($data['url_piece_jointe']) && empty($data['piece_jointe'])) {
+      $data['piece_jointe'] = $data['url_piece_jointe'];
+    }
+    // Valeurs par défaut pour les champs obligatoires non envoyés
+    if (empty($data['statut'])) $data['statut'] = 'en attente';
+    if (empty($data['debit'])) $data['debit'] = 0;
+    if (empty($data['credit'])) $data['credit'] = 0;
+    // Champs optionnels à NULL si non envoyés
+    $optionals = ['user','categorie','commentaire','details','id_utilisateur','id_client','id_fournisseur','id_point_vente','nom_client'];
+    foreach ($optionals as $opt) {
+      if (!isset($data[$opt])) $data[$opt] = null;
+    }
+    $params = [];
+    foreach ($fields as $f) {
+      $val = isset($data[$f]) ? $data[$f] : null;
+      if (is_array($val)) {
+        $val = json_encode($val);
+      }
+      $params[$f] = $val;
+    }
+    $sql = "INSERT INTO stock_compta_ecritures (" . implode(", ", array_keys($params)) . ") VALUES (" . implode(", ", array_map(function($f){return ":$f";}, array_keys($params))) . ")";
+    $stmt = $bdd->prepare($sql);
+    $stmt->execute($params);
+    echo json_encode(['success' => true, 'id' => $bdd->lastInsertId()]);
+    break;
+
+  case 'PUT':
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!isset($data['id_compta'])) {
+      echo json_encode(['error' => 'id_compta manquant']);
+      exit;
+    }
+    $params = [];
+    foreach ($fields as $f) {
+      $params[$f] = isset($data[$f]) ? $data[$f] : null;
+    }
+    $params['id_compta'] = $data['id_compta'];
+    $sql = "UPDATE stock_compta_ecritures SET ";
+    $sql .= implode(", ", array_map(function($f){return "$f=:$f";}, array_keys($params)));
+    $sql .= " WHERE id_compta=:id_compta";
+    $stmt = $bdd->prepare($sql);
+    $stmt->execute($params);
+    echo json_encode(['success' => true]);
+    break;
+
+  case 'DELETE':
+    $id = $_GET['id_compta'] ?? null;
+    if (!$id) {
+      $data = json_decode(file_get_contents('php://input'), true);
+      $id = $data['id_compta'] ?? null;
+    }
+    if (!$id) {
+      echo json_encode(['error' => 'id_compta manquant']);
+      exit;
+    }
+    $sql = "DELETE FROM stock_compta_ecritures WHERE id_compta = :id_compta";
+    $stmt = $bdd->prepare($sql);
+    $stmt->execute(['id_compta' => $id]);
+    echo json_encode(['success' => true]);
+    break;
+
+  default:
+    http_response_code(405);
+    echo json_encode(['error' => 'Méthode non autorisée']);
+}

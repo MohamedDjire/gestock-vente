@@ -128,7 +128,7 @@
               </div>
               <div class="form-group">
                 <label>Adresse</label>
-                <input v-model="form.adresse" placeholder="Adresse du client" />
+                
                 <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
               </div>
               <div class="form-group">
@@ -324,6 +324,9 @@ const submitForm = async () => {
   let id_point_vente = form.value.id_point_vente;
   if (id_point_vente === '' || id_point_vente === undefined) id_point_vente = null;
   if (id_point_vente !== null) id_point_vente = Number(id_point_vente);
+
+  // LOG DEBUG : Afficher la valeur envoyée
+  console.log('[DEBUG] Envoi client :', { ...form.value, id_point_vente, id_utilisateur, id_entreprise });
 
   try {
     if (editingClient.value) {

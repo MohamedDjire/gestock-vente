@@ -8,51 +8,71 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
-
+import { ref, watch, computed } from 'vue'
+const props = defineProps({
+  ecritures: { type: Array, default: () => [] },
+  activeTab: { type: String, default: 'tout' }
+})
 let chartInstance = null
 const chartCanvas = ref(null)
 
-function getMonthLabel(dateStr) {
+function getLabel(dateStr, mode) {
   const d = new Date(dateStr)
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+  if (mode === 'jour') return d.toLocaleDateString()
+  if (mode === 'semaine') {
+    const week = Math.ceil((d.getDate() - d.getDay() + 1) / 7)
+    return `${d.getFullYear()}-S${week}`
+  }
+  if (mode === 'mois') return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+  if (mode === 'trimestre') return d.getFullYear() + '-T' + (Math.floor(d.getMonth() / 3) + 1)
+  if (mode === 'annee') return d.getFullYear().toString()
+  return d.toLocaleDateString()
 }
 
-onMounted(async () => {
-  const Chart = (await import('chart.js/auto')).default
-  // Récupérer l'id_entreprise
-  let id_entreprise = null
-  const user = localStorage.getItem('prostock_user')
-  if (user) {
-    id_entreprise = JSON.parse(user).id_entreprise
-  }
-  let labels = []
-  let dataVentes = []
-  if (id_entreprise) {
-    const res = await getEcritures(id_entreprise)
-    if (res && Array.isArray(res.data)) {
-      // Grouper les ventes par mois
-      const ventes = res.data.filter(e => e.categorie === 'Vente')
-      const ventesParMois = {}
-      ventes.forEach(e => {
-        const mois = getMonthLabel(e.date_ecriture)
-        ventesParMois[mois] = (ventesParMois[mois] || 0) + (parseFloat(e.montant) || 0)
-      })
-      labels = Object.keys(ventesParMois).sort()
-      dataVentes = labels.map(mois => ventesParMois[mois])
+const chartData = computed(() => {
+  // Regrouper par période selon activeTab
+  const mode = ['jour','semaine','mois','trimestre','annee'].includes(props.activeTab) ? props.activeTab : 'mois'
+  const revenus = {}
+  const depenses = {}
+  props.ecritures.forEach(e => {
+    if (!e.date) return
+    const label = getLabel(e.date, mode)
+    if (e.type === 'vente' || (e.type === 'tresorerie' && Number(e.montant) > 0)) {
+      revenus[label] = (revenus[label] || 0) + Number(e.montant)
     }
+    if (e.type === 'achat' || e.type === 'reapprovisionnement' || (e.type === 'tresorerie' && Number(e.montant) < 0)) {
+      depenses[label] = (depenses[label] || 0) + Math.abs(Number(e.montant))
+    }
+  })
+  const allLabels = Array.from(new Set([...Object.keys(revenus), ...Object.keys(depenses)])).sort()
+  return {
+    labels: allLabels,
+    revenus: allLabels.map(l => revenus[l] || 0),
+    depenses: allLabels.map(l => depenses[l] || 0)
   }
+})
+
+async function renderChart() {
+  const Chart = (await import('chart.js/auto')).default
   if (chartInstance) chartInstance.destroy()
   chartInstance = new Chart(chartCanvas.value, {
     type: 'line',
     data: {
-      labels: labels.length ? labels : ['Aucun'],
+      labels: chartData.value.labels.length ? chartData.value.labels : ['Aucun'],
       datasets: [
         {
-          label: 'Ventes',
-          data: dataVentes.length ? dataVentes : [0],
+          label: 'Revenus',
+          data: chartData.value.revenus.length ? chartData.value.revenus : [0],
           borderColor: '#1a5f4a',
           backgroundColor: 'rgba(26,95,74,0.1)',
+          tension: 0.4,
+          fill: true,
+        },
+        {
+          label: 'Dépenses',
+          data: chartData.value.depenses.length ? chartData.value.depenses : [0],
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.08)',
           tension: 0.4,
           fill: true,
         }
@@ -69,7 +89,9 @@ onMounted(async () => {
       maintainAspectRatio: false,
     },
   })
-})
+}
+
+watch(() => [props.ecritures, props.activeTab], renderChart, { immediate: true, deep: true })
 </script>
 
 <style scoped>

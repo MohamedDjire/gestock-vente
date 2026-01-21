@@ -122,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id_entreprise = $pdo->lastInsertId();
         }
         $nomEntreprise = trim($data['nom_entreprise']);
+        error_log('[DEBUG PHP] Insertion client entreprise, id_point_vente = ' . var_export($data['id_point_vente'], true));
         $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type, id_point_vente) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $nomEntreprise, // nom = nom de l'entreprise
@@ -168,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id_entreprise = $pdo->lastInsertId();
             }
         }
+        error_log('[DEBUG PHP] Insertion client particulier, id_point_vente = ' . var_export($data['id_point_vente'], true));
         $stmt = $pdo->prepare('INSERT INTO stock_clients (nom, prenom, id_entreprise, id_utilisateur, email, telephone, adresse, statut, type, id_point_vente) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $data['nom'],
@@ -320,12 +322,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         exit;
     }
     $stmt = $pdo->prepare('DELETE FROM stock_clients WHERE id=?');
-    // Récupérer le nom du client avant suppression
-    $stmtNom = $pdo->prepare('SELECT nom, prenom, nom_entreprise, type FROM stock_clients WHERE id=?');
+    // Récupérer le nom du client avant suppression (nom_entreprise n'existe pas dans stock_clients)
+    $stmtNom = $pdo->prepare('SELECT nom, prenom, type FROM stock_clients WHERE id=?');
     $stmtNom->execute([$id]);
     $client = $stmtNom->fetch(PDO::FETCH_ASSOC);
     if ($client) {
-        $nomJournal = ($client['type'] === 'entreprise') ? ($client['nom_entreprise'] ?? $client['nom']) : ($client['nom'] . ' ' . $client['prenom']);
+        // Pour les entreprises, le nom est dupliqué dans nom et prenom
+        $nomJournal = ($client['type'] === 'entreprise') ? $client['nom'] : ($client['nom'] . ' ' . $client['prenom']);
         $nomUtilisateur = $client['nom'] ?? 'Utilisateur';
     } else {
         $nomJournal = '(client inconnu)';

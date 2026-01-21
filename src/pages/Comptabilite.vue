@@ -4,30 +4,90 @@
       <h1 class="page-title">Comptabilité</h1>
       <div class="actions">
         <button class="btn-primary" @click="openAddEcritureModal">Nouvelle écriture</button>
-        <button class="btn-primary" @click="exportComptaExcel" style="background:#2563eb; margin-left:8px;">Exporter Excel</button>
-        <button class="btn-primary" @click="exportComptaPDF" style="background:#dc2626; margin-left:8px;">Exporter PDF</button>
+        <button class="btn-primary" style="background:#2563eb; margin-left:8px;">Exporter Excel</button>
+        <button class="btn-primary" style="background:#dc2626; margin-left:8px;" @click="exportPDF">Exporter PDF</button>
       </div>
     </div>
 
-    <div class="compta-sections">
-      <PageCard title="Journal général">
-        <Journal />
-      </PageCard>
-      <PageCard title="Trésorerie">
-        <!-- Composant Trésorerie ici -->
-        <div class="coming-soon">À venir</div>
-      </PageCard>
-      <PageCard title="Rapports & KPI">
-        <!-- Composant Rapports ici -->
-        <div class="coming-soon">À venir</div>
+    <div class="kpi-row">
+      <StatCard title="Chiffre d'affaires" :value="kpi.ca" icon="💰" />
+      <StatCard title="Bénéfice" :value="kpi.benefice" icon="📈" />
+      <StatCard title="Trésorerie" :value="kpi.tresorerie" icon="💳" />
+      <StatCard title="Écritures" :value="ecritures.length" icon="🧾" />
+    </div>
+
+    <div class="tabs-container">
+      <button :class="['tab-btn', { active: activeTab === 'tout' }]" @click="activeTab = 'tout'">Tout</button>
+      <button :class="['tab-btn', { active: activeTab === 'revenus' }]" @click="activeTab = 'revenus'">Revenus</button>
+      <button :class="['tab-btn', { active: activeTab === 'depenses' }]" @click="activeTab = 'depenses'">Dépenses</button>
+      <button :class="['tab-btn', { active: activeTab === 'jour' }]" @click="activeTab = 'jour'">Jour</button>
+      <button :class="['tab-btn', { active: activeTab === 'semaine' }]" @click="activeTab = 'semaine'">Semaine</button>
+      <button :class="['tab-btn', { active: activeTab === 'mois' }]" @click="activeTab = 'mois'">Mois</button>
+      <button :class="['tab-btn', { active: activeTab === 'trimestre' }]" @click="activeTab = 'trimestre'">Trimestre</button>
+      <button :class="['tab-btn', { active: activeTab === 'annee' }]" @click="activeTab = 'annee'">Année</button>
+      <button :class="['tab-btn', { active: activeTab === 'rapport' }]" @click="activeTab = 'rapport'">Rapport & Graphique</button>
+    </div>
+
+    <div v-if="activeTab === 'rapport'">
+      <SalesChart :ecritures="filteredEcritures" :activeTab="activeTab" />
+      <div class="rapport-summary" style="margin: 0 32px 32px 32px; background: #f6faf9; border-radius: 18px; padding: 2rem; box-shadow: 0 2px 8px #1a5f4a11;">
+        <h2 class="section-title">Résumé</h2>
+        <div class="totaux-row">
+          <span>Total revenus : <b>{{ totalRevenus.toLocaleString() }} FCFA</b></span>
+          <span>Total dépenses : <b>{{ totalDepenses.toLocaleString() }} FCFA</b></span>
+        </div>
+        <div style="font-size:1.1rem; color:#1a5f4a; margin-top:12px;">Nombre d'écritures : <b>{{ filteredEcritures.length }}</b></div>
+      </div>
+    </div>
+    <div v-else>
+      <PageCard>
+        <template #default>
+          <div class="journal-section">
+            <h2 class="section-title">Journal financier</h2>
+            <div class="totaux-row">
+              <span v-if="activeTab === 'revenus' || activeTab === 'tout'">Total revenus : <b>{{ totalRevenus.toLocaleString() }} FCFA</b></span>
+              <span v-if="activeTab === 'depenses' || activeTab === 'tout'">Total dépenses : <b>{{ totalDepenses.toLocaleString() }} FCFA</b></span>
+            </div>
+            <div class="table-responsive">
+              <table class="table journal-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Référence</th>
+                    <th>Type</th>
+                    <th>Montant</th>
+                    <th>Moyen</th>
+                    <th>Commentaire</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="ecriture in filteredEcritures" :key="ecriture.id_ecriture">
+                    <td>{{ ecriture.date }}</td>
+                    <td>{{ ecriture.reference }}</td>
+                    <td>{{ ecriture.type }}</td>
+                    <td>{{ ecriture.montant }}</td>
+                    <td>{{ ecriture.moyen_paiement || '-' }}</td>
+                    <td>{{ ecriture.commentaire || '-' }}</td>
+                  </tr>
+                  <tr v-if="!filteredEcritures.length">
+                    <td colspan="6" style="text-align:center; color:#888;">Aucune écriture pour l’instant</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
       </PageCard>
     </div>
 
-    <!-- Modale d'ajout écriture (exemple harmonisé) -->
+    <!-- Modale d'ajout d'écriture -->
     <div v-if="showAddEcritureModal" class="modal-overlay" @click.self="closeAddEcritureModal">
       <div class="modal-content large" @click.stop>
-        <div class="modal-header">
-          <h3>Nouvelle écriture comptable</h3>
+        <div class="modal-header modal-header-with-icon modal-header-white">
+          <div class="modal-header-start">
+            <span class="modal-header-icon" style="color:#1a5f4a;">🧾</span>
+            <h3 class="modal-title-green">Nouvelle écriture</h3>
+          </div>
           <button class="modal-close" @click="closeAddEcritureModal">×</button>
         </div>
         <div class="modal-body">
@@ -37,29 +97,86 @@
               <div class="form-row">
                 <div class="form-group">
                   <label>Date *</label>
-                  <input v-model="ecritureForm.date" type="date" required />
+                  <input v-model="form.date" type="date" required />
+                  <small class="form-hint">Date de l’opération</small>
                 </div>
                 <div class="form-group">
-                  <label>Libellé *</label>
-                  <input v-model="ecritureForm.libelle" type="text" required />
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Débit *</label>
-                  <input v-model.number="ecritureForm.debit" type="number" min="0" required />
+                  <label>Reference *</label>
+                  <input v-model="form.reference" type="text" required placeholder="Ex : Vente produit X, Achat fournisseur Y..." />
+                  <small class="form-hint">Décrivez simplement l’opération (ex : Vente, Achat, Réappro...)</small>
                 </div>
                 <div class="form-group">
-                  <label>Crédit *</label>
-                  <input v-model.number="ecritureForm.credit" type="number" min="0" required />
+                  <label>Type *</label>
+                  <select v-model="form.type" required>
+                    <option value="">Sélectionner</option>
+                    <option value="vente">Vente</option>
+                    <option value="achat">Achat</option>
+                    <option value="reapprovisionnement">Réapprovisionnement</option>
+                    <option value="tresorerie">Trésorerie</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                  <small class="form-hint">Choisissez le type d’opération</small>
                 </div>
               </div>
             </div>
+            <div class="form-section">
+              <h4 class="section-title">💸 {{ currentAide.label }}</h4>
+              <div class="form-row">
+                <div class="form-group" v-if="form.type === 'vente'">
+                  <label>Montant encaissé *</label>
+                  <input v-model.number="form.montant" type="number" required />
+                  <small class="form-hint">{{ currentAide.aide }}</small>
+                </div>
+                <div class="form-group" v-else-if="form.type === 'achat' || form.type === 'reapprovisionnement'">
+                  <label>Montant payé *</label>
+                  <input v-model.number="form.montant" type="number" required />
+                  <small class="form-hint">{{ currentAide.aide }}</small>
+                </div>
+                <div class="form-group" v-else-if="form.type === 'tresorerie'">
+                  <label>Montant du mouvement *</label>
+                  <input v-model.number="form.montant" type="number" required />
+                  <small class="form-hint">{{ currentAide.aide }}</small>
+                </div>
+                <div class="form-group" v-else>
+                  <label>Montant *</label>
+                  <input v-model.number="form.montant" type="number" required />
+                  <small class="form-hint">{{ currentAide.aide }}</small>
+                </div>
+              </div>
+            </div>
+            <div class="form-section">
+              <h4 class="section-title">Informations complémentaires</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Moyen de paiement</label>
+                  <select v-model="form.moyen_paiement">
+                    <option value="">Sélectionner</option>
+                    <option value="especes">Espèces</option>
+                    <option value="cheque">Chèque</option>
+                    <option value="virement">Virement</option>
+                    <option value="carte">Carte bancaire</option>
+                    <option value="mobile">Mobile Money</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                  <small class="form-hint">Facultatif. Précise le mode de règlement.</small>
+                </div>
+                <div class="form-group">
+                  <label>Commentaire</label>
+                  <textarea v-model="form.commentaire" rows="2" placeholder="Ajouter une note ou un commentaire..."></textarea>
+                  <small class="form-hint">Facultatif. Toute information utile.</small>
+                </div>
+                <div class="form-group">
+                  <label>Pièce jointe</label>
+                  <input type="file" @change="handleFileUpload" />
+                  <small class="form-hint">Facultatif. Joindre une facture, un reçu, etc.</small>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Enregistrer</button>
+              <button type="button" class="btn-cancel" @click="closeAddEcritureModal">Annuler</button>
+            </div>
           </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-cancel" @click="closeAddEcritureModal">Annuler</button>
-          <button type="button" class="btn-save" @click="submitEcriture">Valider</button>
         </div>
       </div>
     </div>
@@ -67,12 +184,163 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import PageCard from '../components/PageCard.vue'
-import Journal from './Journal.vue'
+import StatCard from '../components/StatCard.vue'
+import SalesChart from '../components/SalesChart.vue'
+import { apiService } from '../composables/Api/apiService.js'
+import { uploadToCloudinary } from '../config/cloudinary.js'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { useAuthStore } from '../stores/auth.js'
+const authStore = useAuthStore ? useAuthStore() : { user: { nom_entreprise: 'Nom de l’entreprise' } };
+const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise';
 
+function exportPDF() {
+  const doc = new jsPDF();
+
+  // Header harmonisé : logo rond + nom entreprise + fond
+  doc.setFillColor(26, 95, 74);
+  doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
+  doc.setFillColor(255,255,255);
+  doc.circle(22, 15, 8, 'F');
+  doc.setTextColor(26,95,74);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PS', 18, 18);
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15);
+  doc.text(entrepriseNom, 210-14, 18, { align: 'right' });
+
+  // Titre centré
+  doc.setFontSize(16);
+  doc.setTextColor(30,30,30);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Journal comptable', 105, 32, { align: 'center' });
+
+  // Bloc statistiques
+  const total = ecritures.value.length;
+  const revenus = totalRevenus.value;
+  const depenses = totalDepenses.value;
+  doc.setFontSize(11);
+  doc.setTextColor(60,60,60);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Total écritures : ${total}   |   Revenus : ${revenus.toLocaleString()} FCFA   |   Dépenses : ${depenses.toLocaleString()} FCFA`, 105, 42, { align: 'center' });
+
+  // Tableau
+  const rows = filteredEcritures.value.map(e => [e.date, e.reference, e.type, e.montant, e.moyen_paiement || '-', e.commentaire || '-']);
+  autoTable(doc, {
+    head: [['Date', 'Référence', 'Type', 'Montant', 'Moyen', 'Commentaire']],
+    body: rows,
+    startY: 48,
+    theme: 'grid',
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [26, 95, 74] },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Pied de page
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(9);
+    doc.setTextColor(120,120,120);
+    doc.text('ProStock - Export PDF', 14, 290);
+    doc.text(`Page ${i} / ${pageCount}`, 200, 290, { align: 'right' });
+    doc.text(new Date().toLocaleDateString(), 105, 290, { align: 'center' });
+  }
+
+  doc.save('journal_comptable.pdf');
+}
+
+const ecritures = ref([])
+const kpi = ref({ ca: '0 FCFA', benefice: '0 FCFA', tresorerie: '0 FCFA' })
 const showAddEcritureModal = ref(false)
-const ecritureForm = ref({ date: '', libelle: '', debit: 0, credit: 0 })
+const form = ref({ date: '', reference: '', type: '', debit: 0, credit: 0, montant: 0, moyen_paiement: '', commentaire: '', piece_jointe: null })
+const activeTab = ref('tout')
+
+const typeAide = {
+  vente: {
+    label: 'Montant encaissé',
+    aide: 'Saisir le montant reçu lors de la vente.'
+  },
+  achat: {
+    label: 'Montant payé',
+    aide: 'Saisir le montant payé pour l’achat.'
+  },
+  reapprovisionnement: {
+    label: 'Montant du réapprovisionnement',
+    aide: 'Saisir le montant total du réapprovisionnement.'
+  },
+  tresorerie: {
+    label: 'Montant du mouvement',
+    aide: 'Saisir le montant du dépôt ou retrait.'
+  },
+  autre: {
+    label: 'Montant',
+    aide: 'Saisir le montant de l’opération.'
+  }
+}
+
+const currentAide = computed(() => typeAide[form.value.type] || typeAide.autre)
+
+function isSameDay(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate();
+}
+function isSameWeek(date1, date2) {
+  const d1 = new Date(date1);
+  const d2 = new Date(date2);
+  const firstDayOfWeek = d => {
+    const day = d.getDay();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+  };
+  return firstDayOfWeek(d1).getTime() === firstDayOfWeek(d2).getTime() && d1.getFullYear() === d2.getFullYear();
+}
+function isSameMonth(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth();
+}
+function isSameQuarter(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() && Math.floor(date1.getMonth() / 3) === Math.floor(date2.getMonth() / 3);
+}
+function isSameYear(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear();
+}
+
+const today = new Date();
+
+const filteredEcritures = computed(() => {
+  let list = ecritures.value;
+  // Filtres temporels
+  if (["jour","semaine","mois","trimestre","annee"].includes(activeTab.value)) {
+    list = list.filter(e => {
+      if (!e.date) return false;
+      const d = new Date(e.date);
+      if (activeTab.value === 'jour') return isSameDay(d, today);
+      if (activeTab.value === 'semaine') return isSameWeek(d, today);
+      if (activeTab.value === 'mois') return isSameMonth(d, today);
+      if (activeTab.value === 'trimestre') return isSameQuarter(d, today);
+      if (activeTab.value === 'annee') return isSameYear(d, today);
+      return true;
+    });
+  }
+  // Filtres revenus/dépenses
+  if (activeTab.value === 'revenus') {
+    return list.filter(e => e.type === 'vente' || (e.type === 'tresorerie' && Number(e.montant) > 0));
+  }
+  if (activeTab.value === 'depenses') {
+    return list.filter(e => e.type === 'achat' || e.type === 'reapprovisionnement' || (e.type === 'tresorerie' && Number(e.montant) < 0));
+  }
+  return list;
+});
+
+const totalRevenus = computed(() =>
+  ecritures.value.filter(e => e.type === 'vente' || (e.type === 'tresorerie' && Number(e.montant) > 0))
+    .reduce((sum, e) => sum + Number(e.montant), 0)
+)
+const totalDepenses = computed(() =>
+  ecritures.value.filter(e => e.type === 'achat' || e.type === 'reapprovisionnement' || (e.type === 'tresorerie' && Number(e.montant) < 0))
+    .reduce((sum, e) => sum + Math.abs(Number(e.montant)), 0)
+)
 
 function openAddEcritureModal() {
   showAddEcritureModal.value = true
@@ -80,50 +348,282 @@ function openAddEcritureModal() {
 function closeAddEcritureModal() {
   showAddEcritureModal.value = false
 }
-function submitEcriture() {
-  // TODO: Ajouter logique d'enregistrement
-  closeAddEcritureModal()
+
+async function loadEcritures() {
+  try {
+    // À adapter selon la gestion d'entreprise (id_entreprise)
+    const id_entreprise = 1
+    const res = await apiService.get(`/api_compta_ecritures.php?id_entreprise=${id_entreprise}`)
+    console.log('[DEBUG API] Réponse brute écritures:', res)
+    // Mapping backend -> frontend pour chaque écriture
+    ecritures.value = (res || []).map(e => ({
+      ...e,
+      date: e.date_ecriture,
+      type: e.type_ecriture,
+      piece_jointe: e.piece_jointe,
+      reference: e.reference,
+      montant: e.montant,
+      moyen_paiement: e.moyen_paiement,
+      commentaire: e.commentaire,
+      debit: e.debit,
+      credit: e.credit
+    }))
+    console.log('[DEBUG FRONT] Tableau écritures.value:', ecritures.value)
+    // Calcul KPI (exemple simplifié)
+    let ca = 0, benefice = 0, tresorerie = 0
+    ecritures.value.forEach(e => {
+      ca += Number(e.type === 'vente' ? e.montant : 0)
+      benefice += Number(e.type === 'vente' ? e.montant - (e.cout || 0) : 0)
+      tresorerie += Number(e.credit || 0) - Number(e.debit || 0)
+    })
+    kpi.value = {
+      ca: ca.toLocaleString() + ' FCFA',
+      benefice: benefice.toLocaleString() + ' FCFA',
+      tresorerie: tresorerie.toLocaleString() + ' FCFA'
+    }
+  } catch (e) {
+    // Gérer l'erreur
+  }
 }
-function exportComptaExcel() {
-  // TODO: Export Excel
+
+onMounted(loadEcritures)
+
+function handleFileUpload(e) {
+  const file = e.target.files[0]
+  form.value.piece_jointe = file || null
 }
-function exportComptaPDF() {
-  // TODO: Export PDF
+
+async function submitEcriture() {
+  // Upload Cloudinary si pièce jointe
+  let urlPiece = ''
+  if (form.value.piece_jointe) {
+    urlPiece = await uploadToCloudinary(form.value.piece_jointe)
+  }
+  // Préparer la donnée à envoyer
+  const id_entreprise = authStore.user?.id_entreprise || 1;
+  const data = {
+    ...form.value,
+    url_piece_jointe: urlPiece,
+    id_entreprise
+  }
+  try {
+    await apiService.post('/api_compta_ecritures.php', data)
+    closeAddEcritureModal()
+    await loadEcritures()
+  } catch (e) {
+    // Gérer l'erreur d'envoi
+    alert("Erreur lors de l'enregistrement de l'écriture.")
+  }
 }
 </script>
 
 <style scoped>
 .compta-page {
-  padding: 2rem;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  min-height: 100vh;
+  background: #f7fafc;
+  max-width: 100vw;
+  padding: 0 0 32px 0;
 }
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  margin-bottom: 24px;
+  padding: 32px 32px 0 32px;
 }
 .page-title {
   font-size: 2rem;
-  font-weight: 700;
+  font-weight: bold;
 }
 .actions {
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 8px;
 }
-.compta-sections {
+.kpi-row {
   display: flex;
-  gap: 2rem;
+  gap: 18px;
+  margin-bottom: 32px;
+  padding: 0 32px;
+}
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #1a5f4a;
+}
+.table-responsive {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.table th, .table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+}
+.table th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.2);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  padding-top: 60px;
+}
+.modal-header.modal-header-with-icon {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 32px 18px 24px;
+}
+.modal-header-white {
+  background: #fff;
+  color: #1a5f4a;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 32px 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(26,95,74,0.08);
+  border-bottom: 2px solid #1a5f4a22;
+}
+.modal-title-green {
+  color: #1a5f4a;
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin: 0;
+}
+.modal-content.large {
+  max-width: 700px;
+  width: 98vw;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(26,95,74,0.10);
+  padding: 0 0 24px 0;
+}
+.modal-body {
+  padding: 24px 32px 0 32px;
+}
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.form-section {
+  background: #f6faf9;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  border: 2px solid rgba(26, 95, 74, 0.13);
+}
+.form-row {
+  display: flex;
+  gap: 18px;
   flex-wrap: wrap;
 }
-.coming-soon {
-  color: #6b7280;
-  font-style: italic;
-  padding: 2rem;
-  text-align: center;
+.form-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 100%;
+}
+.form-group label {
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #1a5f4a;
+}
+.form-hint {
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 4px;
+}
+.form-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 18px;
+}
+.btn-primary {
+  background: #1a5f4a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover {
+  background: #134e3a;
+}
+.btn-cancel {
+  background: #e5e7eb;
+  color: #222;
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-cancel:hover {
+  background: #d1d5db;
+}
+.tabs-container {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 18px 0;
+  padding: 0 32px;
+}
+.tab-btn {
+  background: #f6faf9;
+  color: #1a5f4a;
+  border: 1.5px solid #1a5f4a22;
+  border-radius: 8px 8px 0 0;
+  padding: 8px 22px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.tab-btn.active {
+  background: #fff;
+  color: #2563eb;
+  border-bottom: 2.5px solid #2563eb;
+}
+.totaux-row {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  color: #1a5f4a;
+}
+@media (max-width: 700px) {
+  .modal-content.large {
+    padding: 0 0 16px 0;
+  }
+  .modal-header-white {
+    padding: 14px 12px 14px 12px;
+  }
+  .modal-body {
+    padding: 18px 12px 0 12px;
+  }
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
 }
 </style>
 

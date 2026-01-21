@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS compta_ecritures (
+  id_ecriture INT AUTO_INCREMENT PRIMARY KEY,
+  date DATE NOT NULL,
+  libelle VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  debit DECIMAL(15,2) DEFAULT 0,
+  credit DECIMAL(15,2) DEFAULT 0,
+  montant DECIMAL(15,2) NOT NULL,
+  id_entreprise INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
