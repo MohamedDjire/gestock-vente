@@ -134,13 +134,21 @@
                 📋
               </button>
             </div>
-            <button 
-              v-else 
-              @click="showPointVenteModal = true" 
-              class="btn-select-pv"
-            >
-              📍 Sélectionner un point de vente
-            </button>
+            <template v-else>
+              <div v-if="isAdmin" class="point-vente-info">
+                <span class="pv-badge pv-badge-all">🏭 Tous les points de vente</span>
+                <button @click="showPointVenteModal = true" class="btn-history-small" title="Choisir un point de vente pour la vente">
+                  📍 Choisir PV
+                </button>
+              </div>
+              <button 
+                v-else 
+                @click="showPointVenteModal = true" 
+                class="btn-select-pv"
+              >
+                📍 Sélectionner un point de vente
+              </button>
+            </template>
           </div>
           <div class="search-section">
             <input 
@@ -159,14 +167,19 @@
           </div>
         </div>
         
-        <div v-if="loadingProducts" class="loading-products">
+        <div v-if="!isAdmin && !selectedPointVente" class="no-products">
+          <div class="no-products-icon">📍</div>
+          <p>Aucun point de vente sélectionné</p>
+          <p class="no-products-hint">Veuillez sélectionner un point de vente pour voir les produits</p>
+        </div>
+        <div v-else-if="loadingProducts" class="loading-products">
           <div class="loading-spinner">⏳</div>
           <p>Chargement des produits...</p>
         </div>
         <div v-else-if="filteredProducts.length === 0" class="no-products">
           <div class="no-products-icon">📦</div>
           <p>Aucun produit disponible</p>
-          <p class="no-products-hint" v-if="products.length === 0">Veuillez d'abord créer des produits</p>
+          <p class="no-products-hint" v-if="products.length === 0">Veuillez d'abord créer des produits ou importer des produits dans ce point de vente</p>
           <p class="no-products-hint" v-else>Aucun produit ne correspond à votre recherche</p>
         </div>
         <div v-else class="products-grid">
@@ -854,44 +867,50 @@ const total = computed(() => {
 const loadingProducts = ref(false)
 
 const loadProducts = async () => {
-  loadingProducts.value = true
-  try {
-    // PRIORITÉ : Si un point de vente est sélectionné, charger UNIQUEMENT les produits disponibles dans ce point de vente
-    if (selectedPointVente.value && selectedPointVente.value.id_point_vente) {
-      const pvId = selectedPointVente.value.id_point_vente
-      const url = `/api_produit.php?action=all&id_point_vente=${pvId}`
-      console.log('📦 [Ventes] Chargement produits du point de vente:', pvId, 'url:', url)
-      
-      const response = await apiService.get(url)
-      console.log('📦 [Ventes] Réponse API point de vente:', response)
-      
-      if (response && response.success && response.data) {
-        let allProducts = Array.isArray(response.data) ? response.data.map(p => ({
-          ...p,
-          categorie: p.id_categorie || 'Non catégorisé',
-          actif: p.actif === 1 || p.actif === true || p.actif === '1'
-        })) : []
-        
-        // Filtrer par produits actifs
-        allProducts = allProducts.filter(p => p.actif === 1 || p.actif === true || p.actif === '1')
-        
-        products.value = allProducts
-        const uniqueCategories = [...new Set(products.value.map(p => p.categorie))]
-        categories.value = uniqueCategories.filter(c => c)
-        console.log('✅ [Ventes] Produits du point de vente chargés:', products.value.length, 'produits')
-        return
-      } else {
-        console.warn('⚠️ [Ventes] Aucun produit disponible dans ce point de vente')
-        products.value = []
-        categories.value = []
-        return
-      }
-    }
-    
-    // FALLBACK : Si aucun point de vente n'est sélectionné, ne rien charger
-    console.warn('⚠️ [Ventes] Aucun point de vente sélectionné - aucun produit chargé')
+  // Admin : charger TOUS les produits (tous entrepôts et points de vente), avec ou sans PV sélectionné
+  // Agent : charger uniquement les produits du point de vente sélectionné
+  const isAdminUser = isAdmin.value
+  const pv = selectedPointVente.value
+  const pvId = pv && pv.id_point_vente ? pv.id_point_vente : null
+
+  if (!isAdminUser && (!pv || !pvId)) {
+    console.warn('⚠️ [Ventes] Agent sans point de vente - aucun produit chargé')
     products.value = []
     categories.value = []
+    loadingProducts.value = false
+    return
+  }
+
+  loadingProducts.value = true
+  try {
+    const url = isAdminUser
+      ? '/api_produit.php?action=all'
+      : `/api_produit.php?action=all&id_point_vente=${pvId}`
+    console.log('📦 [Ventes] Chargement produits:', isAdminUser ? 'admin (tous)' : `PV ${pvId}`, 'url:', url)
+
+    const response = await apiService.get(url)
+    console.log('📦 [Ventes] Réponse API:', response)
+
+    if (response && response.success && response.data) {
+      let allProducts = Array.isArray(response.data)
+        ? response.data.map(p => ({
+            ...p,
+            categorie: p.id_categorie || p.categorie || 'Non catégorisé',
+            actif: p.actif === 1 || p.actif === true || p.actif === '1'
+          }))
+        : []
+
+      allProducts = allProducts.filter(p => p.actif === 1 || p.actif === true || p.actif === '1')
+
+      products.value = allProducts
+      const uniqueCategories = [...new Set(products.value.map(p => p.categorie).filter(c => c))]
+      categories.value = uniqueCategories.sort()
+      console.log('✅ [Ventes] Produits chargés:', products.value.length, 'produits')
+    } else {
+      console.warn('⚠️ [Ventes] Aucun produit disponible. Réponse:', response)
+      products.value = []
+      categories.value = []
+    }
   } catch (error) {
     console.error('❌ [Ventes] Erreur lors du chargement des produits:', error)
     products.value = []
@@ -933,15 +952,13 @@ const loadPointsVente = async () => {
         if (pointsVente.value.length === 1) {
           selectedPointVente.value = pointsVente.value[0]
         } else if (pointsVente.value.length > 1) {
-          // Admin doit choisir manuellement
+          // Admin peut choisir un PV plus tard ; on charge quand même tous les produits
           showPointVenteModal.value = true
         }
       }
-      
-      // Charger les produits si un point de vente est sélectionné
-      if (selectedPointVente.value) {
-        await loadProducts()
-      }
+
+      // Admin : toujours charger tous les produits. Agent : charger si un PV est sélectionné
+      await loadProducts()
     }
   } catch (error) {
     console.error('Erreur lors du chargement des points de vente:', error)
@@ -1477,6 +1494,19 @@ watch(() => clientSelectionMode.value, (newMode) => {
     showClientSearch.value = true
   }
 })
+
+// Watcher pour recharger les produits quand le point de vente change (agent) ou pour admin au premier chargement
+watch(() => selectedPointVente.value, async (newPv) => {
+  if (isAdmin.value) {
+    // Admin : recharger tous les produits (ou produits du PV si un PV est sélectionné)
+    await loadProducts()
+  } else if (newPv && newPv.id_point_vente) {
+    await loadProducts()
+  } else if (!newPv) {
+    products.value = []
+    categories.value = []
+  }
+}, { immediate: false })
 
 const confirmSale = async () => {
   if (cart.value.length === 0 || !selectedPointVente.value) {
