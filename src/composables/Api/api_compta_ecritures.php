@@ -1,5 +1,3 @@
-
-
 <?php
 // Autoriser CORS pour le développement local (toujours AVANT tout output)
 header('Access-Control-Allow-Origin: *');
@@ -20,8 +18,8 @@ if (!function_exists('createDatabaseConnection')) {
         'success'=>false,
         'message'=>'database.php non trouvé ou fonction absente',
         'dbPath'=>$dbPath,
-        'file'=>__FILE__,
-        'line'=>__LINE__,
+        'file' => __FILE__,
+        'line' => __LINE__,
         'included_files'=>get_included_files()
     ]);
     exit;
@@ -77,6 +75,15 @@ switch ($method) {
 
   case 'POST':
     $data = json_decode(file_get_contents('php://input'), true);
+    // Suppression via POST/action=delete
+    if (isset($data['action']) && $data['action'] === 'delete' && !empty($data['id_compta'])) {
+      $id = $data['id_compta'];
+      $sql = "DELETE FROM stock_compta_ecritures WHERE id_compta = :id_compta";
+      $stmt = $bdd->prepare($sql);
+      $stmt->execute(['id_compta' => $id]);
+      echo json_encode(['success' => true, 'deleted_id' => $id]);
+      break;
+    }
     // Mapping automatique des champs frontend vers backend
     if (isset($data['date']) && empty($data['date_ecriture'])) {
       $data['date_ecriture'] = $data['date'];
@@ -91,6 +98,16 @@ switch ($method) {
     if (empty($data['statut'])) $data['statut'] = 'en attente';
     if (empty($data['debit'])) $data['debit'] = 0;
     if (empty($data['credit'])) $data['credit'] = 0;
+    // Valeurs par défaut personnalisées pour référence, commentaire, moyen_paiement
+    if (empty($data['reference'])) {
+      $data['reference'] = 'VENTE-' . date('Ymd-His') . '-' . strtoupper(substr(md5(uniqid()), 0, 4));
+    }
+    if (empty($data['commentaire'])) {
+      $data['commentaire'] = "Vente enregistrée automatiquement";
+    }
+    if (empty($data['moyen_paiement'])) {
+      $data['moyen_paiement'] = 'espèces';
+    }
     // Champs optionnels à NULL si non envoyés
     $optionals = ['user','categorie','commentaire','details','id_utilisateur','id_client','id_fournisseur','id_point_vente','nom_client'];
     foreach ($optionals as $opt) {

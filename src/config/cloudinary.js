@@ -32,9 +32,9 @@ export const uploadPhoto = async (file, membreId = null, altText = "") => {
     }
 
     // Vérifier le type de fichier
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "application/pdf"]
     if (!allowedTypes.includes(file.type)) {
-      throw new Error("Type de fichier non supporté. Utilisez JPG, PNG, GIF ou WebP.")
+      throw new Error("Type de fichier non supporté. Utilisez JPG, PNG, GIF, WebP ou PDF.")
     }
 
     // Vérifier la taille (max 5MB)

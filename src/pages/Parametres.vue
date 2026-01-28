@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import apiEntrepot from '../composables/Api/api_entrepot.js'
 import apiPointVente from '../composables/Api/api_point_vente.js'
+import { apiService } from '../composables/api/apiService.js'
 
 // --- Entrepôts et points de vente ---
 const entrepots = ref([])
@@ -135,6 +136,44 @@ const isAdmin = computed(() => {
   const role = (authStore.userRole || authStore.user?.role || '').toLowerCase();
   return role === 'admin' || role === 'superadmin';
 })
+
+// Gestion des préférences de notifications (email & sms) - version FR
+const emailActive = ref(false)
+const smsActive = ref(false)
+const emailAdmin = ref('')
+const telephoneAdmin = ref('')
+const notifierVente = ref(true)
+const notifierPaiement = ref(false)
+const notifierStockFaible = ref(false)
+const notifierObjectifVente = ref(false)
+
+onMounted(async () => {
+  try {
+    const res = await apiService.get('/api_stock_notification_settings.php')
+    emailActive.value = !!res?.email_active
+    smsActive.value = !!res?.sms_active
+    emailAdmin.value = res?.email_admin || ''
+    telephoneAdmin.value = res?.telephone_admin || ''
+    notifierVente.value = !!res?.notifier_vente
+    notifierPaiement.value = !!res?.notifier_paiement
+    notifierStockFaible.value = !!res?.notifier_stock_faible
+    notifierObjectifVente.value = !!res?.notifier_objectif_vente
+  } catch (e) {}
+})
+
+async function enregistrerParamNotif() {
+  await apiService.post('/api_stock_notification_settings.php', {
+    email_admin: emailAdmin.value,
+    telephone_admin: telephoneAdmin.value,
+    email_active: emailActive.value,
+    sms_active: smsActive.value,
+    notifier_vente: notifierVente.value,
+    notifier_paiement: notifierPaiement.value,
+    notifier_stock_faible: notifierStockFaible.value,
+    notifier_objectif_vente: notifierObjectifVente.value
+  })
+  alert('Préférences de notifications enregistrées !')
+}
 </script>
 <template>
   <div v-if="isAdmin" class="settings-page">
@@ -243,8 +282,31 @@ const isAdmin = computed(() => {
         </template>
         <template v-else-if="section==='notifications'">
           <h2>Notifications</h2>
-          <p>Configurer les notifications par email, SMS, etc.</p>
-          <button class="btn-primary">Configurer</button>
+          <p>Configurer les notifications par email et SMS pour les événements liés aux ventes.</p>
+          <form @submit.prevent="enregistrerParamNotif" class="notif-form">
+            <div class="form-group">
+              <label>Email de l'administrateur</label>
+              <input v-model="emailAdmin" type="email" placeholder="ex: admin@mail.com" />
+            </div>
+            <div class="form-group">
+              <label>Numéro de téléphone de l'administrateur</label>
+              <input v-model="telephoneAdmin" type="text" placeholder="ex: +2250700000000" />
+            </div>
+            <div class="form-group">
+              <label><input type="checkbox" v-model="emailActive" /> Activer notifications Email</label>
+              <label style="margin-left:2em;"><input type="checkbox" v-model="smsActive" /> Activer notifications SMS</label>
+            </div>
+            <div class="form-group">
+              <label>Événements à notifier :</label>
+              <div style="display:flex; flex-direction:column; gap:4px; margin-left:1em;">
+                <label><input type="checkbox" v-model="notifierVente" /> Nouvelle vente enregistrée</label>
+                <label><input type="checkbox" v-model="notifierPaiement" /> Paiement reçu</label>
+                <label><input type="checkbox" v-model="notifierStockFaible" /> Stock faible après vente</label>
+                <label><input type="checkbox" v-model="notifierObjectifVente" /> Objectif de vente atteint</label>
+              </div>
+            </div>
+            <button class="btn-primary" style="margin-top:12px;">Enregistrer</button>
+          </form>
         </template>
         <template v-else-if="section==='sauvegarde'">
           <h2>Sauvegarde & restauration</h2>

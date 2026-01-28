@@ -301,6 +301,8 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
         );
 
         // Enregistrer une écriture comptable automatique
+        // Désactivé : insertion automatique écriture comptable (doublon avec frontend)
+        /*
         try {
             $sqlEcriture = "INSERT INTO stock_compta_ecritures (date_ecriture, type_ecriture, montant, user, categorie, moyen_paiement, statut, reference, piece_jointe, commentaire, details, id_entreprise) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmtEcriture = $bdd->prepare($sqlEcriture);
@@ -321,6 +323,7 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
         } catch (Exception $e) {
             error_log("Erreur lors de l'insertion de l'écriture comptable vente : " . $e->getMessage());
         }
+        */
 
         // Enregistrer dans le journal
         try {
@@ -448,7 +451,37 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
         }
         
         $bdd->commit();
-        
+
+        // Préparer les détails pour la notification
+        $venteDetails = [
+            'numero' => $ventesCreees[0]['id_vente'] ?? '',
+            'montant' => $montantTotalFinal,
+            'date' => date('Y-m-d H:i:s'),
+            'utilisateur' => isset($currentUser['nom']) ? $currentUser['nom'] . ' ' . ($currentUser['prenom'] ?? '') : 'Utilisateur inconnu',
+            // Ajouter d'autres champs si besoin
+        ];
+
+        // Inclure et appeler la notification
+        try {
+            $notifierFile = __DIR__ . '/notifier_apres_vente.php';
+            if (file_exists($notifierFile)) {
+                // Rendre $venteDetails accessible dans le scope du require
+                global $pdo;
+                if (!isset($pdo)) {
+                    // Si $pdo n'est pas défini, essayer de le récupérer depuis $bdd
+                    if (isset($bdd) && $bdd instanceof PDO) {
+                        $pdo = $bdd;
+                    }
+                }
+                // $venteDetails est déjà défini ci-dessus
+                require $notifierFile;
+            } else {
+                error_log('notifier_apres_vente.php introuvable');
+            }
+        } catch (Exception $e) {
+            error_log('Erreur lors de la notification après vente : ' . $e->getMessage());
+        }
+
         return [
             'id_vente' => $ventesCreees[0]['id_vente'] ?? null,
             'ventes' => $ventesCreees,

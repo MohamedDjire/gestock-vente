@@ -750,7 +750,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiService } from '../composables/Api/apiService.js'
-import apiClient from '../composables/Api/apiClient.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useCurrency } from '../composables/useCurrency.js'
 
@@ -1671,7 +1670,7 @@ const processSale = async () => {
       prix_unitaire: item.prix_unitaire,
       remise: item.remise || 0
     }))
-    
+
     // Construire les notes avec toutes les remises
     let notes = []
     if (totalRemisesIndividuelles.value > 0) {
@@ -1680,32 +1679,19 @@ const processSale = async () => {
     if (discount.value > 0) {
       notes.push(`Remise globale: ${formatPrice(discount.value)}`)
     }
-    
+
     const saleData = {
       id_point_vente: selectedPointVente.value.id_point_vente,
       produits: produits,
       remise: discount.value + totalRemisesIndividuelles.value,
       notes: notes.length > 0 ? notes.join(' | ') : null
     }
-    
+
     const response = await apiService.post('/api_vente.php', saleData)
-    
+
     if (response.success) {
       // Récupérer l'ID de la vente depuis la réponse
       const idVente = response.data?.id_vente || response.data?.ventes?.[0]?.id_vente || Date.now()
-
-      // Créer une écriture comptable automatiquement
-      let id_entreprise = null
-      if (selectedPointVente.value && selectedPointVente.value.id_entreprise) {
-        id_entreprise = selectedPointVente.value.id_entreprise
-      } else {
-        // fallback: récupère depuis le localStorage si besoin
-        const user = localStorage.getItem('prostock_user')
-        if (user) {
-          id_entreprise = JSON.parse(user).id_entreprise
-        }
-      }
-      // Écriture comptable désactivée (api_compta supprimée)
 
       // Créer le reçu avec toutes les informations
       lastSaleReceipt.value = {
@@ -1731,6 +1717,69 @@ const processSale = async () => {
         total: total.value
       }
 
+      // === GÉNÉRATION ET UPLOAD DU REÇU PDF ===
+      let urlPieceJointe = ''
+      try {
+        const doc = new jsPDF()
+        doc.setFontSize(16)
+        doc.text('Reçu de Vente', 105, 20, { align: 'center' })
+        doc.setFontSize(12)
+        doc.text(`Point de Vente : ${selectedPointVente.value.nom_point_vente}`, 20, 35)
+        doc.text(`Date : ${new Date().toLocaleString('fr-FR')}`, 20, 43)
+        doc.text(`N° Vente : ${idVente}`, 20, 51)
+        let y = 60
+        doc.text('Produits :', 20, y)
+        y += 7
+        cart.value.forEach(item => {
+          doc.text(`- ${item.nom} (x${item.quantite}) : ${formatPrice(item.sous_total)}`, 25, y)
+          y += 7
+        })
+        y += 5
+        doc.text(`Total : ${formatPrice(total.value)}`, 20, y)
+        y += 10
+        doc.text('Merci de votre visite !', 20, y)
+
+        // Convertir le PDF en blob
+        const pdfBlob = doc.output('blob')
+        // Créer un objet File pour Cloudinary
+        const pdfFile = new File([pdfBlob], `recu_vente_${idVente}.pdf`, { type: 'application/pdf' })
+        // Uploader sur Cloudinary
+        urlPieceJointe = await uploadToCloudinary(pdfFile)
+      } catch (err) {
+        console.error('Erreur lors de la génération ou upload du reçu PDF:', err)
+        urlPieceJointe = ''
+      }
+
+      // === AJOUT AUTOMATIQUE ÉCRITURE COMPTABLE ===
+      try {
+        const now = new Date();
+        const moyenPaiement = cart.value[0]?.moyen_paiement || 'espèces';
+        const commentaire = notes.length > 0 ? notes.join(' | ') : '';
+        const ecriture = {
+          date_ecriture: now.toISOString().slice(0, 19).replace('T', ' '),
+          type_ecriture: 'vente',
+          montant: total.value,
+          debit: 0,
+          credit: total.value,
+          user: authStore.user?.nom || authStore.user?.email || 'utilisateur inconnu',
+          categorie: 'Vente',
+          moyen_paiement: moyenPaiement,
+          statut: 'valide',
+          reference: idVente,
+          commentaire: commentaire,
+          details: JSON.stringify(cart.value.map(item => ({ nom: item.nom, quantite: item.quantite, prix_unitaire: item.prix_unitaire }))),
+          id_entreprise: authStore.user?.id_entreprise || null,
+          id_utilisateur: authStore.user?.id_utilisateur || authStore.user?.id || null,
+          id_point_vente: selectedPointVente.value.id_point_vente,
+          nom_client: cart.value[0]?.client_nom || null,
+          piece_jointe: urlPieceJointe
+        }
+        await apiCompta.addEcriture(ecriture)
+        console.log('Écriture comptable créée avec succès')
+      } catch (err) {
+        console.error('Erreur lors de la création de l\'écriture comptable:', err)
+      }
+
       // Vider le panier automatiquement après vente réussie (sans confirmation)
       cart.value = []
       discount.value = 0
@@ -1742,8 +1791,6 @@ const processSale = async () => {
 
       // Recharger les produits pour mettre à jour les stocks
       await loadProducts()
-
-      // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
     } else {
       // Erreur silencieuse, juste dans la console
       console.error('Erreur lors de l\'enregistrement de la vente:', response.message || 'Erreur inconnue')

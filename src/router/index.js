@@ -128,6 +128,7 @@ const routes = [
     path: '/comptabilite',
     name: 'Comptabilite',
     component: () => import('../pages/Comptabilite.vue'),
+<<<<<<< Updated upstream
     meta: { requiresAuth: true }
   },
   {
@@ -135,6 +136,9 @@ const routes = [
     name: 'HistoriqueVentes',
     component: () => import('../pages/HistoriqueVentes.vue'),
     meta: { requiresAuth: true }
+=======
+    meta: { requiresAuth: true, requiresCompta: true }
+>>>>>>> Stashed changes
   }
 ]
 
@@ -171,7 +175,19 @@ router.beforeEach((to, from, next) => {
     } else {
       next();
     }
-  } else {
+  }
+  // Si la route nécessite l'accès comptabilité et que l'utilisateur n'est pas autorisé
+  else if (to.meta.requiresCompta && authStore.isAuthenticated) {
+    const userRole = authStore.userRole?.toLowerCase();
+    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+    const hasCompta = isAdmin || authStore.user?.acces_comptabilite === true || authStore.user?.acces_comptabilite === 1;
+    if (!hasCompta) {
+      next({ name: 'Dashboard' });
+    } else {
+      next();
+    }
+  }
+  else {
     next();
   }
 });

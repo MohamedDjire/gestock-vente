@@ -193,24 +193,73 @@
             <div class="modal-body">
               <form class="settings-form" @submit.prevent="saveEntreprise">
                 <div v-if="entrepriseError" class="form-error">{{ entrepriseError }}</div>
-                <div class="form-group"><label>Nom</label><input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" /></div>
-                <div class="form-group"><label>Sigle</label><input type="text" v-model="entreprise.sigle" placeholder="Sigle" /></div>
-                <div class="form-group"><label>Numéro d'identification</label><input type="text" v-model="entreprise.num" placeholder="Num" /></div>
-                <div class="form-group"><label>NCC</label><input type="text" v-model="entreprise.ncc" placeholder="NCC" /></div>
-                <div class="form-group"><label>Numéro de banque</label><input type="text" v-model="entreprise.num_banque" placeholder="Numéro de banque" /></div>
-                <div class="form-group"><label>Adresse</label><input type="text" v-model="entreprise.adresse" placeholder="Adresse" /></div>
-                <div class="form-group"><label>Devise</label><input type="text" v-model="entreprise.devise" placeholder="XOF, EUR..." /></div>
-                <div class="form-group"><label>Email</label><input type="email" v-model="entreprise.email" placeholder="Email" /></div>
-                <div class="form-group"><label>Téléphone</label><input type="text" v-model="entreprise.telephone" placeholder="Téléphone" /></div>
-                <div class="form-group"><label>Site web</label><input type="text" v-model="entreprise.site_web" placeholder="Site web" /></div>
-                <div class="form-group">
-                  <label>Logo</label>
-                  <input type="file" accept="image/*" @change="onEntrepriseLogoChange" />
-                  <div v-if="uploadingLogoEntrep" class="form-hint">Envoi en cours...</div>
-                  <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo" style="max-width:100px;border-radius:8px;" /></div>
-                  <div v-if="logoErrorEntrep" style="color:#dc2626;font-size:0.9em;">{{ logoErrorEntrep }}</div>
+                <div class="form-section">
+                  <h4 class="section-title">📝 Identité</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Nom</label>
+                      <input type="text" v-model="entreprise.nom" placeholder="Nom de l'entreprise" />
+                    </div>
+                    <div class="form-group">
+                      <label>Sigle</label>
+                      <input type="text" v-model="entreprise.sigle" placeholder="Sigle" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Numéro d'identification</label>
+                      <input type="text" v-model="entreprise.num" placeholder="Num" />
+                    </div>
+                    <div class="form-group">
+                      <label>NCC</label>
+                      <input type="text" v-model="entreprise.ncc" placeholder="NCC" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Numéro de banque</label>
+                      <input type="text" v-model="entreprise.num_banque" placeholder="Numéro de banque" />
+                    </div>
+                    <div class="form-group">
+                      <label>Devise</label>
+                      <input type="text" v-model="entreprise.devise" placeholder="XOF, EUR..." />
+                    </div>
+                  </div>
                 </div>
-                <div class="modal-actions">
+                <div class="form-section">
+                  <h4 class="section-title">📞 Coordonnées</h4>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Email</label>
+                      <input type="email" v-model="entreprise.email" placeholder="Email" />
+                    </div>
+                    <div class="form-group">
+                      <label>Téléphone</label>
+                      <input type="text" v-model="entreprise.telephone" placeholder="Téléphone" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Adresse</label>
+                      <input type="text" v-model="entreprise.adresse" placeholder="Adresse" />
+                    </div>
+                    <div class="form-group">
+                      <label>Site web</label>
+                      <input type="text" v-model="entreprise.site_web" placeholder="Site web" />
+                    </div>
+                  </div>
+                </div>
+                <div class="form-section">
+                  <h4 class="section-title">🖼️ Logo</h4>
+                  <div class="form-group">
+                    <label>Logo</label>
+                    <input type="file" accept="image/*" @change="onEntrepriseLogoChange" />
+                    <div v-if="uploadingLogoEntrep" class="form-hint">Envoi en cours...</div>
+                    <div v-if="entreprise.logo" style="margin-top:0.5em;"><img :src="entreprise.logo" alt="Logo" style="max-width:100px;border-radius:8px;" /></div>
+                    <div v-if="logoErrorEntrep" style="color:#dc2626;font-size:0.9em;">{{ logoErrorEntrep }}</div>
+                  </div>
+                </div>
+                <div class="modal-footer">
                   <button type="button" class="btn-cancel" @click="showEditModalEntrep = false">Annuler</button>
                   <button type="submit" class="btn-save" :disabled="savingEntreprise">{{ savingEntreprise ? 'Enregistrement...' : 'Enregistrer' }}</button>
                 </div>

@@ -181,9 +181,10 @@ try {
         $idPointsVente = isset($input['id_points_vente']) && is_array($input['id_points_vente']) ? array_map('intval', $input['id_points_vente']) : null;
 
         if ($idPv !== null && $idEntrepots !== null) {
-            $stmt = $bdd->prepare("SELECT id_point_vente FROM stock_point_vente WHERE id_point_vente = ? AND id_entreprise = ?");
+            $stmt = $bdd->prepare("SELECT id_point_vente, nom_point_vente FROM stock_point_vente WHERE id_point_vente = ? AND id_entreprise = ?");
             $stmt->execute([$idPv, $enterpriseId]);
-            if (!$stmt->fetch()) {
+            $pvRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$pvRow) {
                 http_response_code(404);
                 echo json_encode(['success' => false, 'message' => 'Point de vente introuvable'], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -192,10 +193,35 @@ try {
             $stmtIns = $bdd->prepare("INSERT INTO stock_point_vente_entrepot (id_point_vente, id_entrepot) VALUES (?, ?)");
             foreach ($idEntrepots as $eid) {
                 if ($eid <= 0) continue;
-                $chk = $bdd->prepare("SELECT id_entrepot FROM stock_entrepot WHERE id_entrepot = ? AND id_entreprise = ?");
+                $chk = $bdd->prepare("SELECT id_entrepot, nom_entrepot FROM stock_entrepot WHERE id_entrepot = ? AND id_entreprise = ?");
                 $chk->execute([$eid, $enterpriseId]);
-                if ($chk->fetch()) {
+                $entrepotRow = $chk->fetch(PDO::FETCH_ASSOC);
+                if ($entrepotRow) {
                     $stmtIns->execute([$idPv, $eid]);
+                    // Enregistrement écriture comptable
+                    require_once __DIR__ . '/functions_compta.php';
+                    $params = [
+                        'date_ecriture' => date('Y-m-d H:i:s'),
+                        'type_ecriture' => 'ravitaillement',
+                        'montant' => 0,
+                        'debit' => 0,
+                        'credit' => 0,
+                        'user' => $currentUser['nom'] ?? $currentUser['username'] ?? null,
+                        'categorie' => 'Ravitaillement',
+                        'moyen_paiement' => null,
+                        'statut' => 'effectué',
+                        'reference' => 'RAVITAILLEMENT-' . date('Ymd-His') . '-' . strtoupper(substr(md5(uniqid()), 0, 4)),
+                        'piece_jointe' => null,
+                        'commentaire' => 'Ravitaillement du point de vente ' . $pvRow['nom_point_vente'] . ' depuis l\'entrepôt ' . $entrepotRow['nom_entrepot'],
+                        'details' => json_encode(['id_point_vente' => $idPv, 'id_entrepot' => $eid]),
+                        'id_entreprise' => $enterpriseId,
+                        'id_utilisateur' => $currentUser['id_utilisateur'] ?? null,
+                        'id_client' => null,
+                        'id_fournisseur' => null,
+                        'id_point_vente' => $idPv,
+                        'nom_client' => null
+                    ];
+                    enregistrerEcritureRavitaillement($bdd, $params);
                 }
             }
             echo json_encode(['success' => true, 'message' => 'Ravitaillement mis à jour (par point de vente)'], JSON_UNESCAPED_UNICODE);
@@ -203,9 +229,10 @@ try {
         }
 
         if ($idE !== null && $idPointsVente !== null) {
-            $stmt = $bdd->prepare("SELECT id_entrepot FROM stock_entrepot WHERE id_entrepot = ? AND id_entreprise = ?");
+            $stmt = $bdd->prepare("SELECT id_entrepot, nom_entrepot FROM stock_entrepot WHERE id_entrepot = ? AND id_entreprise = ?");
             $stmt->execute([$idE, $enterpriseId]);
-            if (!$stmt->fetch()) {
+            $entrepotRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$entrepotRow) {
                 http_response_code(404);
                 echo json_encode(['success' => false, 'message' => 'Entrepôt introuvable'], JSON_UNESCAPED_UNICODE);
                 exit;
@@ -214,10 +241,35 @@ try {
             $stmtIns = $bdd->prepare("INSERT INTO stock_point_vente_entrepot (id_point_vente, id_entrepot) VALUES (?, ?)");
             foreach ($idPointsVente as $pvid) {
                 if ($pvid <= 0) continue;
-                $chk = $bdd->prepare("SELECT id_point_vente FROM stock_point_vente WHERE id_point_vente = ? AND id_entreprise = ?");
+                $chk = $bdd->prepare("SELECT id_point_vente, nom_point_vente FROM stock_point_vente WHERE id_point_vente = ? AND id_entreprise = ?");
                 $chk->execute([$pvid, $enterpriseId]);
-                if ($chk->fetch()) {
+                $pvRow = $chk->fetch(PDO::FETCH_ASSOC);
+                if ($pvRow) {
                     $stmtIns->execute([$pvid, $idE]);
+                    // Enregistrement écriture comptable
+                    require_once __DIR__ . '/functions_compta.php';
+                    $params = [
+                        'date_ecriture' => date('Y-m-d H:i:s'),
+                        'type_ecriture' => 'ravitaillement',
+                        'montant' => 0,
+                        'debit' => 0,
+                        'credit' => 0,
+                        'user' => $currentUser['nom'] ?? $currentUser['username'] ?? null,
+                        'categorie' => 'Ravitaillement',
+                        'moyen_paiement' => null,
+                        'statut' => 'effectué',
+                        'reference' => 'RAVITAILLEMENT-' . date('Ymd-His') . '-' . strtoupper(substr(md5(uniqid()), 0, 4)),
+                        'piece_jointe' => null,
+                        'commentaire' => 'Ravitaillement du point de vente ' . $pvRow['nom_point_vente'] . ' depuis l\'entrepôt ' . $entrepotRow['nom_entrepot'],
+                        'details' => json_encode(['id_point_vente' => $pvid, 'id_entrepot' => $idE]),
+                        'id_entreprise' => $enterpriseId,
+                        'id_utilisateur' => $currentUser['id_utilisateur'] ?? null,
+                        'id_client' => null,
+                        'id_fournisseur' => null,
+                        'id_point_vente' => $pvid,
+                        'nom_client' => null
+                    ];
+                    enregistrerEcritureRavitaillement($bdd, $params);
                 }
             }
             echo json_encode(['success' => true, 'message' => 'Ravitaillement mis à jour (par entrepôt)'], JSON_UNESCAPED_UNICODE);

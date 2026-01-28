@@ -60,9 +60,15 @@ const router = useRouter()
 const authStore = useAuthStore()
 const showLogoutModal = ref(false)
 
+
 const isAdmin = computed(() => {
   const role = authStore.userRole?.toLowerCase()
   return role === 'admin' || role === 'superadmin'
+})
+
+const hasComptaAccess = computed(() => {
+  if (isAdmin.value) return true
+  return authStore.user?.acces_comptabilite === true || authStore.user?.acces_comptabilite === 1
 })
 
 const menuItems = computed(() => {
@@ -72,18 +78,17 @@ const menuItems = computed(() => {
     { name: 'Entrepôts', route: '/entrepot', icon: '🏭' },
     { name: 'Points de Vente', route: '/point-vente', icon: '🏪' },
     { name: 'Ventes', route: '/ventes', icon: '🛒' },
-    { name: 'Comptabilité', route: '/comptabilite', icon: '💰' },
+    // Comptabilité : visible seulement si admin ou acces_comptabilite
+    ...(hasComptaAccess.value ? [{ name: 'Comptabilité', route: '/comptabilite', icon: '💰' }] : []),
     { name: 'Clients', route: '/clients', icon: '🧑‍💼' },
     { name: 'Fournisseurs', route: '/fournisseurs', icon: '🏢' },
     { name: 'Journal', route: '/journal', icon: '📝' },
     { name: 'Paramètres', route: '/parametres', icon: '⚙️' }
   ]
-  
   // Ajouter le lien "Gestion du Compte" uniquement pour les admins
   if (isAdmin.value) {
     items.push({ name: 'Gestion du Compte', route: '/gestion-compte', icon: '👑' })
   }
-  
   return items
 })
 

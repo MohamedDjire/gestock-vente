@@ -92,7 +92,7 @@
         </span>
       </div>
       <span class="notif-icon">🔔</span>
-      <div class="profile" @click="showProfileMenu = !showProfileMenu">
+      <div class="profile" ref="profileMenuContainer" @click="showProfileMenu = !showProfileMenu">
         <img :src="user?.photo || user?.avatar || 'https://randomuser.me/api/portraits/women/44.jpg'" alt="profile" />
         <span class="profile-name">{{ user?.nom || 'Danielle Campbell' }}</span>
         <div v-if="showProfileMenu" class="profile-menu">
@@ -158,6 +158,7 @@ const onAvatarChange = async (e) => {
 const user = computed(() => authStore.user)
 const currencyStore = useCurrencyStore()
 const showProfileMenu = ref(false)
+const profileMenuContainer = ref(null)
 const showLogoutModal = ref(false)
 const router = useRouter()
 
@@ -244,6 +245,20 @@ onUnmounted(() => {
 
 watch(() => currencyStore.currency, (newCurrency) => {
   currencyCode.value = newCurrency
+})
+
+// Fermer le menu profil si clic en dehors
+function handleClickOutsideProfile(event) {
+  if (showProfileMenu.value && profileMenuContainer.value && !profileMenuContainer.value.contains(event.target)) {
+    showProfileMenu.value = false;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('click', handleClickOutsideProfile)
+})
+onUnmounted(() => {
+  window.removeEventListener('click', handleClickOutsideProfile)
 })
 </script>
 

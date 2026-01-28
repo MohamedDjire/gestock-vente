@@ -5,20 +5,22 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   optimizeDeps: {
-    include: ['chart.js/auto', 'jspdf', 'jspdf-autotable', 'xlsx', '@vuepic/vue-datepicker']
+    include: [
+      'chart.js/auto',
+      'jspdf',
+      'jspdf-autotable',
+      'xlsx',
+      '@vuepic/vue-datepicker'
+    ]
   },
   resolve: {
     alias: {
-      'chart.js': 'chart.js'
+      // 'chart.js': 'chart.js' // Alias inutile, à activer seulement si besoin spécifique
     }
   },
-  // Proxy pour contourner CORS en développement (solution alternative)
   server: {
     host: 'localhost',
     port: 5173,
-    // Corriger le WebSocket HMR (400) : forcer host/port/protocole pour la poignée de main.
-    // Si l'erreur persiste (p.ex. avec rolldown-vite), essayer: hmr: false
-    // ou repasser à "vite" au lieu de "rolldown-vite" dans package.json.
     hmr: {
       protocol: 'ws',
       host: 'localhost',
@@ -26,10 +28,68 @@ export default defineConfig({
       clientPort: 5173,
     },
     proxy: {
-      // Un seul proxy: tout passe par /api-stock/*
-      // Exemple: /api-stock/login.php -> https://aliadjame.com/api-stock/login.php
       '/api-stock': {
-        target: 'https://aliadjame.com',
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_compta_ecritures.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_point_vente.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_produit.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_fournisseur.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_vente.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_forfait.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_entrepot.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_entreprise.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_utilisateur.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/check_forfait.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/check_forfait_limits.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_stock_notification_settings.php': {
+        target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,
         secure: false,
       }
