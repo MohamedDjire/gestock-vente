@@ -8,11 +8,12 @@ import { getLocalStorage, setLocalStorage, removeLocalStorage } from '../../util
  */
 
 
-// URL de base de l'API - toujours proxy local en dev
-let API_BASE_URL = '';
-if (!import.meta.env.DEV) {
-  API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aliadjame.com/api-stock';
-}
+// URL de base de l'API
+// - En dev: on passe par le proxy Vite (/api-stock) pour éviter CORS
+// - En prod: par défaut on utilise aussi /api-stock (même origine), sauf si surchargé par VITE_API_BASE_URL
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  '/api-stock'
 
 // Créer une instance axios
 const apiClient = axios.create({

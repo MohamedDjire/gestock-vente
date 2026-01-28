@@ -426,9 +426,12 @@
                     <option value="Agent">Agent</option>
                   </select>
                 </div>
-                <div class="form-group" v-if="!editingUser">
-                  <label>Mot de passe *</label>
-                  <input v-model="userForm.password" type="password" required />
+                <div class="form-group">
+                  <label>{{ editingUser ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe *' }}</label>
+                  <input v-model="userForm.password" type="password" :required="!editingUser" />
+                  <small style="display:block;color:#6b7280;margin-top:6px;">
+                    Min 6 caractères, au moins 1 lettre et 1 chiffre. Caractères spéciaux optionnels.
+                  </small>
                 </div>
                 <div class="form-group">
                   <label>Téléphone</label>
@@ -991,6 +994,12 @@ const saveUser = async () => {
       }
       const response = await apiService.put(`/index.php?action=update&id=${editingUser.value.id_utilisateur}`, updateData)
       if (response.success) {
+        // Si un nouveau mot de passe est fourni, le réinitialiser via endpoint admin dédié
+        if (userForm.value.password && userForm.value.password.trim().length > 0) {
+          await apiService.put(`/index.php?action=admin_reset_password&id=${editingUser.value.id_utilisateur}`, {
+            new_password: userForm.value.password
+          })
+        }
         triggerSnackbar('Utilisateur modifié avec succès !', 'success')
         await loadUsers()
         closeUserModal()
@@ -999,6 +1008,10 @@ const saveUser = async () => {
       }
     } else {
       // Création
+      if (!userForm.value.password || userForm.value.password.trim().length === 0) {
+        triggerSnackbar('Mot de passe requis', 'error')
+        return
+      }
       const payload = {
         ...userForm.value,
         mot_de_passe: userForm.value.password

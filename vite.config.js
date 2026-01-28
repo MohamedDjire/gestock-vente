@@ -26,78 +26,10 @@ export default defineConfig({
       clientPort: 5173,
     },
     proxy: {
-      '/login.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/index.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
+      // Un seul proxy: tout passe par /api-stock/*
+      // Exemple: /api-stock/login.php -> https://aliadjame.com/api-stock/login.php
       '/api-stock': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_point_vente.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_produit.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_fournisseur.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_vente.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_ravitaillement.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_forfait.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_entrepot.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_stock.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_entreprise.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api_utilisateur.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/check_forfait.php': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/check_forfait_limits.php': {
-        target: 'https://aliadjame.com/api-stock',
+        target: 'https://aliadjame.com',
         changeOrigin: true,
         secure: false,
       }

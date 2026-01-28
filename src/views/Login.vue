@@ -43,12 +43,17 @@
               placeholder="Entrez votre mot de passe"
               required
               class="form-input"
+              @blur="passwordTouched = true"
             />
+            <p v-if="passwordTouched && passwordHelp" class="password-hint">
+              {{ passwordHelp }}
+            </p>
           </div>
 
-          <div v-if="error" class="error-message">{{ error }}</div>
+          <div v-if="localError" class="error-message">{{ localError }}</div>
+          <div v-else-if="error" class="error-message">{{ error }}</div>
 
-          <button type="submit" class="auth-button" :disabled="loading">
+          <button type="submit" class="auth-button" :disabled="loading || !canSubmit">
             {{ loading ? 'Connexion...' : 'Se connecter' }}
           </button>
         </form>
@@ -122,7 +127,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { logJournal } from '../composables/useJournal.js'
@@ -140,7 +145,40 @@ const formData = ref({
 
 
 
+const passwordTouched = ref(false)
+const localError = ref('')
+
+const passwordRules = computed(() => {
+  const pwd = String(formData.value.password || '')
+  return {
+    hasMinLength: pwd.length >= 6,
+    hasLetter: /[A-Za-z]/.test(pwd),
+    hasDigit: /\d/.test(pwd)
+  }
+})
+
+const canSubmit = computed(() => {
+  const r = passwordRules.value
+  return r.hasMinLength && r.hasLetter && r.hasDigit
+})
+
+const passwordHelp = computed(() => {
+  if (canSubmit.value) return ''
+  const r = passwordRules.value
+  const missing = []
+  if (!r.hasMinLength) missing.push('au moins 6 caractères')
+  if (!r.hasLetter) missing.push('au moins 1 lettre')
+  if (!r.hasDigit) missing.push('au moins 1 chiffre')
+  return `Mot de passe requis: ${missing.join(', ')}. Caractères spéciaux: optionnels.`
+})
+
 const handleLogin = async () => {
+  passwordTouched.value = true
+  localError.value = ''
+  if (!canSubmit.value) {
+    localError.value = passwordHelp.value || 'Mot de passe invalide.'
+    return
+  }
   const result = await login(formData.value.email, formData.value.password)
   if (result.success) {
     // Journaliser la connexion
@@ -306,6 +344,12 @@ const handleLogin = async () => {
   padding: 0.5rem;
   background: #fee2e2;
   border-radius: 6px;
+}
+
+.password-hint {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
 }
 
 .auth-button {

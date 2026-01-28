@@ -355,6 +355,27 @@ function getUsersByRole($bdd, $role, $enterpriseId) {
 }
 
 /**
+ * Politique mot de passe:
+ * - min 6 caractères
+ * - au moins 1 lettre
+ * - au moins 1 chiffre
+ * - caractères spéciaux: autorisés mais non obligatoires
+ */
+function validatePasswordPolicy($password) {
+    $password = (string)$password;
+    if (strlen($password) < 6) {
+        throw new Exception("Mot de passe invalide: minimum 6 caractères.");
+    }
+    if (!preg_match('/[A-Za-z]/', $password)) {
+        throw new Exception("Mot de passe invalide: doit contenir au moins une lettre.");
+    }
+    if (!preg_match('/\d/', $password)) {
+        throw new Exception("Mot de passe invalide: doit contenir au moins un chiffre.");
+    }
+    return true;
+}
+
+/**
  * Créer un nouvel utilisateur
  */
 function createUser($bdd, $data) {
@@ -370,6 +391,7 @@ function createUser($bdd, $data) {
         throw new Exception("Ce nom d'utilisateur est déjà utilisé");
     }
     
+    validatePasswordPolicy($data['mot_de_passe']);
     $hashedPassword = password_hash($data['mot_de_passe'], PASSWORD_BCRYPT);
     
     $stmt = $bdd->prepare("
@@ -605,12 +627,38 @@ function updateUserPassword($bdd, $userId, $oldPassword, $newPassword) {
         throw new Exception("Ancien mot de passe incorrect");
     }
     
+    validatePasswordPolicy($newPassword);
     $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
     
     $updateStmt = $bdd->prepare("UPDATE stock_utilisateur SET mot_de_passe = :password, date_modification = NOW() WHERE id_utilisateur = :id");
     $updateStmt->execute(['password' => $hashedPassword, 'id' => $userId]);
     
     return ['message' => 'Mot de passe mis à jour avec succès'];
+}
+
+/**
+ * Réinitialiser le mot de passe d'un utilisateur (admin)
+ * Ne requiert PAS l'ancien mot de passe.
+ */
+function adminResetUserPassword($bdd, $currentUser, $targetUserId, $newPassword) {
+    if ($currentUser['user_role'] !== 'admin' && $currentUser['user_role'] !== 'superadmin') {
+        throw new Exception("Accès non autorisé - admin requis", 403);
+    }
+    $targetUser = getUserById($bdd, $targetUserId);
+    if (!$targetUser) {
+        throw new Exception("Utilisateur introuvable", 404);
+    }
+    // Un admin ne peut reset que dans sa propre entreprise (superadmin peut tout)
+    if ($currentUser['user_role'] !== 'superadmin' && $targetUser['id_entreprise'] != $currentUser['enterprise_id']) {
+        throw new Exception("Accès non autorisé à cet utilisateur", 403);
+    }
+
+    validatePasswordPolicy($newPassword);
+    $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+    $updateStmt = $bdd->prepare("UPDATE stock_utilisateur SET mot_de_passe = :password, date_modification = NOW() WHERE id_utilisateur = :id");
+    $updateStmt->execute(['password' => $hashedPassword, 'id' => $targetUserId]);
+
+    return ['message' => 'Mot de passe réinitialisé avec succès'];
 }
 
 /**
@@ -826,6 +874,11 @@ try {
                     }
                     
                     $resultat = updateUserPassword($bdd, $id, $data['password'], $data['new_password']);
+                } elseif ($action === 'admin_reset_password' && $id !== null) {
+                    if (!isset($data['new_password'])) {
+                        throw new Exception("Nouveau mot de passe requis");
+                    }
+                    $resultat = adminResetUserPassword($bdd, $currentUser, $id, $data['new_password']);
                 } else {
                     throw new Exception("Action non valide ou paramètres manquants pour la méthode PUT");
                 }

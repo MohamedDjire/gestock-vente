@@ -84,6 +84,27 @@ function usernameExists($bdd, $username) {
 }
 
 /**
+ * Politique mot de passe:
+ * - min 6 caractères
+ * - au moins 1 lettre
+ * - au moins 1 chiffre
+ * - caractères spéciaux: autorisés mais non obligatoires
+ */
+function validatePasswordPolicy($password) {
+    $password = (string)$password;
+    if (strlen($password) < 6) {
+        throw new Exception("Mot de passe invalide: minimum 6 caractères.");
+    }
+    if (!preg_match('/[A-Za-z]/', $password)) {
+        throw new Exception("Mot de passe invalide: doit contenir au moins une lettre.");
+    }
+    if (!preg_match('/\d/', $password)) {
+        throw new Exception("Mot de passe invalide: doit contenir au moins un chiffre.");
+    }
+    return true;
+}
+
+/**
  * Récupérer un utilisateur par ID
  */
 function getUserById($bdd, $userId) {
@@ -157,6 +178,7 @@ function registerUser($bdd, $data) {
     
     // Hasher le mot de passe
     $password = $data['password'] ?? $data['mot_de_passe'];
+    validatePasswordPolicy($password);
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
     
     // Préparer les données
