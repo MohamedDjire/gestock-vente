@@ -147,6 +147,12 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
             throw new Exception("Point de vente non trouvé", 404);
         }
         
+        $tablePpvExists = false;
+        $chkPpvTable = $bdd->query("SHOW TABLES LIKE 'stock_produit_point_vente'");
+        if ($chkPpvTable && $chkPpvTable->rowCount() > 0) {
+            $tablePpvExists = true;
+        }
+        
         // Traiter chaque produit
         foreach ($data['produits'] as $produit) {
             $idProduit = (int)$produit['id_produit'];
@@ -170,9 +176,23 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
                 throw new Exception("Produit non trouvé ou inactif: ID {$idProduit}");
             }
             
-            // Vérifier le stock disponible
-            if ($produitData['quantite_stock'] < $quantite) {
-                throw new Exception("Stock insuffisant pour le produit '{$produitData['nom']}'. Stock disponible: {$produitData['quantite_stock']}");
+            // Stock à vérifier : point de vente (quantite_disponible) si la table existe et a une ligne, sinon stock_produit
+            $stockDispo = (int)($produitData['quantite_stock'] ?? 0);
+            $utiliserStockPv = false;
+            if ($tablePpvExists) {
+                $stmtPpv = $bdd->prepare("
+                    SELECT quantite_disponible FROM stock_produit_point_vente
+                    WHERE id_produit = ? AND id_point_vente = ? AND id_entreprise = ?
+                ");
+                $stmtPpv->execute([$idProduit, $idPointVente, $enterpriseId]);
+                $ppv = $stmtPpv->fetch(PDO::FETCH_ASSOC);
+                if ($ppv !== false) {
+                    $stockDispo = (int)($ppv['quantite_disponible'] ?? 0);
+                    $utiliserStockPv = true;
+                }
+            }
+            if ($stockDispo < $quantite) {
+                throw new Exception("Stock insuffisant pour le produit '{$produitData['nom']}'. Stock disponible: {$stockDispo}");
             }
             
             // Utiliser le prix fourni ou le prix de vente du produit
@@ -208,22 +228,29 @@ function createVente($bdd, $data, $enterpriseId, $userId, $currentUser = null) {
             
             $idVente = $bdd->lastInsertId();
             
-            // Créer une sortie de stock
-            // NOTE: Le trigger 'trg_after_sortie_stock' déduira automatiquement le stock
-            // Ne pas déduire manuellement pour éviter la double déduction
-            $sortieStmt = $bdd->prepare("
-                INSERT INTO stock_sortie (
-                    id_produit, quantite, motif, id_user, id_entreprise, type_sortie
-                ) VALUES (
-                    :id_produit, :quantite, 'Vente', :id_user, :id_entreprise, 'vente'
-                )
-            ");
-            $sortieStmt->execute([
-                'id_produit' => $idProduit,
-                'quantite' => $quantite,
-                'id_user' => $userId,
-                'id_entreprise' => $enterpriseId
-            ]);
+            // Décrémenter le stock : point de vente (ppv) ou sortie globale (stock_produit via trigger)
+            if ($utiliserStockPv) {
+                $upPpv = $bdd->prepare("
+                    UPDATE stock_produit_point_vente
+                    SET quantite_disponible = GREATEST(0, quantite_disponible - ?)
+                    WHERE id_produit = ? AND id_point_vente = ? AND id_entreprise = ?
+                ");
+                $upPpv->execute([$quantite, $idProduit, $idPointVente, $enterpriseId]);
+            } else {
+                $sortieStmt = $bdd->prepare("
+                    INSERT INTO stock_sortie (
+                        id_produit, quantite, motif, id_user, id_entreprise, type_sortie
+                    ) VALUES (
+                        :id_produit, :quantite, 'Vente', :id_user, :id_entreprise, 'vente'
+                    )
+                ");
+                $sortieStmt->execute([
+                    'id_produit' => $idProduit,
+                    'quantite' => $quantite,
+                    'id_user' => $userId,
+                    'id_entreprise' => $enterpriseId
+                ]);
+            }
             
             // Récupérer les détails de la vente créée
             $getStmt = $bdd->prepare("
@@ -518,7 +545,10 @@ function getVentes($bdd, $enterpriseId, $filters = [], $userId = null, $userRole
     try {
         $stmt = $bdd->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("✅ [API Vente] getVentes: " . count($result) . " ventes trouvées pour entreprise " . $enterpriseId . 
+                  (isset($filters['id_point_vente']) ? " et point de vente " . $filters['id_point_vente'] : ""));
+        return $result;
     } catch (PDOException $e) {
         $msg = $e->getMessage() ?: 'Erreur SQL inconnue';
         $orderBy = 'v.date_vente DESC';
@@ -556,6 +586,143 @@ function getVentes($bdd, $enterpriseId, $filters = [], $userId = null, $userRole
     }
 }
 
+/**
+ * Annuler une vente et remettre le stock en place
+ */
+function cancelVente($bdd, $data, $enterpriseId, $userId) {
+    if (!isset($data['id_vente']) || !$data['id_vente']) {
+        throw new Exception("ID de vente manquant", 400);
+    }
+    
+    $idVente = (int)$data['id_vente'];
+    
+    $bdd->beginTransaction();
+    
+    try {
+        // Récupérer toutes les ventes avec cet ID (groupées par date/user/pv)
+        $stmt = $bdd->prepare("
+            SELECT v.*, p.nom as produit_nom
+            FROM stock_vente v
+            LEFT JOIN stock_produit p ON v.id_produit = p.id_produit
+            WHERE v.id_vente = ? AND v.id_entreprise = ? AND v.statut != 'annule'
+        ");
+        $stmt->execute([$idVente, $enterpriseId]);
+        $ventes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($ventes) === 0) {
+            throw new Exception("Vente non trouvée ou déjà annulée", 404);
+        }
+        
+        // Vérifier si la table stock_produit_point_vente existe
+        $tablePpvExists = false;
+        $chkPpvTable = $bdd->query("SHOW TABLES LIKE 'stock_produit_point_vente'");
+        if ($chkPpvTable && $chkPpvTable->rowCount() > 0) {
+            $tablePpvExists = true;
+        }
+        
+        // Remettre le stock en place pour chaque produit
+        foreach ($ventes as $vente) {
+            $idProduit = (int)$vente['id_produit'];
+            $quantite = (int)$vente['quantite'];
+            $idPointVente = (int)$vente['id_point_vente'];
+            
+            if ($tablePpvExists) {
+                // Remettre le stock dans stock_produit_point_vente
+                $stmtPpv = $bdd->prepare("
+                    UPDATE stock_produit_point_vente 
+                    SET quantite_disponible = quantite_disponible + ?
+                    WHERE id_produit = ? AND id_point_vente = ? AND id_entreprise = ?
+                ");
+                $stmtPpv->execute([$quantite, $idProduit, $idPointVente, $enterpriseId]);
+                
+                // Si aucune ligne n'existe, en créer une
+                if ($stmtPpv->rowCount() === 0) {
+                    $stmtIns = $bdd->prepare("
+                        INSERT INTO stock_produit_point_vente (id_produit, id_point_vente, id_entreprise, quantite_disponible, actif)
+                        VALUES (?, ?, ?, ?, 1)
+                    ");
+                    $stmtIns->execute([$idProduit, $idPointVente, $enterpriseId, $quantite]);
+                }
+            } else {
+                // Remettre le stock dans stock_produit via stock_entree
+                $stmtEntree = $bdd->prepare("
+                    INSERT INTO stock_entree (id_produit, quantite, prix_unitaire, id_user, id_entreprise, notes)
+                    VALUES (?, ?, 0, ?, ?, ?)
+                ");
+                $notes = "Annulation vente #{$idVente} - Remise en stock";
+                $stmtEntree->execute([$idProduit, $quantite, $userId, $enterpriseId, $notes]);
+            }
+        }
+        
+        // Marquer la vente comme annulée
+        $stmtUpdate = $bdd->prepare("
+            UPDATE stock_vente 
+            SET statut = 'annule', notes = CONCAT(COALESCE(notes, ''), ' | Annulée le ', NOW())
+            WHERE id_vente = ? AND id_entreprise = ?
+        ");
+        $stmtUpdate->execute([$idVente, $enterpriseId]);
+        
+        $bdd->commit();
+        
+        error_log("✅ [API Vente] Vente #{$idVente} annulée, stock remis en place");
+        
+        return [
+            'id_vente' => $idVente,
+            'message' => 'Vente annulée avec succès. Le stock a été remis en place.'
+        ];
+        
+    } catch (Exception $e) {
+        $bdd->rollBack();
+        error_log("❌ [API Vente] Erreur annulation vente #{$idVente}: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
+ * Mettre à jour les notes d'une vente pour enregistrer un paiement supplémentaire
+ */
+function updateVentePayment($bdd, $data, $enterpriseId, $userId) {
+    $idVente = isset($data['id_vente']) ? (int)$data['id_vente'] : null;
+    $newNotes = $data['notes'] ?? null;
+    
+    if (!$idVente || !$newNotes) {
+        throw new Exception("ID vente et notes requis");
+    }
+    
+    // Vérifier que la vente existe et appartient à l'entreprise
+    $stmt = $bdd->prepare("
+        SELECT id_vente, notes, statut 
+        FROM stock_vente 
+        WHERE id_vente = ? AND id_entreprise = ? 
+        LIMIT 1
+    ");
+    $stmt->execute([$idVente, $enterpriseId]);
+    $vente = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$vente) {
+        throw new Exception("Vente non trouvée", 404);
+    }
+    
+    if ($vente['statut'] === 'annule') {
+        throw new Exception("Impossible de modifier une vente annulée", 400);
+    }
+    
+    // Mettre à jour les notes
+    $updateStmt = $bdd->prepare("
+        UPDATE stock_vente 
+        SET notes = ? 
+        WHERE id_vente = ? AND id_entreprise = ?
+    ");
+    $updateStmt->execute([$newNotes, $idVente, $enterpriseId]);
+    
+    error_log("✅ [API Vente] Paiement supplémentaire enregistré pour vente #{$idVente}");
+    
+    return [
+        'id_vente' => $idVente,
+        'message' => 'Paiement enregistré avec succès'
+    ];
+}
+
 // =====================================================
 // GESTION DES REQUÊTES
 // =====================================================
@@ -582,6 +749,10 @@ try {
         case 'POST':
             if ($action === 'create' || $action === '') {
                 $resultat = createVente($bdd, $data, $enterpriseId, $userId, $currentUser);
+            } elseif ($action === 'cancel') {
+                $resultat = cancelVente($bdd, $data, $enterpriseId, $userId);
+            } elseif ($action === 'update_payment') {
+                $resultat = updateVentePayment($bdd, $data, $enterpriseId, $userId);
             } else {
                 throw new Exception("Action non valide");
             }

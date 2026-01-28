@@ -71,13 +71,8 @@ try {
     exit;
 }
 
-// Admin uniquement
 $role = strtolower($currentUser['user_role'] ?? $currentUser['role'] ?? '');
-if (!in_array($role, ['admin', 'superadmin'])) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Réservé aux administrateurs'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
+$isAdmin = in_array($role, ['admin', 'superadmin']);
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
@@ -88,6 +83,11 @@ try {
         $listAll = isset($_GET['list']) && $_GET['list'] === '1';
 
         if ($listAll) {
+            if (!$isAdmin) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Réservé aux administrateurs'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $stmt = $bdd->prepare("
                 SELECT pv.id_point_vente, pv.nom_point_vente,
                        GROUP_CONCAT(pve.id_entrepot) AS id_entrepots_concat
@@ -115,6 +115,16 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Point de vente introuvable'], JSON_UNESCAPED_UNICODE);
                 exit;
             }
+            // Non-admin : n'autoriser que si ce point de vente est dans leurs permissions
+            if (!$isAdmin) {
+                $perm = $currentUser['permissions_points_vente'] ?? [];
+                $ids = is_array($perm) ? array_map('intval', $perm) : [];
+                if (!in_array($idPv, $ids, true)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Accès non autorisé à ce point de vente'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
             $stmt = $bdd->prepare("
                 SELECT pve.id_entrepot, e.nom_entrepot
                 FROM stock_point_vente_entrepot pve
@@ -129,6 +139,11 @@ try {
         }
 
         if ($idE) {
+            if (!$isAdmin) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Réservé aux administrateurs'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $stmt = $bdd->prepare("SELECT id_entrepot FROM stock_entrepot WHERE id_entrepot = ? AND id_entreprise = ?");
             $stmt->execute([$idE, $enterpriseId]);
             if (!$stmt->fetch()) {
@@ -155,6 +170,11 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!$isAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Réservé aux administrateurs'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $idPv = isset($input['id_point_vente']) ? (int)$input['id_point_vente'] : null;
         $idEntrepots = isset($input['id_entrepots']) && is_array($input['id_entrepots']) ? array_map('intval', $input['id_entrepots']) : null;
         $idE = isset($input['id_entrepot']) ? (int)$input['id_entrepot'] : null;

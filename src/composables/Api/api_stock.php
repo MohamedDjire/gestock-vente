@@ -272,17 +272,6 @@ function createSortie($bdd, $data, $enterpriseId, $userId) {
     }
     
     // Vérifier que le stock est suffisant (sauf pour les pertes)
-    
-        // Journaliser l'entrée de stock dans stock_journal
-        $userName = ($entree['user_nom'] ?? '') . ' ' . ($entree['user_prenom'] ?? '');
-        $nomProduit = $entree['produit_nom'] ?? '';
-        $journalStmt = $bdd->prepare('INSERT INTO stock_journal (date, user, action, details, id_entreprise) VALUES (NOW(), ?, ?, ?, ?)');
-        $journalStmt->execute([
-            trim($userName) !== '' ? trim($userName) : 'Utilisateur',
-            'Entrée stock',
-            'Produit : ' . $nomProduit,
-            $enterpriseId
-        ]);
     if ($data['type_sortie'] !== 'perte' && $product['quantite_stock'] < $data['quantite']) {
         throw new Exception("Stock insuffisant. Stock disponible: " . $product['quantite_stock']);
     }
@@ -332,6 +321,54 @@ function createSortie($bdd, $data, $enterpriseId, $userId) {
     }
     
     $sortieId = $bdd->lastInsertId();
+    
+    // Transfert vers point de vente : mettre à jour stock_produit_point_vente
+    if (($data['type_sortie'] ?? '') === 'transfert' && !empty($data['point_vente_destination'])) {
+        $idPv = (int)$data['point_vente_destination'];
+        error_log("📦 [api_stock] Transfert vers point de vente: id_pv=$idPv, id_produit={$data['id_produit']}, quantite={$data['quantite']}, entreprise=$enterpriseId");
+        
+        if ($idPv > 0) {
+            $chk = $bdd->prepare("SELECT id_point_vente, nom_point_vente FROM stock_point_vente WHERE id_point_vente = ? AND id_entreprise = ?");
+            $chk->execute([$idPv, $enterpriseId]);
+            $pvExists = $chk->fetch(PDO::FETCH_ASSOC);
+            
+            if ($pvExists) {
+                error_log("✅ [api_stock] Point de vente $idPv trouvé: " . ($pvExists['nom_point_vente'] ?? ''));
+                $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_produit_point_vente'");
+                if ($checkTable && $checkTable->rowCount() > 0) {
+                    error_log("✅ [api_stock] Table stock_produit_point_vente existe");
+                    try {
+                        $ins = $bdd->prepare("INSERT INTO stock_produit_point_vente (id_produit, id_point_vente, id_entreprise, quantite_disponible, actif) VALUES (?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE quantite_disponible = quantite_disponible + ?");
+                        $ins->execute([$data['id_produit'], $idPv, $enterpriseId, (int)$data['quantite'], (int)$data['quantite']]);
+                        $rowsAffected = $ins->rowCount();
+                        error_log("✅ [api_stock] INSERT/UPDATE stock_produit_point_vente: rows_affected=$rowsAffected");
+                        
+                        // Vérifier que l'insertion a bien fonctionné
+                        $verify = $bdd->prepare("SELECT quantite_disponible FROM stock_produit_point_vente WHERE id_produit = ? AND id_point_vente = ? AND id_entreprise = ?");
+                        $verify->execute([$data['id_produit'], $idPv, $enterpriseId]);
+                        $verifData = $verify->fetch(PDO::FETCH_ASSOC);
+                        if ($verifData) {
+                            error_log("✅ [api_stock] Vérification: quantite_disponible=" . ($verifData['quantite_disponible'] ?? 0));
+                        } else {
+                            error_log("❌ [api_stock] ERREUR: Ligne non trouvée après INSERT/UPDATE!");
+                        }
+                    } catch (PDOException $e) {
+                        error_log("❌ [api_stock] Erreur PDO lors de l'insertion: " . $e->getMessage());
+                        throw new Exception("Erreur lors de l'ajout au point de vente: " . $e->getMessage());
+                    }
+                } else {
+                    error_log("⚠️ [api_stock] Table stock_produit_point_vente n'existe pas - création nécessaire");
+                    throw new Exception("La table stock_produit_point_vente n'existe pas. Exécutez create_table_produit_point_vente.sql");
+                }
+            } else {
+                error_log("❌ [api_stock] Point de vente $idPv non trouvé pour entreprise $enterpriseId");
+                throw new Exception("Point de vente non trouvé ou non autorisé");
+            }
+        } else {
+            error_log("❌ [api_stock] ID point de vente invalide: $idPv");
+            throw new Exception("ID point de vente invalide");
+        }
+    }
     
     // Récupérer la sortie créée
     $getStmt = $bdd->prepare("

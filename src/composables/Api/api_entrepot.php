@@ -97,7 +97,7 @@ if (!function_exists('authenticateAndAuthorize')) {
 // Authentifier l'utilisateur
 try {
     $currentUser = authenticateAndAuthorize($bdd);
-    $enterpriseId = $currentUser['enterprise_id'];
+    $enterpriseId = (int)($currentUser['enterprise_id'] ?? $currentUser['id_entreprise'] ?? 0);
 } catch (Exception $e) {
     http_response_code(401);
     echo json_encode([
@@ -141,6 +141,13 @@ try {
                 try {
                     $isAdmin = isset($currentUser['user_role']) && in_array(strtolower($currentUser['user_role']), ['admin', 'superadmin']);
                     $params = [];
+                    // Même règle de correspondance que action=produits : exact LOWER+TRIM OU l'un contient l'autre + actif uniquement
+                    $matchJoin = " p.id_entreprise = e.id_entreprise AND (p.actif IS NULL OR p.actif = 1) AND (
+                        LOWER(TRIM(COALESCE(p.entrepot,''))) = LOWER(TRIM(e.nom_entrepot))
+                        OR ( TRIM(COALESCE(p.entrepot,'')) != ''
+                             AND ( LOWER(TRIM(e.nom_entrepot)) LIKE CONCAT('%', LOWER(TRIM(p.entrepot)), '%')
+                                  OR LOWER(TRIM(p.entrepot)) LIKE CONCAT('%', LOWER(TRIM(e.nom_entrepot)), '%') ) )
+                    ) ";
                     $sql = "
                         SELECT 
                             e.*,
@@ -149,7 +156,7 @@ try {
                             COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) AS valeur_stock_achat,
                             COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) AS valeur_stock_vente
                         FROM stock_entrepot e
-                        LEFT JOIN stock_produit p ON LOWER(TRIM(p.entrepot)) = LOWER(TRIM(e.nom_entrepot)) AND p.id_entreprise = e.id_entreprise
+                        LEFT JOIN stock_produit p ON " . $matchJoin . "
                         WHERE e.id_entreprise = ?
                     ";
                     $params[] = $enterpriseId;
@@ -193,10 +200,12 @@ try {
                     exit;
                 }
                 
-                $nomEntrepot = $entrepot['nom_entrepot'];
-                
+                $nomEntrepot = trim($entrepot['nom_entrepot']);
+                // Paramètres positionnels ? pour éviter HY093 (paramètres nommés dupliqués)
+                $matchEntrepot = " ( LOWER(TRIM(COALESCE(p.entrepot,''))) = LOWER(TRIM(?)) OR ( TRIM(COALESCE(p.entrepot,'')) != '' AND ( LOWER(TRIM(?)) LIKE CONCAT('%', LOWER(TRIM(p.entrepot)), '%') OR LOWER(TRIM(p.entrepot)) LIKE CONCAT('%', LOWER(TRIM(?)), '%') ) ) ) ";
                 // Calculer la date de début de la semaine (7 derniers jours)
                 $dateDebut = date('Y-m-d H:i:s', strtotime('-7 days'));
+                $paramsRapport = [$enterpriseId, $nomEntrepot, $nomEntrepot, $nomEntrepot, $dateDebut];
                 
                 // Récupérer les entrées de la semaine
                 $stmt = $bdd->prepare("
@@ -213,16 +222,11 @@ try {
                         NULL AS entrepot_destination
                     FROM stock_entree e
                     INNER JOIN stock_produit p ON e.id_produit = p.id_produit
-                    WHERE LOWER(TRIM(p.entrepot)) = LOWER(TRIM(:nom_entrepot)) 
-                    AND p.id_entreprise = :id_entreprise
-                    AND e.date_entree >= :date_debut
+                    WHERE p.id_entreprise = ? AND " . $matchEntrepot . "
+                    AND e.date_entree >= ?
                     ORDER BY e.date_entree DESC
                 ");
-                $stmt->execute([
-                    'nom_entrepot' => trim($nomEntrepot),
-                    'id_entreprise' => $enterpriseId,
-                    'date_debut' => $dateDebut
-                ]);
+                $stmt->execute($paramsRapport);
                 $entrees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 // Récupérer les sorties de la semaine
@@ -240,16 +244,11 @@ try {
                         s.entrepot_destination
                     FROM stock_sortie s
                     INNER JOIN stock_produit p ON s.id_produit = p.id_produit
-                    WHERE LOWER(TRIM(p.entrepot)) = LOWER(TRIM(:nom_entrepot)) 
-                    AND p.id_entreprise = :id_entreprise
-                    AND s.date_sortie >= :date_debut
+                    WHERE p.id_entreprise = ? AND " . $matchEntrepot . "
+                    AND s.date_sortie >= ?
                     ORDER BY s.date_sortie DESC
                 ");
-                $stmt->execute([
-                    'nom_entrepot' => trim($nomEntrepot),
-                    'id_entreprise' => $enterpriseId,
-                    'date_debut' => $dateDebut
-                ]);
+                $stmt->execute($paramsRapport);
                 $sorties = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 // Combiner et trier tous les mouvements
@@ -276,6 +275,7 @@ try {
             } elseif ($action === 'produits' && isset($_GET['id_entrepot'])) {
                 // Récupérer les produits d'un entrepôt spécifique
                 $idEntrepot = (int)$_GET['id_entrepot'];
+                $isAdmin = isset($currentUser['user_role']) && in_array(strtolower($currentUser['user_role']), ['admin', 'superadmin']);
                 
                 // Vérifier que l'entrepôt appartient à l'entreprise
                 $stmt = $bdd->prepare("SELECT nom_entrepot FROM stock_entrepot WHERE id_entrepot = :id AND id_entreprise = :id_entreprise");
@@ -290,7 +290,26 @@ try {
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
-                
+                if (!$isAdmin && isset($currentUser['permissions_entrepots']) && is_array($currentUser['permissions_entrepots']) && count($currentUser['permissions_entrepots']) > 0) {
+                    $ids = array_map('intval', $currentUser['permissions_entrepots']);
+                    if (!in_array($idEntrepot, $ids, true)) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'message' => 'Accès non autorisé à cet entrepôt'], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                }
+                // Vérifier que la colonne entrepot existe (add_entrepot_column.sql)
+                $hasEntrepotCol = true;
+                try {
+                    $chk = $bdd->query("SHOW COLUMNS FROM stock_produit LIKE 'entrepot'");
+                    $hasEntrepotCol = $chk && $chk->rowCount() > 0;
+                } catch (Throwable $t) { /* ignore */ }
+                if (!$hasEntrepotCol) {
+                    echo json_encode(['success' => true, 'data' => [], 'entrepot' => $entrepot], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                $nom = trim((string)($entrepot['nom_entrepot'] ?? ''));
+                // Match flexible : exact OU nom/entrepot l’un contient l’autre (ex. "meuble" / "Entrepot meuble")
                 $stmt = $bdd->prepare("
                     SELECT 
                         p.*,
@@ -298,15 +317,32 @@ try {
                         (p.quantite_stock * p.prix_achat) AS valeur_stock_achat,
                         (p.quantite_stock * p.prix_vente) AS valeur_stock_vente
                     FROM stock_produit p
-                    WHERE LOWER(TRIM(p.entrepot)) = LOWER(TRIM(:nom_entrepot)) 
-                    AND p.id_entreprise = :id_entreprise
+                    WHERE p.id_entreprise = ?
+                    AND (p.actif IS NULL OR p.actif = 1)
+                    AND (
+                        LOWER(TRIM(COALESCE(p.entrepot,''))) = LOWER(TRIM(?))
+                        OR ( TRIM(COALESCE(p.entrepot,'')) != ''
+                             AND ( LOWER(TRIM(?)) LIKE CONCAT('%', LOWER(TRIM(p.entrepot)), '%')
+                                  OR LOWER(TRIM(p.entrepot)) LIKE CONCAT('%', LOWER(TRIM(?)), '%') ) )
+                    )
                     ORDER BY p.nom ASC
                 ");
-                $stmt->execute([
-                    'nom_entrepot' => trim($entrepot['nom_entrepot']),
-                    'id_entreprise' => $enterpriseId
-                ]);
+                $stmt->execute([$enterpriseId, $nom, $nom, $nom]);
                 $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                error_log("✅ [API Entrepot] Produits trouvés: " . count($produits) . " pour entrepôt '$nom'");
+                if (count($produits) > 0) {
+                    $exemples = array_slice($produits, 0, 3);
+                    foreach ($exemples as $ex) {
+                        error_log("  - Produit: {$ex['nom']} (id={$ex['id_produit']}), stock={$ex['quantite_stock']}, entrepot={$ex['entrepot']}");
+                    }
+                } else {
+                    // Vérifier tous les produits pour debug
+                    $checkAll = $bdd->prepare("SELECT COUNT(*) as total, GROUP_CONCAT(DISTINCT entrepot SEPARATOR ', ') as entrepots FROM stock_produit WHERE id_entreprise = ? AND (actif IS NULL OR actif = 1)");
+                    $checkAll->execute([$enterpriseId]);
+                    $allData = $checkAll->fetch(PDO::FETCH_ASSOC);
+                    error_log("⚠️ [API Entrepot] Aucun produit trouvé pour '$nom'. Total produits actifs: " . ($allData['total'] ?? 0) . ", Entrepôts dans produits: " . ($allData['entrepots'] ?? ''));
+                }
                 
                 echo json_encode([
                     'success' => true,
@@ -314,9 +350,70 @@ try {
                     'entrepot' => $entrepot
                 ], JSON_UNESCAPED_UNICODE);
                 
-            } elseif (isset($_GET['id_entrepot'])) {
-                // Récupérer un entrepôt spécifique
+            } elseif ($action === 'sorties' && isset($_GET['id_entrepot'])) {
+                // Historique des sorties d’un entrepôt (sans limite 7 jours)
                 $idEntrepot = (int)$_GET['id_entrepot'];
+                $jours = isset($_GET['jours']) ? (int)$_GET['jours'] : 90;
+                $isAdmin = isset($currentUser['user_role']) && in_array(strtolower($currentUser['user_role']), ['admin', 'superadmin']);
+                
+                $stmt = $bdd->prepare("SELECT nom_entrepot FROM stock_entrepot WHERE id_entrepot = :id AND id_entreprise = :id_entreprise");
+                $stmt->execute(['id' => $idEntrepot, 'id_entreprise' => $enterpriseId]);
+                $entrepot = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$entrepot) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'message' => 'Entrepôt non trouvé'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                if (!$isAdmin && isset($currentUser['permissions_entrepots']) && is_array($currentUser['permissions_entrepots']) && count($currentUser['permissions_entrepots']) > 0) {
+                    $ids = array_map('intval', $currentUser['permissions_entrepots']);
+                    if (!in_array($idEntrepot, $ids, true)) {
+                        http_response_code(403);
+                        echo json_encode(['success' => false, 'message' => 'Accès non autorisé'], JSON_UNESCAPED_UNICODE);
+                        exit;
+                    }
+                }
+                // Vérifier colonne entrepot (stock_produit) et entrepot_destination (stock_sortie)
+                $hasEntrepotCol = true;
+                $hasEntrepotDest = true;
+                try {
+                    $c1 = $bdd->query("SHOW COLUMNS FROM stock_produit LIKE 'entrepot'");
+                    $hasEntrepotCol = $c1 && $c1->rowCount() > 0;
+                    $c2 = $bdd->query("SHOW COLUMNS FROM stock_sortie LIKE 'entrepot_destination'");
+                    $hasEntrepotDest = $c2 && $c2->rowCount() > 0;
+                } catch (Throwable $t) { /* ignore */ }
+                if (!$hasEntrepotCol) {
+                    echo json_encode(['success' => true, 'data' => []], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                $colDest = $hasEntrepotDest ? 's.entrepot_destination' : 'NULL AS entrepot_destination';
+                $nom = trim((string)($entrepot['nom_entrepot'] ?? ''));
+                $dateFiltre = $jours > 0 ? " AND s.date_sortie >= DATE_SUB(NOW(), INTERVAL " . (int)$jours . " DAY) " : "";
+                $stmt = $bdd->prepare("
+                    SELECT s.id_sortie AS id, 'sortie' AS type, s.date_sortie AS date, s.quantite,
+                           p.nom AS produit_nom, p.code_produit, s.type_sortie, s.motif, " . $colDest . ",
+                           (s.quantite * COALESCE(s.prix_unitaire, p.prix_vente, 0)) AS montant
+                    FROM stock_sortie s
+                    INNER JOIN stock_produit p ON s.id_produit = p.id_produit
+                    WHERE p.id_entreprise = ?
+                    AND ( LOWER(TRIM(COALESCE(p.entrepot,''))) = LOWER(TRIM(?))
+                          OR ( TRIM(COALESCE(p.entrepot,'')) != '' AND ( LOWER(TRIM(?)) LIKE CONCAT('%', LOWER(TRIM(p.entrepot)), '%') OR LOWER(TRIM(p.entrepot)) LIKE CONCAT('%', LOWER(TRIM(?)), '%') ) ) )
+                    " . $dateFiltre . "
+                    ORDER BY s.date_sortie DESC
+                ");
+                $stmt->execute([$enterpriseId, $nom, $nom, $nom]);
+                $sorties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode(['success' => true, 'data' => $sorties], JSON_UNESCAPED_UNICODE);
+                exit;
+                
+            } elseif (isset($_GET['id_entrepot'])) {
+                // Récupérer un entrepôt spécifique (même règle de match que action=produits)
+                $idEntrepot = (int)$_GET['id_entrepot'];
+                $matchSingle = " p.id_entreprise = e.id_entreprise AND (p.actif IS NULL OR p.actif = 1) AND (
+                    LOWER(TRIM(COALESCE(p.entrepot,''))) = LOWER(TRIM(e.nom_entrepot))
+                    OR ( TRIM(COALESCE(p.entrepot,'')) != ''
+                         AND ( LOWER(TRIM(e.nom_entrepot)) LIKE CONCAT('%', LOWER(TRIM(p.entrepot)), '%')
+                              OR LOWER(TRIM(p.entrepot)) LIKE CONCAT('%', LOWER(TRIM(e.nom_entrepot)), '%') ) )
+                ) ";
                 $stmt = $bdd->prepare("
                     SELECT 
                         e.*,
@@ -325,7 +422,7 @@ try {
                         COALESCE(SUM(p.quantite_stock * p.prix_achat), 0) AS valeur_stock_achat,
                         COALESCE(SUM(p.quantite_stock * p.prix_vente), 0) AS valeur_stock_vente
                     FROM stock_entrepot e
-                    LEFT JOIN stock_produit p ON p.entrepot = e.nom_entrepot AND p.id_entreprise = e.id_entreprise
+                    LEFT JOIN stock_produit p ON " . $matchSingle . "
                     WHERE e.id_entrepot = :id AND e.id_entreprise = :id_entreprise
                     GROUP BY e.id_entrepot
                 ");
@@ -585,7 +682,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Erreur base de données',
+        'message' => 'Erreur base de données: ' . $e->getMessage(),
         'error' => $e->getMessage(),
         'code' => $e->getCode()
     ], JSON_UNESCAPED_UNICODE);

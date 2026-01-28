@@ -502,9 +502,14 @@
           <div v-if="activeAgentTab === 'ventes'" class="agent-tab-panel">
             <div class="panel-header">
               <h3>Mes Ventes</h3>
-              <button @click="openSaleModal" class="btn-primary">
-                <span>+</span> Nouvelle Vente
-              </button>
+              <div class="panel-header-actions">
+                <button @click="openImportModal" class="btn-secondary btn-import-entrepot" title="Importer des produits depuis l'entrepôt">
+                  📥 Importer depuis l'entrepôt
+                </button>
+                <button @click="openSaleModal" class="btn-primary">
+                  <span>+</span> Nouvelle Vente
+                </button>
+              </div>
             </div>
             
             <!-- Filtres de recherche -->
@@ -630,6 +635,108 @@
           </div>
 
           <!-- Onglet Retours -->
+          <!-- Onglet Stock -->
+          <div v-if="activeAgentTab === 'stock'" class="agent-tab-panel">
+            <div class="panel-header">
+              <h3>Stock du Point de Vente</h3>
+              <button @click="openImportModal" class="btn-primary">
+                <span>📥</span> Importer depuis l'entrepôt
+              </button>
+            </div>
+            
+            <!-- Filtres de recherche -->
+            <div class="stock-filters">
+              <div class="search-box">
+                <input
+                  v-model="stockSearchQuery"
+                  type="text"
+                  placeholder="🔍 Rechercher un produit..."
+                  class="search-input"
+                />
+              </div>
+              <div class="filter-buttons">
+                <select v-model="stockSelectedCategory" class="filter-select">
+                  <option value="">Toutes les catégories</option>
+                  <option v-for="cat in stockCategories" :key="cat" :value="cat">{{ cat }}</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Tableau des produits -->
+            <div class="stock-table-container">
+              <div v-if="loadingStock" class="loading-state">Chargement du stock...</div>
+              <div v-else-if="stockFilteredProducts.length === 0" class="empty-state">
+                <p>Aucun produit disponible dans ce point de vente.</p>
+                <button @click="openImportModal" class="btn-primary">Importer des produits depuis l'entrepôt</button>
+              </div>
+              <table v-else class="stock-table">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Code</th>
+                    <th>Catégorie</th>
+                    <th>Stock Disponible</th>
+                    <th>Prix de Vente</th>
+                    <th>Valeur Stock</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr 
+                    v-for="produit in stockFilteredProducts" 
+                    :key="produit.id_produit"
+                    :class="{ 'out-of-stock-row': produit.quantite_stock === 0 }"
+                  >
+                    <td>
+                      <div class="produit-cell">
+                        <span v-if="produit.image" class="produit-image-small">
+                          <img :src="produit.image" :alt="produit.nom" />
+                        </span>
+                        <span v-else class="produit-icon-small">📦</span>
+                        <strong>{{ produit.nom }}</strong>
+                      </div>
+                    </td>
+                    <td>{{ produit.code_produit || '—' }}</td>
+                    <td>{{ produit.categorie || '—' }}</td>
+                    <td>
+                      <span 
+                        :class="['stock-badge', 
+                          produit.quantite_stock === 0 ? 'rupture' : 
+                          produit.quantite_stock <= (produit.seuil_minimum || 0) ? 'alerte' : 'normal'
+                        ]"
+                      >
+                        {{ produit.quantite_stock || 0 }}
+                      </span>
+                    </td>
+                    <td class="valeur-stock-cell">{{ formatCurrency(produit.prix_vente || 0) }}</td>
+                    <td class="valeur-stock-cell">{{ formatCurrency((produit.prix_vente || 0) * (produit.quantite_stock || 0)) }}</td>
+                    <td>
+                      <span 
+                        :class="['status-badge', 
+                          produit.statut_stock === 'rupture' ? 'rupture' :
+                          produit.statut_stock === 'alerte' ? 'alerte' : 'normal'
+                        ]"
+                      >
+                        {{ produit.statut_stock === 'rupture' ? 'Rupture' : 
+                           produit.statut_stock === 'alerte' ? 'Stock faible' : 'Normal' }}
+                      </span>
+                    </td>
+                    <td>
+                      <button 
+                        @click="openAddQuantityModal(produit)" 
+                        class="btn-add-quantity"
+                        title="Ajouter des quantités depuis l'entrepôt"
+                      >
+                        ➕ Ajouter
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div v-if="activeAgentTab === 'retours'" class="agent-tab-panel">
             <div class="panel-header">
               <h3>Retours</h3>
@@ -720,8 +827,32 @@
                   <option value="">Toutes les catégories</option>
                   <option v-for="cat in saleCategories" :key="cat" :value="cat">{{ cat }}</option>
                 </select>
+                <button 
+                  @click="loadSaleProducts(true)" 
+                  class="btn-refresh-products"
+                  title="Actualiser les produits"
+                  :disabled="loadingSaleProducts"
+                >
+                  {{ loadingSaleProducts ? '⏳' : '🔄' }}
+                </button>
               </div>
-              <div class="sale-products-grid">
+              <div v-if="loadingSaleProducts" class="sale-loading-state">
+                <div class="loading-spinner">⏳</div>
+                <p>Chargement des produits...</p>
+              </div>
+              <div v-else-if="saleFilteredProducts.length === 0" class="sale-empty-state">
+                <div class="empty-state-icon">📦</div>
+                <p class="empty-state-title">Aucun produit disponible</p>
+                <p class="empty-state-message">
+                  Aucun produit n'est actuellement disponible dans ce point de vente.
+                  <br />
+                  Importez des produits depuis l'entrepôt pour pouvoir les vendre.
+                </p>
+                <button @click="closeSaleModal(); openImportModal()" class="btn-primary">
+                  📥 Importer des produits depuis l'entrepôt
+                </button>
+              </div>
+              <div v-else class="sale-products-grid">
                 <div 
                   v-for="product in saleFilteredProducts" 
                   :key="product.id_produit"
@@ -870,6 +1001,163 @@
           <button @click="closeRetourModal" class="btn-secondary">Annuler</button>
           <button @click="saveRetour" class="btn-primary" :disabled="savingRetour">
             {{ savingRetour ? 'Enregistrement...' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Importer depuis l'entrepôt -->
+    <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
+      <div class="modal-content import-entrepot-modal" @click.stop>
+        <div class="modal-header">
+          <h3>📥 Importer des produits depuis l'entrepôt</h3>
+          <button @click="closeImportModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group" v-if="!hasSingleEntrepot">
+            <label>Entrepôt *</label>
+            <select v-model="importEntrepotId" @change="loadImportProduits" class="form-select">
+              <option :value="null">Choisir un entrepôt</option>
+              <option v-for="e in entrepots" :key="e.id_entrepot" :value="e.id_entrepot">
+                {{ e.nom_entrepot }}
+              </option>
+            </select>
+          </div>
+          <div v-else-if="selectedEntrepotName" class="form-group">
+            <label>Entrepôt</label>
+            <div class="selected-entrepot-display">
+              <span class="entrepot-badge">📦 {{ selectedEntrepotName }}</span>
+              <small class="form-hint">Votre entrepôt assigné (sélection automatique)</small>
+            </div>
+          </div>
+          <div v-if="loadingImportProduits" class="import-loading">Chargement des produits...</div>
+          <div v-else-if="importEntrepotId && importProduits.length === 0" class="import-empty">
+            Aucun produit dans cet entrepôt.
+          </div>
+          <div v-else-if="importEntrepotId && importProduits.length > 0" class="import-products-section">
+            <h4>Produits disponibles</h4>
+            <div class="import-products-table-wrap">
+              <table class="import-products-table">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Code</th>
+                    <th>Stock</th>
+                    <th>Quantité à importer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in importProduits" :key="p.id_produit" :class="{ 'out-of-stock': (p.quantite_stock || 0) === 0 }">
+                    <td>{{ p.nom }}</td>
+                    <td>{{ p.code_produit || '—' }}</td>
+                    <td>{{ p.quantite_stock || 0 }}</td>
+                    <td>
+                      <input
+                        v-model.number="importQuantites[p.id_produit]"
+                        type="number"
+                        min="0"
+                        :max="p.quantite_stock || 0"
+                        class="import-qty-input"
+                        placeholder="0"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="import-hint">Saisissez la quantité à transférer vers ce point de vente. Le stock de l'entrepôt sera diminué d'autant.</p>
+          </div>
+          <div v-if="importing" class="import-progress">
+            <div class="progress-spinner">⏳</div>
+            <p>Import en cours... Veuillez patienter.</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeImportModal" class="btn-secondary" :disabled="importing">Annuler</button>
+          <button
+            @click="processImport"
+            class="btn-primary"
+            :disabled="importing || !hasImportSelection"
+          >
+            {{ importing ? '⏳ Import en cours...' : '📥 Importer la sélection' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modale Ajouter Quantité -->
+    <div v-if="showAddQuantityModal && selectedProductForQuantity" class="modal-overlay" @click.self="closeAddQuantityModal">
+      <div class="modal-content medium" @click.stop>
+        <div class="modal-header">
+          <h3>Ajouter des quantités</h3>
+          <button @click="closeAddQuantityModal" class="modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="loadingEntrepotStock" class="loading-state">
+            <p>Chargement du stock disponible dans l'entrepôt...</p>
+          </div>
+          <div v-else>
+            <div class="product-info-section">
+              <h4>{{ selectedProductForQuantity.nom }}</h4>
+              <p class="product-code-hint">Code: {{ selectedProductForQuantity.code_produit || '—' }}</p>
+              <div class="stock-info-grid">
+                <div class="stock-info-item">
+                  <span class="stock-label">Stock actuel (Point de vente):</span>
+                  <span class="stock-value current">{{ selectedProductForQuantity.quantite_stock || 0 }}</span>
+                </div>
+                <div class="stock-info-item">
+                  <span class="stock-label">Stock disponible (Entrepôt):</span>
+                  <span class="stock-value available" :class="{ 'low-stock': entrepotStockAvailable <= 0 }">
+                    {{ entrepotStockAvailable }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="add-quantity-input">Quantité à ajouter</label>
+              <input
+                id="add-quantity-input"
+                v-model.number="addQuantityValue"
+                type="number"
+                :min="1"
+                :max="entrepotStockAvailable"
+                class="form-input"
+                placeholder="Saisissez la quantité"
+                @input="validateAddQuantity"
+              />
+              <p class="form-hint" v-if="entrepotStockAvailable > 0">
+                Maximum disponible: <strong>{{ entrepotStockAvailable }}</strong>
+              </p>
+              <p class="form-hint error" v-else>
+                ⚠️ Aucun stock disponible dans l'entrepôt
+              </p>
+            </div>
+            
+            <div v-if="addQuantityValue > 0 && entrepotStockAvailable > 0" class="quantity-preview">
+              <div class="preview-row">
+                <span>Stock actuel:</span>
+                <span>{{ selectedProductForQuantity.quantite_stock || 0 }}</span>
+              </div>
+              <div class="preview-row">
+                <span>Quantité à ajouter:</span>
+                <span class="highlight">+{{ addQuantityValue }}</span>
+              </div>
+              <div class="preview-row total">
+                <span>Nouveau stock:</span>
+                <span class="highlight total">{{ (selectedProductForQuantity.quantite_stock || 0) + addQuantityValue }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="closeAddQuantityModal" class="btn-secondary" :disabled="addingQuantity">Annuler</button>
+          <button
+            @click="processAddQuantity"
+            class="btn-primary"
+            :disabled="addingQuantity || addQuantityValue <= 0 || addQuantityValue > entrepotStockAvailable || entrepotStockAvailable <= 0"
+          >
+            {{ addingQuantity ? '⏳ Ajout en cours...' : '✅ Ajouter la quantité' }}
           </button>
         </div>
       </div>
@@ -1059,6 +1347,7 @@ const currentPointVente = ref(null)
 const activeAgentTab = ref('ventes')
 const agentTabs = [
   { id: 'ventes', label: 'Ventes', icon: '💰' },
+  { id: 'stock', label: 'Stock', icon: '📦' },
   { id: 'livraisons', label: 'Livraisons', icon: '🚚' },
   { id: 'commandes', label: 'Commandes', icon: '🛒' },
   { id: 'retours', label: 'Retours', icon: '↩️' }
@@ -1073,10 +1362,15 @@ const agentVentes = ref([])
 const agentLivraisons = ref([])
 const agentCommandes = ref([])
 const agentRetours = ref([])
+const agentStockProduits = ref([])
 const loadingVentes = ref(false)
 const loadingLivraisons = ref(false)
 const loadingCommandes = ref(false)
 const loadingRetours = ref(false)
+const loadingStock = ref(false)
+const stockSearchQuery = ref('')
+const stockSelectedCategory = ref('')
+const stockCategories = ref([])
 
 // Filtres pour les ventes
 const venteFilterDateDebut = ref('')
@@ -1097,6 +1391,7 @@ const saleSearchQuery = ref('')
 const saleSelectedCategory = ref('')
 const saleCategories = ref([])
 const processingSale = ref(false)
+const loadingSaleProducts = ref(false)
 
 // Formulaires
 const livraisonForm = ref({
@@ -1124,6 +1419,22 @@ const retourForm = ref({
 const savingLivraison = ref(false)
 const savingCommande = ref(false)
 const savingRetour = ref(false)
+
+// Modale Importer depuis l'entrepôt
+const showImportModal = ref(false)
+const importEntrepotId = ref(null)
+const importProduits = ref([])
+const importQuantites = ref({})
+const loadingImportProduits = ref(false)
+const importing = ref(false)
+
+// Modale Ajouter Quantité
+const showAddQuantityModal = ref(false)
+const selectedProductForQuantity = ref(null)
+const addQuantityValue = ref(0)
+const entrepotStockAvailable = ref(0)
+const loadingEntrepotStock = ref(false)
+const addingQuantity = ref(false)
 
 // Reçu de vente
 const lastSaleReceipt = ref(null)
@@ -1488,6 +1799,66 @@ const loadAgentRetours = async () => {
   }
 }
 
+const loadAgentStock = async () => {
+  if (!currentPointVente.value?.id_point_vente) {
+    agentStockProduits.value = []
+    return
+  }
+  
+  loadingStock.value = true
+  try {
+    const response = await apiService.get(`/api_produit.php?action=all&id_point_vente=${currentPointVente.value.id_point_vente}`)
+    if (response && response.success && response.data) {
+      let produits = Array.isArray(response.data) ? response.data : []
+      produits = produits.filter(p => p.actif === 1 || p.actif === true || p.actif === '1')
+      // Exclure les produits en rupture (stock = 0)
+      produits = produits.filter(p => (p.quantite_stock || 0) > 0)
+      // Mapper id_categorie vers categorie si nécessaire
+      produits = produits.map(p => ({
+        ...p,
+        categorie: p.categorie || p.id_categorie || 'Non catégorisé'
+      }))
+      agentStockProduits.value = produits
+      const cats = [...new Set(produits.map(p => p.categorie).filter(Boolean))]
+      stockCategories.value = cats.sort()
+      console.log('✅ [PointVente] Stock chargé:', produits.length, 'produits, catégories:', stockCategories.value)
+      console.log('✅ [PointVente] Stock chargé:', produits.length, 'produits')
+    } else {
+      agentStockProduits.value = []
+    }
+  } catch (error) {
+    console.error('❌ [PointVente] Erreur chargement stock:', error)
+    agentStockProduits.value = []
+  } finally {
+    loadingStock.value = false
+  }
+}
+
+const stockFilteredProducts = computed(() => {
+  let filtered = agentStockProduits.value.filter(p => p.actif === 1)
+  
+  if (stockSearchQuery.value) {
+    const query = stockSearchQuery.value.toLowerCase()
+    filtered = filtered.filter(p => 
+      p.nom?.toLowerCase().includes(query) ||
+      p.code_produit?.toLowerCase().includes(query)
+    )
+  }
+  
+  if (stockSelectedCategory.value) {
+    filtered = filtered.filter(p => p.categorie === stockSelectedCategory.value)
+  }
+  
+  return filtered.sort((a, b) => {
+    // Trier par statut (rupture en premier, puis alerte, puis normal)
+    const statutOrder = { 'rupture': 0, 'alerte': 1, 'normal': 2 }
+    const orderA = statutOrder[a.statut_stock] ?? 2
+    const orderB = statutOrder[b.statut_stock] ?? 2
+    if (orderA !== orderB) return orderA - orderB
+    return a.nom.localeCompare(b.nom)
+  })
+})
+
 const clearVenteFilters = () => {
   venteFilterDateDebut.value = ''
   venteFilterDateFin.value = ''
@@ -1553,8 +1924,9 @@ const openSaleModal = async () => {
   saleCart.value = []
   saleSearchQuery.value = ''
   saleSelectedCategory.value = ''
-  await loadSaleProducts()
-  console.log('Modale ouverte, produits chargés')
+  // Force refresh pour avoir les derniers produits importés
+  await loadSaleProducts(true)
+  console.log('Modale ouverte, produits chargés:', saleProducts.value.length)
 }
 
 const closeSaleModal = () => {
@@ -1608,73 +1980,355 @@ const closeRetourModal = () => {
   showRetourModal.value = false
 }
 
-// Fonctions pour la modale de vente
-const loadSaleProducts = async () => {
-  try {
-    const user = authStore.user
-    let url = '/api_produit.php?action=all'
-    
-    console.log('👤 [PointVente] User:', user?.username, 'isAdmin:', isAdmin.value)
-    console.log('👤 [PointVente] permissions_entrepots:', user?.permissions_entrepots)
-    
-    // Si l'utilisateur n'est pas admin, passer les IDs d'entrepôts à l'API
-    if (user && !isAdmin.value) {
-      // Pour les agents, ils DOIVENT avoir des permissions d'entrepôts
-      if (user.permissions_entrepots && Array.isArray(user.permissions_entrepots) && user.permissions_entrepots.length > 0) {
-        const entrepotIds = user.permissions_entrepots.map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0)
-        if (entrepotIds.length > 0) {
-          url += '&id_entrepots=' + entrepotIds.join(',')
-          console.log('🏭 [PointVente] Agent - URL avec filtrage:', url)
-          console.log('🏭 [PointVente] Agent - IDs entrepôts:', entrepotIds)
-        } else {
-          console.warn('⚠️ [PointVente] Agent - Aucun ID d\'entrepôt valide')
-          // Si l'agent n'a pas d'IDs valides, ne pas charger de produits
-          saleProducts.value = []
-          saleCategories.value = []
-          return
-        }
-      } else {
-        console.warn('⚠️ [PointVente] Agent - Aucune permission d\'entrepôt, aucun produit chargé')
-        // Si l'agent n'a pas de permissions, ne pas charger de produits
-        saleProducts.value = []
-        saleCategories.value = []
+// Modale Importer depuis l'entrepôt
+const openImportModal = async () => {
+  showImportModal.value = true
+  importProduits.value = []
+  importQuantites.value = {}
+  
+  await loadEntrepots()
+  
+  const user = authStore.user
+  // Si agent avec un seul entrepôt autorisé : sélection automatique
+  if (user && !isAdmin.value && user.permissions_entrepots && Array.isArray(user.permissions_entrepots) && user.permissions_entrepots.length === 1) {
+    const seulEntrepotId = parseInt(user.permissions_entrepots[0])
+    if (!isNaN(seulEntrepotId) && seulEntrepotId > 0) {
+      // Vérifier que cet entrepôt existe dans la liste chargée
+      const entrepotTrouve = entrepots.value.find(e => e.id_entrepot === seulEntrepotId)
+      if (entrepotTrouve) {
+        importEntrepotId.value = seulEntrepotId
+        console.log('✅ [Import] Agent avec un seul entrepôt - sélection automatique:', entrepotTrouve.nom_entrepot)
+        await loadImportProduits()
         return
       }
+    }
+  }
+  
+  // Sinon : utiliser l'entrepôt du point de vente ou laisser l'utilisateur choisir
+  importEntrepotId.value = currentPointVente.value?.id_entrepot || null
+  if (importEntrepotId.value) {
+    await loadImportProduits()
+  }
+}
+
+const closeImportModal = () => {
+  showImportModal.value = false
+  importEntrepotId.value = null
+  importProduits.value = []
+  importQuantites.value = {}
+}
+
+const loadImportProduits = async () => {
+  if (!importEntrepotId.value) {
+    importProduits.value = []
+    return
+  }
+  loadingImportProduits.value = true
+  importProduits.value = []
+  importQuantites.value = {}
+  try {
+    const res = await apiService.get(`/api_entrepot.php?action=produits&id_entrepot=${importEntrepotId.value}`)
+    if (res?.success && Array.isArray(res.data)) {
+      importProduits.value = res.data
+      importQuantites.value = Object.fromEntries((res.data || []).map(p => [String(p.id_produit), 0]))
+    }
+  } catch (e) {
+    console.error('Erreur chargement produits entrepôt:', e)
+    showNotification('error', 'Erreur', e?.message || 'Impossible de charger les produits de l\'entrepôt')
+  } finally {
+    loadingImportProduits.value = false
+  }
+}
+
+// Fonctions pour ajouter des quantités
+const openAddQuantityModal = async (produit) => {
+  selectedProductForQuantity.value = produit
+  addQuantityValue.value = 0
+  entrepotStockAvailable.value = 0
+  showAddQuantityModal.value = true
+  
+  // Charger le stock disponible dans l'entrepôt
+  await loadEntrepotStockForProduct(produit.id_produit)
+}
+
+const closeAddQuantityModal = () => {
+  showAddQuantityModal.value = false
+  selectedProductForQuantity.value = null
+  addQuantityValue.value = 0
+  entrepotStockAvailable.value = 0
+}
+
+const loadEntrepotStockForProduct = async (idProduit) => {
+  if (!idProduit || !currentPointVente.value) {
+    entrepotStockAvailable.value = 0
+    return
+  }
+  
+  loadingEntrepotStock.value = true
+  try {
+    // Déterminer l'entrepôt à utiliser
+    let entrepotId = null
+    const user = authStore.user
+    
+    // Si agent avec un seul entrepôt autorisé
+    if (user && !isAdmin.value && user.permissions_entrepots && Array.isArray(user.permissions_entrepots) && user.permissions_entrepots.length === 1) {
+      entrepotId = parseInt(user.permissions_entrepots[0])
+    } else if (currentPointVente.value.id_entrepot) {
+      entrepotId = currentPointVente.value.id_entrepot
     } else {
-      console.log('✅ [PointVente] Admin - Pas de filtre, tous les produits')
+      // Charger les entrepôts et prendre le premier disponible
+      await loadEntrepots()
+      if (entrepots.value.length > 0) {
+        entrepotId = entrepots.value[0].id_entrepot
+      }
     }
     
-    const response = await apiService.get(url)
-    console.log('📦 [PointVente] Réponse API:', response)
+    if (!entrepotId) {
+      console.warn('⚠️ [AddQuantity] Aucun entrepôt trouvé')
+      entrepotStockAvailable.value = 0
+      return
+    }
     
+    // Charger les produits de l'entrepôt
+    console.log('🔍 [AddQuantity] Chargement stock pour produit', idProduit, 'depuis entrepôt', entrepotId)
+    const res = await apiService.get(`/api_entrepot.php?action=produits&id_entrepot=${entrepotId}`)
+    console.log('📦 [AddQuantity] Réponse API entrepôt:', res)
+    
+    if (res?.success && Array.isArray(res.data)) {
+      console.log('📦 [AddQuantity] Produits reçus:', res.data.length)
+      const produitEntrepot = res.data.find(p => p.id_produit === idProduit)
+      if (produitEntrepot) {
+        entrepotStockAvailable.value = parseInt(produitEntrepot.quantite_stock || 0, 10)
+        console.log('✅ [AddQuantity] Stock entrepôt trouvé:', entrepotStockAvailable.value, 'pour produit', produitEntrepot.nom)
+      } else {
+        entrepotStockAvailable.value = 0
+        console.warn('⚠️ [AddQuantity] Produit id=' + idProduit + ' non trouvé dans l\'entrepôt. Produits disponibles:', res.data.map(p => `${p.id_produit}(${p.nom})`).slice(0, 5))
+      }
+    } else {
+      entrepotStockAvailable.value = 0
+      console.error('❌ [AddQuantity] Réponse API invalide:', res)
+    }
+  } catch (e) {
+    console.error('❌ [AddQuantity] Erreur chargement stock entrepôt:', e)
+    entrepotStockAvailable.value = 0
+    showNotification('error', 'Erreur', 'Impossible de charger le stock de l\'entrepôt')
+  } finally {
+    loadingEntrepotStock.value = false
+  }
+}
+
+const validateAddQuantity = () => {
+  if (addQuantityValue.value < 0) {
+    addQuantityValue.value = 0
+  }
+  if (addQuantityValue.value > entrepotStockAvailable.value) {
+    addQuantityValue.value = entrepotStockAvailable.value
+  }
+}
+
+const processAddQuantity = async () => {
+  if (!selectedProductForQuantity.value || !currentPointVente.value || addQuantityValue.value <= 0) {
+    return
+  }
+  
+  if (addQuantityValue.value > entrepotStockAvailable.value) {
+    showNotification('error', 'Erreur', 'La quantité demandée dépasse le stock disponible dans l\'entrepôt')
+    return
+  }
+  
+  addingQuantity.value = true
+  
+  try {
+    const importData = {
+      id_produit: selectedProductForQuantity.value.id_produit,
+      quantite: addQuantityValue.value,
+      type_sortie: 'transfert',
+      point_vente_destination: currentPointVente.value.id_point_vente,
+      prix_unitaire: selectedProductForQuantity.value.prix_vente || selectedProductForQuantity.value.prix_achat || 0
+    }
+    
+    console.log('📥 [AddQuantity] Transfert:', importData)
+    
+    const response = await apiService.post('/api_stock.php?type=sortie', importData)
+    console.log('📥 [AddQuantity] Réponse API:', response)
+    
+    if (response && response.success) {
+      showNotification('success', 'Succès', `${addQuantityValue.value} unité(s) ajoutée(s) avec succès`)
+      closeAddQuantityModal()
+      
+      // Recharger le stock
+      await new Promise(resolve => setTimeout(resolve, 300))
+      await loadAgentStock()
+      await loadSaleProducts(true)
+    } else {
+      const errorMsg = response?.message || response?.error || 'Erreur lors de l\'ajout'
+      showNotification('error', 'Erreur', errorMsg)
+    }
+  } catch (e) {
+    const errorMsg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Erreur inconnue'
+    console.error('❌ [AddQuantity] Exception:', errorMsg, e)
+    showNotification('error', 'Erreur', errorMsg)
+  } finally {
+    addingQuantity.value = false
+  }
+}
+
+const processImport = async () => {
+  if (!currentPointVente.value?.id_point_vente) {
+    showNotification('error', 'Erreur', 'Point de vente non défini')
+    return
+  }
+  const q = importQuantites.value || {}
+  const toImport = (importProduits.value || []).filter(p => (q[p.id_produit] || 0) > 0)
+  if (toImport.length === 0) {
+    showNotification('warning', 'Attention', 'Aucune quantité sélectionnée')
+    return
+  }
+  
+  console.log('📥 [Import] Début import:', toImport.length, 'produits')
+  console.log('📥 [Import] Point de vente:', currentPointVente.value.id_point_vente)
+  
+  importing.value = true
+  const errors = []
+  const ok = []
+  
+  for (const p of toImport) {
+    const quantite = Math.max(0, parseInt(q[p.id_produit], 10) || 0)
+    if (quantite <= 0) continue
+    
+    const importData = {
+      id_produit: p.id_produit,
+      quantite,
+      type_sortie: 'transfert',
+      point_vente_destination: currentPointVente.value.id_point_vente,
+      prix_unitaire: p.prix_vente || p.prix_achat || 0
+    }
+    
+    console.log('📥 [Import] Produit:', p.nom, 'Qté:', quantite, 'Data:', importData)
+    
+    try {
+      const response = await apiService.post('/api_stock.php?type=sortie', importData)
+      console.log('📥 [Import] Réponse API pour', p.nom, ':', response)
+      
+      if (response && response.success) {
+        ok.push({ nom: p.nom, quantite })
+        console.log('✅ [Import] Succès:', p.nom, quantite)
+      } else {
+        const msg = response?.message || response?.error || 'Réponse API invalide'
+        errors.push(`${p.nom}: ${msg}`)
+        console.error('❌ [Import] Échec:', p.nom, msg)
+      }
+    } catch (e) {
+      const errorMsg = e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Erreur inconnue'
+      errors.push(`${p.nom}: ${errorMsg}`)
+      console.error('❌ [Import] Exception:', p.nom, errorMsg, e)
+    }
+  }
+  
+  importing.value = false
+  
+  console.log('📥 [Import] Résultat - OK:', ok.length, 'Erreurs:', errors.length)
+  
+  if (errors.length > 0 && ok.length === 0) {
+    showNotification('error', 'Échec de l\'import', 'Aucun produit importé. ' + errors.join(' ; '))
+  } else if (errors.length > 0) {
+    showNotification('warning', 'Import partiel', `${ok.length} produit(s) importé(s). Erreurs: ${errors.join(' ; ')}`)
+  }
+  
+  if (ok.length > 0) {
+    showNotification('success', 'Import réussi', `${ok.length} produit(s) importé(s) vers le point de vente.`)
+    closeImportModal()
+    
+    // Petit délai pour laisser l'API finaliser les mises à jour
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // Recharger les produits de vente avec force refresh (pour la modale de vente si elle est ouverte)
+    await loadSaleProducts(true) // forceRefresh = true pour éviter le cache
+    console.log('✅ [Import] Produits de vente rechargés:', saleProducts.value.length, 'produits')
+    
+    // Recharger le stock si on est sur l'onglet Stock
+    if (activeAgentTab.value === 'stock') {
+      await loadAgentStock()
+    } else {
+      // Recharger quand même en arrière-plan pour que l'onglet Stock soit à jour
+      loadAgentStock()
+    }
+    console.log('✅ [Import] Stock rechargé')
+  }
+}
+
+// Fonctions pour la modale de vente
+// Charge UNIQUEMENT les produits DISPONIBLES AU POINT DE VENTE (stock_produit_point_vente.quantite_disponible),
+// c.-à-d. ceux importés depuis l'entrepôt. Aucun fallback vers l'entrepôt.
+const loadSaleProducts = async (forceRefresh = false) => {
+  loadingSaleProducts.value = true
+  try {
+    const pvId = currentPointVente.value?.id_point_vente
+    
+    // EXIGER un point de vente : sans point de vente, pas de produits vendables
+    if (!pvId) {
+      console.warn('⚠️ [PointVente] Aucun point de vente défini - aucun produit chargé')
+      saleProducts.value = []
+      saleCategories.value = []
+      return
+    }
+
+    // Vider d'abord pour forcer le re-render
+    if (forceRefresh) {
+      saleProducts.value = []
+      saleCategories.value = []
+      console.log('🔄 [PointVente] Force refresh - vidage des produits')
+      // Petit délai pour que Vue détecte le changement
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+
+    // UNIQUEMENT les produits du point de vente (stock_produit_point_vente)
+    // Ajouter un timestamp pour éviter le cache
+    const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : ''
+    const url = `/api_produit.php?action=all&id_point_vente=${pvId}${cacheBuster}`
+    console.log('📦 [PointVente] Chargement produits du point de vente uniquement (importés): id_point_vente=', pvId, 'forceRefresh=', forceRefresh, 'url=', url)
+
+    const response = await apiService.get(url)
+    console.log('📦 [PointVente] Réponse API complète:', JSON.stringify(response, null, 2))
+
     if (response && response.success && response.data) {
       let allProducts = Array.isArray(response.data) ? response.data : []
-      
-      console.log('📦 [PointVente] Total produits reçus:', allProducts.length)
+      console.log('📦 [PointVente] Produits bruts reçus:', allProducts.length)
       
       // Filtrer par produits actifs
       allProducts = allProducts.filter(p => p.actif === 1 || p.actif === true || p.actif === '1')
+      console.log('📦 [PointVente] Produits actifs après filtre:', allProducts.length)
       
-      console.log('📦 [PointVente] Produits actifs:', allProducts.length)
+      // Exclure les produits en rupture (stock = 0)
+      allProducts = allProducts.filter(p => (p.quantite_stock || 0) > 0)
+      console.log('📦 [PointVente] Produits avec stock > 0 après filtre rupture:', allProducts.length)
       
-      // Afficher les entrepôts des produits pour vérification
-      if (allProducts.length > 0) {
-        const entrepotsUniques = [...new Set(allProducts.map(p => p.entrepot).filter(Boolean))]
-        console.log('📦 [PointVente] Entrepôts dans les produits reçus:', entrepotsUniques)
-      }
-      
-      saleProducts.value = allProducts
-      // Extraire les catégories uniques
+      // quantite_stock = quantite_disponible (point de vente) depuis stock_produit_point_vente
+      // Forcer une nouvelle référence pour Vue en créant un nouveau tableau
+      saleProducts.value = allProducts.map(p => ({ ...p }))
       const cats = [...new Set(saleProducts.value.map(p => p.categorie).filter(Boolean))]
       saleCategories.value = cats.sort()
-      console.log('✅ [PointVente] Produits finaux chargés:', saleProducts.value.length)
+      console.log('✅ [PointVente] Produits vendables chargés (point de vente uniquement):', saleProducts.value.length, 'produits')
+      
+      // Log des IDs des produits pour vérification
+      if (saleProducts.value.length > 0) {
+        const ids = saleProducts.value.map(p => `${p.id_produit}(${p.nom}, stock=${p.quantite_stock})`).slice(0, 5)
+        console.log('📦 [PointVente] Exemples produits:', ids.join(', '), saleProducts.value.length > 5 ? '...' : '')
+      } else {
+        console.warn('⚠️ [PointVente] AUCUN PRODUIT RETOURNÉ - Vérifiez que les produits ont bien été importés dans stock_produit_point_vente')
+      }
     } else {
-      console.error('❌ [PointVente] Réponse API invalide:', response)
       saleProducts.value = []
+      saleCategories.value = []
+      console.warn('⚠️ [PointVente] Aucun produit disponible dans ce point de vente. Réponse:', response)
     }
   } catch (error) {
-    console.error('❌ [PointVente] Erreur lors du chargement des produits:', error)
+    console.error('❌ [PointVente] Erreur chargement produits:', error)
+    console.error('❌ [PointVente] Stack:', error.stack)
     saleProducts.value = []
+    saleCategories.value = []
+  } finally {
+    loadingSaleProducts.value = false
   }
 }
 
@@ -1698,6 +2352,11 @@ const saleFilteredProducts = computed(() => {
 
 const saleTotal = computed(() => {
   return saleCart.value.reduce((sum, item) => sum + (item.sous_total || 0), 0)
+})
+
+const hasImportSelection = computed(() => {
+  const q = importQuantites.value || {}
+  return (importProduits.value || []).some(p => (q[p.id_produit] || 0) > 0)
 })
 
 const addToSaleCart = (product) => {
@@ -1881,6 +2540,10 @@ const processSaleFromModal = async () => {
       // Recharger les autres données en arrière-plan
       await loadAgentVentes()
       await loadAgentPointVente()
+      // Recharger le stock si on est sur l'onglet Stock
+      if (activeAgentTab.value === 'stock') {
+        await loadAgentStock()
+      }
 
       // Le reçu est automatiquement enregistré côté serveur dans api_vente.php
       console.log('=== processSaleFromModal SUCCÈS ===')
@@ -2316,9 +2979,18 @@ watch(() => route.query.point_vente, async (id) => {
 // Watcher pour recharger les données quand on change d'onglet (agent ou admin en mode historique)
 watch(activeAgentTab, (newTab) => {
   if (newTab === 'ventes' && currentPointVente.value) loadAgentVentes()
+  else if (newTab === 'stock' && currentPointVente.value) loadAgentStock()
   else if (newTab === 'livraisons' && currentPointVente.value) loadAgentLivraisons()
   else if (newTab === 'commandes' && currentPointVente.value) loadAgentCommandes()
   else if (newTab === 'retours' && currentPointVente.value) loadAgentRetours()
+})
+
+// Recharger les produits de vente quand la modale s'ouvre (avec force refresh)
+watch(showSaleModal, async (isOpen) => {
+  if (isOpen && currentPointVente.value) {
+    console.log('🔄 [PointVente] Modale de vente ouverte - rechargement des produits (force refresh)')
+    await loadSaleProducts(true) // Force refresh pour avoir les derniers produits importés
+  }
 })
 
 onMounted(async () => {
@@ -2344,15 +3016,35 @@ onMounted(async () => {
     await loadAgentPointVente()
     console.log('onMounted - Point de vente après chargement:', currentPointVente.value)
     if (currentPointVente.value) {
-      loadAgentVentes()
+      // Charger les données selon l'onglet actif
+      if (activeAgentTab.value === 'ventes') {
+        loadAgentVentes()
+      } else if (activeAgentTab.value === 'stock') {
+        loadAgentStock()
+      } else if (activeAgentTab.value === 'livraisons') {
+        loadAgentLivraisons()
+      } else if (activeAgentTab.value === 'commandes') {
+        loadAgentCommandes()
+      } else if (activeAgentTab.value === 'retours') {
+        loadAgentRetours()
+      }
     }
   }
 })
 
-// Recharger les ventes quand on revient sur la page (si on est sur l'onglet ventes)
+// Recharger les données quand on revient sur la page selon l'onglet actif
 onActivated(() => {
-  if (activeAgentTab.value === 'ventes' && currentPointVente.value) {
+  if (!currentPointVente.value) return
+  if (activeAgentTab.value === 'ventes') {
     loadAgentVentes()
+  } else if (activeAgentTab.value === 'stock') {
+    loadAgentStock()
+  } else if (activeAgentTab.value === 'livraisons') {
+    loadAgentLivraisons()
+  } else if (activeAgentTab.value === 'commandes') {
+    loadAgentCommandes()
+  } else if (activeAgentTab.value === 'retours') {
+    loadAgentRetours()
   }
 })
 </script>
@@ -3064,6 +3756,122 @@ onActivated(() => {
   margin: 0;
 }
 
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Modale Importer depuis l'entrepôt */
+.import-entrepot-modal .modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.import-loading, .import-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.import-products-section {
+  margin-top: 1rem;
+}
+
+.import-products-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: #374151;
+}
+
+.import-products-table-wrap {
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.import-products-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.import-products-table th {
+  background: #f3f4f6;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+}
+
+.import-products-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.import-products-table tr.out-of-stock {
+  background: #fef2f2;
+  color: #9ca3af;
+}
+
+.import-qty-input {
+  width: 5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.import-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.import-progress {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #eff6ff;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #bfdbfe;
+}
+
+.progress-spinner {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.import-progress p {
+  margin: 0;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.selected-entrepot-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.entrepot-badge {
+  display: inline-block;
+  padding: 0.75rem 1rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
 /* Styles pour la modale de détails de vente */
 .vente-details-info {
   margin-bottom: 1.5rem;
@@ -3247,6 +4055,248 @@ onActivated(() => {
   color: #059669;
 }
 
+/* Styles pour la section Stock */
+.stock-filters {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.stock-filters .search-box {
+  flex: 1;
+  max-width: 400px;
+}
+
+.stock-filters .search-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.stock-filters .filter-select {
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: white;
+  min-width: 200px;
+}
+
+.stock-table-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.stock-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.stock-table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.stock-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stock-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.stock-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.stock-table tbody tr.out-of-stock-row {
+  background-color: #fef2f2;
+  opacity: 0.7;
+}
+
+.stock-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.stock-table td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #111827;
+}
+
+.btn-add-quantity {
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-add-quantity:hover {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.btn-add-quantity:active {
+  transform: translateY(0);
+}
+
+/* Styles pour la modale Ajouter Quantité */
+.product-info-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.product-info-section h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  color: #111827;
+}
+
+.product-code-hint {
+  margin: 0 0 1rem 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.stock-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stock-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stock-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stock-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stock-value.current {
+  color: #1a5f4a;
+}
+
+.stock-value.available {
+  color: #059669;
+}
+
+.stock-value.available.low-stock {
+  color: #dc2626;
+}
+
+.quantity-preview {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f0fdf4;
+  border-radius: 8px;
+  border: 1px solid #86efac;
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.preview-row.total {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 2px solid #86efac;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.preview-row .highlight {
+  color: #059669;
+  font-weight: 600;
+}
+
+.preview-row.total .highlight {
+  color: #1a5f4a;
+  font-size: 1.3rem;
+}
+
+.form-hint {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.form-hint.error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.form-hint strong {
+  color: #059669;
+  font-weight: 700;
+}
+
+.produit-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.produit-image-small {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+}
+
+.produit-image-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.produit-icon-small {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 1.25rem;
+}
+
 .produits-list {
   display: flex;
   flex-wrap: wrap;
@@ -3344,6 +4394,55 @@ onActivated(() => {
 }
 
 .loading-state,
+.sale-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.sale-loading-state .loading-spinner {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  animation: spin 1s linear infinite;
+}
+
+.sale-loading-state p {
+  margin: 0;
+  font-size: 1rem;
+  color: #6b7280;
+}
+
+.sale-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state-message {
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
 .empty-state {
   text-align: center;
   padding: 3rem;
@@ -3597,6 +4696,31 @@ onActivated(() => {
   border-radius: 8px;
   font-size: 1rem;
   min-width: 200px;
+}
+
+.btn-refresh-products {
+  padding: 0.75rem 1rem;
+  background: #f3f4f6;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-refresh-products:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+  transform: rotate(90deg);
+}
+
+.btn-refresh-products:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .sale-products-grid {

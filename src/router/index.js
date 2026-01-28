@@ -129,6 +129,12 @@ const routes = [
     name: 'Comptabilite',
     component: () => import('../pages/Comptabilite.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/historique-ventes',
+    name: 'HistoriqueVentes',
+    component: () => import('../pages/HistoriqueVentes.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

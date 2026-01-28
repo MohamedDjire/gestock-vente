@@ -815,7 +815,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import Topbar from '../components/Topbar.vue'
@@ -1159,20 +1159,10 @@ const loadAgentSorties = async () => {
   
   loadingSorties.value = true
   try {
-    const response = await apiService.get(`/api_entrepot.php?action=rapport&id_entrepot=${currentEntrepot.value.id_entrepot}`)
+    // action=sorties : historique complet des sorties (jours=0 = tout)
+    const response = await apiService.get(`/api_entrepot.php?action=sorties&id_entrepot=${currentEntrepot.value.id_entrepot}&jours=0`)
     if (response && response.success) {
-      // Filtrer uniquement les sorties
-      const mouvements = response.data?.mouvements || []
-      agentSorties.value = mouvements
-        .filter(m => m.type === 'sortie')
-        .map(sortie => {
-          // L'API ne retourne pas prix_unitaire dans les sorties, donc montant = 0
-          // On pourrait récupérer le prix depuis le produit si nécessaire
-          return {
-            ...sortie,
-            montant: 0 // Le montant n'est pas disponible dans les données de sortie
-          }
-        })
+      agentSorties.value = response.data || []
     } else {
       agentSorties.value = []
     }
@@ -1290,6 +1280,7 @@ const createSortie = async () => {
       type_sortie: 'transfert',
       motif: sortieFormData.value.motif || `Transfert vers ${pointVente?.nom_point_vente || 'Point de vente'}`,
       entrepot_destination: pointVente?.nom_point_vente || null,
+      point_vente_destination: sortieFormData.value.point_vente_destination || null,
       prix_unitaire: produit?.prix_vente || null
     }
     
@@ -1330,6 +1321,17 @@ onMounted(async () => {
     await loadAgentEntrepot()
   }
   document.addEventListener('click', handleClickOutside)
+})
+
+onActivated(() => {
+  // Recharger les données au retour sur la page (ex. après ajout de produits ailleurs)
+  if (isAdmin.value) {
+    loadEntrepots()
+  } else if (currentEntrepot.value) {
+    loadAgentProduits()
+    loadAgentSorties()
+    loadAgentEntrepot()
+  }
 })
 
 onUnmounted(() => {

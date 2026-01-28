@@ -61,12 +61,22 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/api_ravitaillement.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
       '/api_forfait.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,
         secure: false,
       },
       '/api_entrepot.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_stock.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,
         secure: false,

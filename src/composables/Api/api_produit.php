@@ -107,12 +107,83 @@ try {
  * @param int|null $idPointVente Si fourni, ne retourne que les produits disponibles dans ce point de vente
  */
 function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots = null) {
+    // Mode POINT DE VENTE : produits importés (stock_produit_point_vente) avec quantite_disponible
+    $idPointVente = $idPointVente ? (int)$idPointVente : null;
+    if ($idPointVente > 0) {
+        $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_produit_point_vente'");
+        if ($checkTable && $checkTable->rowCount() > 0) {
+            $sqlPv = "
+                SELECT 
+                    p.id_produit,
+                    p.code_produit,
+                    p.nom,
+                    p.id_categorie,
+                    COALESCE(p.id_categorie, 'Non catégorisé') AS categorie,
+                    p.prix_achat,
+                    p.prix_vente,
+                    ppv.quantite_disponible AS quantite_stock,
+                    p.seuil_minimum,
+                    p.date_expiration,
+                    p.date_creation,
+                    p.date_modification,
+                    p.actif,
+                    p.id_entreprise,
+                    p.image,
+                    COALESCE(p.entrepot, 'Magasin') AS entrepot,
+                    (p.prix_vente - p.prix_achat) AS marge_beneficiaire,
+                    ((p.prix_vente - p.prix_achat) * ppv.quantite_disponible) AS valeur_stock,
+                    CASE 
+                        WHEN ppv.quantite_disponible <= p.seuil_minimum THEN 'alerte'
+                        WHEN ppv.quantite_disponible = 0 THEN 'rupture'
+                        ELSE 'normal'
+                    END AS statut_stock
+                FROM stock_produit p
+                INNER JOIN stock_produit_point_vente ppv ON ppv.id_produit = p.id_produit
+                    AND ppv.id_point_vente = ?
+                    AND ppv.id_entreprise = ?
+                WHERE p.id_entreprise = ?
+                AND (p.actif IS NULL OR p.actif = 1)
+                AND ppv.quantite_disponible > 0
+                ORDER BY p.nom ASC
+            ";
+            $stmt = $bdd->prepare($sqlPv);
+            $stmt->execute([$idPointVente, $enterpriseId, $enterpriseId]);
+            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            error_log("✅ [API Produit] Mode point de vente (id=$idPointVente): " . count($result) . " produits");
+            if (count($result) > 0) {
+                $exemples = array_slice($result, 0, 5);
+                foreach ($exemples as $ex) {
+                    error_log("  - Produit: {$ex['nom']} (id={$ex['id_produit']}), stock={$ex['quantite_stock']}, statut={$ex['statut_stock']}, seuil={$ex['seuil_minimum']}");
+                }
+            } else {
+                // Vérifier si des produits existent dans stock_produit_point_vente pour ce PV
+                $checkPpv = $bdd->prepare("SELECT COUNT(*) as total, SUM(quantite_disponible) as total_stock FROM stock_produit_point_vente WHERE id_point_vente = ? AND id_entreprise = ?");
+                $checkPpv->execute([$idPointVente, $enterpriseId]);
+                $countPpv = $checkPpv->fetch(PDO::FETCH_ASSOC);
+                error_log("⚠️ [API Produit] Aucun produit retourné. Total dans stock_produit_point_vente: " . ($countPpv['total'] ?? 0) . ", Stock total: " . ($countPpv['total_stock'] ?? 0));
+                
+                // Vérifier les produits avec stock > 0
+                $checkStock = $bdd->prepare("SELECT id_produit, quantite_disponible, actif FROM stock_produit_point_vente WHERE id_point_vente = ? AND id_entreprise = ? AND quantite_disponible > 0 LIMIT 5");
+                $checkStock->execute([$idPointVente, $enterpriseId]);
+                $stocks = $checkStock->fetchAll(PDO::FETCH_ASSOC);
+                if (count($stocks) > 0) {
+                    error_log("⚠️ [API Produit] Produits avec stock > 0 trouvés mais non retournés:");
+                    foreach ($stocks as $s) {
+                        error_log("  - Produit id={$s['id_produit']}, stock={$s['quantite_disponible']}, actif={$s['actif']}");
+                    }
+                }
+            }
+            return $result;
+        }
+    }
+
     $sql = "
         SELECT 
             p.id_produit,
             p.code_produit,
             p.nom,
             p.id_categorie,
+            COALESCE(p.id_categorie, 'Non catégorisé') AS categorie,
             p.prix_achat,
             p.prix_vente,
             p.quantite_stock,
@@ -138,11 +209,10 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots 
     
     $params = [$enterpriseId];
     
-    // Filtrer par entrepôts assignés si fourni (POUR LES AGENTS SEULEMENT)
+    // Filtrer par entrepôts assignés si fourni (ignoré quand id_point_vente est fourni)
     if ($idEntrepots !== null && is_array($idEntrepots) && count($idEntrepots) > 0) {
         error_log("🔍 [API Produit] Filtrage par entrepôts demandé. IDs: " . json_encode($idEntrepots));
         
-        // Récupérer les noms des entrepôts assignés
         $idsAutorises = array_map('intval', $idEntrepots);
         $idsAutorises = array_filter($idsAutorises, function($id) { return $id > 0; });
         
@@ -159,7 +229,6 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots 
             error_log("🔍 [API Produit] Noms d'entrepôts trouvés: " . json_encode($nomsEntrepots));
             
             if (count($nomsEntrepots) > 0) {
-                // Filtrer les produits par nom d'entrepôt (insensible à la casse)
                 $placeholders = implode(',', array_fill(0, count($nomsEntrepots), '?'));
                 $sql .= " AND LOWER(TRIM(COALESCE(p.entrepot, 'Magasin'))) IN ($placeholders)";
                 foreach ($nomsEntrepots as $nom) {
@@ -167,7 +236,6 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots 
                 }
                 error_log("✅ [API Produit] Filtre appliqué avec " . count($nomsEntrepots) . " entrepôts");
             } else {
-                // Si aucun entrepôt n'est trouvé, ne retourner aucun produit
                 $sql .= " AND 1 = 0";
                 error_log("⚠️ [API Produit] Aucun entrepôt trouvé, aucun produit retourné");
             }
@@ -176,23 +244,10 @@ function getAllProducts($bdd, $enterpriseId, $idPointVente = null, $idEntrepots 
         error_log("ℹ️ [API Produit] Pas de filtre par entrepôts (admin ou pas de permissions)");
     }
     
-    // Filtrer par point de vente si fourni
-    if ($idPointVente !== null) {
-        // Vérifier si la table de liaison existe
+    // Filtrer par point de vente si fourni (fallback sans table ppv: match par entrepôt du PV)
+    if ($idPointVente !== null && $idPointVente > 0) {
         $checkTable = $bdd->query("SHOW TABLES LIKE 'stock_produit_point_vente'");
-        if ($checkTable->rowCount() > 0) {
-            // Utiliser la table de liaison
-            $sql .= " AND EXISTS (
-                SELECT 1 FROM stock_produit_point_vente ppv
-                WHERE ppv.id_produit = p.id_produit
-                AND ppv.id_point_vente = ?
-                AND ppv.id_entreprise = ?
-                AND ppv.actif = 1
-            )";
-            $params[] = (int)$idPointVente;
-            $params[] = $enterpriseId;
-        } else {
-            // Fallback : utiliser l'entrepôt du point de vente
+        if (!$checkTable || $checkTable->rowCount() == 0) {
             $sql .= " AND EXISTS (
                 SELECT 1 FROM stock_point_vente pv
                 INNER JOIN stock_entrepot e ON e.id_entrepot = pv.id_entrepot
@@ -483,15 +538,15 @@ try {
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'GET':
             if ($action === 'all') {
-                // Récupérer le paramètre id_point_vente si fourni
+                // Récupérer le paramètre id_point_vente si fourni (produits disponibles au point de vente)
                 $idPointVente = isset($_GET['id_point_vente']) ? (int)$_GET['id_point_vente'] : null;
-                // Récupérer les IDs d'entrepôts si fournis (pour les agents)
+                // Récupérer les IDs d'entrepôts si fournis (pour les agents). Ignoré si id_point_vente fourni.
                 $idEntrepots = null;
-                if (isset($_GET['id_entrepots']) && !empty($_GET['id_entrepots'])) {
+                if ($idPointVente <= 0 && isset($_GET['id_entrepots']) && !empty($_GET['id_entrepots'])) {
                     $idEntrepots = is_array($_GET['id_entrepots']) ? $_GET['id_entrepots'] : explode(',', $_GET['id_entrepots']);
                     $idEntrepots = array_map('intval', $idEntrepots);
                     $idEntrepots = array_filter($idEntrepots, function($id) { return $id > 0; });
-                    $idEntrepots = array_values($idEntrepots); // Réindexer
+                    $idEntrepots = array_values($idEntrepots);
                 }
                 $resultat = getAllProducts($bdd, $enterpriseId, $idPointVente, $idEntrepots);
             } elseif ($action === 'single' && $id !== null) {
