@@ -3,7 +3,12 @@
     <div class="products-header">
       <h2 class="dashboard-title">Produits & Stocks</h2>
       <div style="display: flex; gap: 1rem;">
-        <button @click="goToEntrepot" class="btn-secondary" style="background: #3b82f6; color: white;">
+        <button 
+          v-if="isAdmin" 
+          @click="goToEntrepot" 
+          class="btn-secondary" 
+          style="background: #3b82f6; color: white;"
+        >
           <span>🏭</span> Gérer les Entrepôts
         </button>
         <button @click="openImportModal" class="btn-secondary" style="background: #10b981; color: white;">
@@ -942,6 +947,14 @@ import { logJournal } from '../composables/useJournal'
 import apiCompta from '../composables/Api/apiCompta.js'
 import { useAuthStore } from '../stores/auth.js'
 const authStore = useAuthStore()
+
+// Vérifier si l'utilisateur est admin
+const isAdmin = computed(() => {
+  const user = authStore.user
+  if (!user) return false
+  const role = String(user.role || user.user_role || '').toLowerCase()
+  return role === 'admin' || role === 'superadmin'
+})
 import * as XLSX from 'xlsx'
 import { uploadPhoto } from '../config/cloudinary'
 
