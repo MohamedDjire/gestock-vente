@@ -115,7 +115,9 @@
             />
           </div>
 
-          <div v-if="error" class="error-message">{{ error }}</div>
+          <div v-if="localError || authStore.error" class="error-message">
+            {{ localError || authStore.error }}
+          </div>
 
           <button type="submit" class="auth-button" :disabled="loading">
             {{ loading ? 'Création du compte...' : "S'inscrire" }}
@@ -197,7 +199,10 @@ import { useAuthStore } from '../stores/auth.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const { signUp, loading, error } = authStore
+const { signUp, loading } = authStore
+
+// Créer une référence locale pour les erreurs du formulaire
+const localError = ref('')
 
 const formData = ref({
   nom: '',
@@ -211,9 +216,35 @@ const formData = ref({
 })
 
 const handleSignUp = async () => {
+  // Réinitialiser les erreurs
+  localError.value = ''
+  authStore.error = null
+  
+  // Nettoyer le localStorage avant l'inscription pour éviter les conflits
+  localStorage.removeItem('prostock_token')
+  localStorage.removeItem('prostock_user')
+  localStorage.removeItem('prostock_expires_at')
+  
+  console.log('📝 Tentative d\'inscription avec email:', formData.value.email)
+  
   // Vérifier que les mots de passe correspondent
   if (formData.value.password !== formData.value.confirmPassword) {
-    error.value = 'Les mots de passe ne correspondent pas'
+    localError.value = 'Les mots de passe ne correspondent pas'
+    return
+  }
+  
+  // Vérifier la politique de mot de passe (min 6 caractères, 1 lettre, 1 chiffre)
+  const password = formData.value.password
+  if (password.length < 6) {
+    localError.value = 'Le mot de passe doit contenir au moins 6 caractères'
+    return
+  }
+  if (!/[A-Za-z]/.test(password)) {
+    localError.value = 'Le mot de passe doit contenir au moins une lettre'
+    return
+  }
+  if (!/\d/.test(password)) {
+    localError.value = 'Le mot de passe doit contenir au moins un chiffre'
     return
   }
 
@@ -229,11 +260,32 @@ const handleSignUp = async () => {
     mot_de_passe: formData.value.password // Pour compatibilité avec l'API
   }
 
-  const result = await signUp(signUpData)
-  
-  if (result.success) {
-    // Rediriger vers le dashboard après inscription réussie
-    router.push({ name: 'Dashboard' })
+  try {
+    const result = await signUp(signUpData)
+    
+    if (result.success) {
+      console.log('✅ Inscription réussie pour:', result.user?.email)
+      
+      // Rediriger vers le dashboard après inscription réussie
+      router.push({ name: 'Dashboard' })
+      // Attendre un peu pour s'assurer que le store est complètement mis à jour
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      // Vérifier que l'utilisateur est bien authentifié avant de rediriger
+      if (authStore.isAuthenticated) {
+        window.location.href = '/dashboard'
+      } else {
+        window.location.href = '/dashboard'
+      }
+    } else {
+      // Afficher l'erreur du store ou une erreur par défaut
+      const errorMsg = result.error || authStore.error || 'Erreur lors de la création du compte'
+      localError.value = errorMsg
+      console.error('❌ Échec de l\'inscription:', errorMsg)
+    }
+  } catch (err) {
+    console.error('❌ Erreur lors de l\'inscription:', err)
+    localError.value = err.message || 'Une erreur est survenue lors de la création du compte'
   }
 }
 </script>

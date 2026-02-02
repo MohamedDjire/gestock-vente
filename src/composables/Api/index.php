@@ -640,23 +640,126 @@ function updateUserPassword($bdd, $userId, $oldPassword, $newPassword) {
  * Réinitialiser le mot de passe d'un utilisateur (admin)
  * Ne requiert PAS l'ancien mot de passe.
  */
-function adminResetUserPassword($bdd, $currentUser, $targetUserId, $newPassword) {
+function adminResetUserPassword($bdd, $currentUser, $targetUserId, $newPassword, $oldPassword = null) {
+    error_log("🔐 [Admin Reset Password] Début - Admin ID: " . ($currentUser['id'] ?? $currentUser['user_id'] ?? 'N/A') . ", Target User ID: {$targetUserId}");
+    
     if ($currentUser['user_role'] !== 'admin' && $currentUser['user_role'] !== 'superadmin') {
+        error_log("❌ [Admin Reset Password] Accès refusé - Rôle: " . ($currentUser['user_role'] ?? 'N/A'));
         throw new Exception("Accès non autorisé - admin requis", 403);
     }
+    
     $targetUser = getUserById($bdd, $targetUserId);
     if (!$targetUser) {
+        error_log("❌ [Admin Reset Password] Utilisateur introuvable - ID: {$targetUserId}");
         throw new Exception("Utilisateur introuvable", 404);
     }
+    
+    error_log("🔐 [Admin Reset Password] Utilisateur cible trouvé - Email: " . ($targetUser['email'] ?? 'N/A') . ", Username: " . ($targetUser['username'] ?? 'N/A'));
+    
     // Un admin ne peut reset que dans sa propre entreprise (superadmin peut tout)
     if ($currentUser['user_role'] !== 'superadmin' && $targetUser['id_entreprise'] != $currentUser['enterprise_id']) {
+        error_log("❌ [Admin Reset Password] Accès refusé - Entreprise différente");
         throw new Exception("Accès non autorisé à cet utilisateur", 403);
+    }
+
+    // Vérifier si c'est l'utilisateur lui-même qui change son mot de passe
+    $isChangingOwnPassword = ($currentUser['id'] ?? $currentUser['user_id'] ?? null) == $targetUserId;
+    
+    // Si un ancien mot de passe est fourni, le vérifier (obligatoire si c'est l'utilisateur lui-même)
+    if ($isChangingOwnPassword) {
+        // Si c'est l'utilisateur lui-même, l'ancien mot de passe est OBLIGATOIRE
+        if ($oldPassword === null || $oldPassword === '') {
+            error_log("❌ [Admin Reset Password] Ancien mot de passe requis pour modifier son propre mot de passe - User ID: {$targetUserId}");
+            throw new Exception("L'ancien mot de passe est requis pour modifier votre propre mot de passe", 400);
+        }
+        
+        // Vérifier l'ancien mot de passe
+        $stmt = $bdd->prepare("SELECT mot_de_passe FROM stock_utilisateur WHERE id_utilisateur = :id");
+        $stmt->execute(['id' => $targetUserId]);
+        $currentPasswordData = $stmt->fetch();
+        
+        if (!$currentPasswordData || !password_verify($oldPassword, $currentPasswordData['mot_de_passe'])) {
+            error_log("❌ [Admin Reset Password] Ancien mot de passe incorrect pour utilisateur ID: {$targetUserId}");
+            throw new Exception("L'ancien mot de passe est incorrect", 400);
+        }
+        error_log("✅ [Admin Reset Password] Ancien mot de passe vérifié avec succès (utilisateur modifie son propre mot de passe)");
+    } else {
+        // Si c'est un admin qui change le mot de passe d'un autre utilisateur, l'ancien mot de passe n'est PAS requis
+        if ($oldPassword !== null && $oldPassword !== '') {
+            // Si fourni, on peut le vérifier pour sécurité supplémentaire, mais ce n'est pas obligatoire
+            $stmt = $bdd->prepare("SELECT mot_de_passe FROM stock_utilisateur WHERE id_utilisateur = :id");
+            $stmt->execute(['id' => $targetUserId]);
+            $currentPasswordData = $stmt->fetch();
+            
+            if ($currentPasswordData && password_verify($oldPassword, $currentPasswordData['mot_de_passe'])) {
+                error_log("✅ [Admin Reset Password] Ancien mot de passe vérifié (optionnel pour admin)");
+            } else {
+                error_log("⚠️ [Admin Reset Password] Ancien mot de passe fourni mais incorrect (ignoré car admin)");
+                // On ne bloque pas, car un admin peut changer n'importe quel mot de passe
+            }
+        }
+        error_log("✅ [Admin Reset Password] Admin modifie le mot de passe d'un autre utilisateur (ancien mot de passe non requis)");
     }
 
     validatePasswordPolicy($newPassword);
     $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
-    $updateStmt = $bdd->prepare("UPDATE stock_utilisateur SET mot_de_passe = :password, date_modification = NOW() WHERE id_utilisateur = :id");
-    $updateStmt->execute(['password' => $hashedPassword, 'id' => $targetUserId]);
+    
+    error_log("🔐 [Admin Reset Password] Hash généré pour utilisateur ID: {$targetUserId}, Email: " . ($targetUser['email'] ?? 'N/A'));
+    
+    // Vérifier combien de lignes seront affectées AVANT la mise à jour
+    $checkBeforeStmt = $bdd->prepare("SELECT COUNT(*) as count FROM stock_utilisateur WHERE id_utilisateur = :id");
+    $checkBeforeStmt->execute(['id' => $targetUserId]);
+    $beforeCount = $checkBeforeStmt->fetch()['count'];
+    error_log("🔐 [Admin Reset Password] Nombre d'utilisateurs avec cet ID avant UPDATE: {$beforeCount}");
+    
+    // Utiliser une transaction pour garantir l'intégrité
+    $bdd->beginTransaction();
+    
+    try {
+        $updateStmt = $bdd->prepare("UPDATE stock_utilisateur SET mot_de_passe = :password, date_modification = NOW() WHERE id_utilisateur = :id");
+        $updateStmt->execute(['password' => $hashedPassword, 'id' => $targetUserId]);
+        
+        $rowsAffected = $updateStmt->rowCount();
+        error_log("🔐 [Admin Reset Password] Lignes affectées par UPDATE: {$rowsAffected}");
+        
+        if ($rowsAffected === 0) {
+            $bdd->rollBack();
+            error_log("❌ [Admin Reset Password] Aucune ligne affectée - ID utilisateur invalide: {$targetUserId}");
+            throw new Exception("Erreur lors de la mise à jour du mot de passe - utilisateur non trouvé");
+        }
+        
+        // Vérifier que la mise à jour a bien fonctionné
+        $verifyStmt = $bdd->prepare("SELECT id_utilisateur, email, username, mot_de_passe FROM stock_utilisateur WHERE id_utilisateur = :id");
+        $verifyStmt->execute(['id' => $targetUserId]);
+        $updated = $verifyStmt->fetch();
+        
+        if (!$updated) {
+            $bdd->rollBack();
+            error_log("❌ [Admin Reset Password] Utilisateur non trouvé après UPDATE - ID: {$targetUserId}");
+            throw new Exception("Erreur lors de la mise à jour du mot de passe - utilisateur non trouvé");
+        }
+        
+        error_log("🔐 [Admin Reset Password] Utilisateur trouvé après UPDATE - ID: {$updated['id_utilisateur']}, Email: {$updated['email']}");
+        
+        // Vérifier que le nouveau mot de passe fonctionne
+        if (!password_verify($newPassword, $updated['mot_de_passe'])) {
+            $bdd->rollBack();
+            error_log("❌ [Admin Reset Password] Échec de vérification pour utilisateur ID: {$targetUserId}, Email: {$updated['email']}");
+            error_log("❌ [Admin Reset Password] Hash stocké: " . substr($updated['mot_de_passe'], 0, 20) . "...");
+            throw new Exception("Erreur lors de la mise à jour du mot de passe - vérification échouée");
+        }
+        
+        // Commit de la transaction
+        $bdd->commit();
+        
+        error_log("✅ [Admin Reset Password] Mot de passe mis à jour avec succès pour utilisateur ID: {$targetUserId}, Email: {$updated['email']}");
+        error_log("✅ [Admin Reset Password] Vérification réussie - le nouveau mot de passe fonctionne");
+        
+    } catch (Exception $e) {
+        $bdd->rollBack();
+        error_log("❌ [Admin Reset Password] Erreur dans la transaction: " . $e->getMessage());
+        throw $e;
+    }
 
     return ['message' => 'Mot de passe réinitialisé avec succès'];
 }
@@ -878,7 +981,8 @@ try {
                     if (!isset($data['new_password'])) {
                         throw new Exception("Nouveau mot de passe requis");
                     }
-                    $resultat = adminResetUserPassword($bdd, $currentUser, $id, $data['new_password']);
+                    $oldPassword = $data['old_password'] ?? null;
+                    $resultat = adminResetUserPassword($bdd, $currentUser, $id, $data['new_password'], $oldPassword);
                 } else {
                     throw new Exception("Action non valide ou paramètres manquants pour la méthode PUT");
                 }

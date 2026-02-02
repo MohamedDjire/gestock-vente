@@ -16,14 +16,23 @@ $allowedOrigins = [
 ];
 
 // Récupérer l'origine de la requête
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$origin = $_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '';
+
+// Extraire l'origine depuis le referer si nécessaire
+if (empty($origin) && !empty($_SERVER['HTTP_REFERER'])) {
+    $parsed = parse_url($_SERVER['HTTP_REFERER']);
+    if ($parsed) {
+        $origin = $parsed['scheme'] . '://' . $parsed['host'] . (isset($parsed['port']) ? ':' . $parsed['port'] : '');
+    }
+}
 
 // Définir l'origine autorisée
-if (in_array($origin, $allowedOrigins)) {
+if (!empty($origin) && in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: " . $origin);
 } else {
     // En développement, autoriser toutes les origines (à retirer en production)
-    header("Access-Control-Allow-Origin: *");
+    // Mais préférer l'origine de la requête si disponible
+    header("Access-Control-Allow-Origin: " . ($origin ?: '*'));
 }
 
 // Définir les autres headers CORS

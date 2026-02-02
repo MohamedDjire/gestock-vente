@@ -148,45 +148,50 @@ const formData = ref({
 const passwordTouched = ref(false)
 const localError = ref('')
 
-const passwordRules = computed(() => {
+// Pour le login, on n'empêche plus la connexion si l'ancien mot de passe
+// ne respecte pas la nouvelle politique. La politique est appliquée côté
+// serveur uniquement lors de la création / modification de mot de passe.
+const passwordHelp = computed(() => {
   const pwd = String(formData.value.password || '')
-  return {
-    hasMinLength: pwd.length >= 6,
-    hasLetter: /[A-Za-z]/.test(pwd),
-    hasDigit: /\d/.test(pwd)
+  if (!pwd) {
+    return 'Mot de passe requis: au moins 6 caractères, 1 lettre et 1 chiffre. Caractères spéciaux: optionnels.'
   }
+  if (pwd.length < 6) {
+    return 'Mot de passe conseillé: au moins 6 caractères.'
+  }
+  return ''
 })
 
 const canSubmit = computed(() => {
-  const r = passwordRules.value
-  return r.hasMinLength && r.hasLetter && r.hasDigit
-})
-
-const passwordHelp = computed(() => {
-  if (canSubmit.value) return ''
-  const r = passwordRules.value
-  const missing = []
-  if (!r.hasMinLength) missing.push('au moins 6 caractères')
-  if (!r.hasLetter) missing.push('au moins 1 lettre')
-  if (!r.hasDigit) missing.push('au moins 1 chiffre')
-  return `Mot de passe requis: ${missing.join(', ')}. Caractères spéciaux: optionnels.`
+  // Autoriser la soumission dès qu\'un mot de passe est saisi,
+  // pour ne pas bloquer les anciens comptes déjà en base.
+  return !!formData.value.password && !!formData.value.email
 })
 
 const handleLogin = async () => {
   passwordTouched.value = true
   localError.value = ''
-  if (!canSubmit.value) {
-    localError.value = passwordHelp.value || 'Mot de passe invalide.'
-    return
-  }
+  
+  // Nettoyer le localStorage avant la connexion pour éviter les conflits
+  // (surtout si on vient de modifier un mot de passe)
+  localStorage.removeItem('prostock_token')
+  localStorage.removeItem('prostock_user')
+  localStorage.removeItem('prostock_expires_at')
+  
+  console.log('🔐 Tentative de connexion avec email:', formData.value.email)
+  
   const result = await login(formData.value.email, formData.value.password)
+  
   if (result.success) {
+    console.log('✅ Connexion réussie pour:', result.user?.email)
+    
     // Journaliser la connexion
     await logJournal({
       user: result.user?.email || formData.value.email,
       action: 'Connexion',
       details: 'Connexion réussie'
     })
+    
     // Rediriger vers le dashboard après connexion réussie
     router.push({ name: 'Dashboard' })
     // Attendre que Vue ait terminé toutes les mises à jour réactives
@@ -207,6 +212,10 @@ const handleLogin = async () => {
     }
   } else {
     console.error('❌ Échec de la connexion:', result.error)
+    localError.value = result.error || 'Email ou mot de passe incorrect'
+    // Réinitialiser le formulaire en cas d'erreur
+    formData.value.email = ''
+    formData.value.password = ''
   }
 }
 </script>

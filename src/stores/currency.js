@@ -242,9 +242,73 @@ export const useCurrencyStore = defineStore('currency', () => {
   }
 
   /**
+   * Met à jour les taux de change depuis une API externe
+   * Utilise l'API gratuite exchangerate-api.com
+   */
+  const fetchLatestRates = async () => {
+    try {
+      // API gratuite pour les taux de change (sans clé API requise)
+      // Alternative: utiliser exchangerate-api.com ou fixer.io avec clé API
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD')
+      
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.rates) {
+        // Convertir les taux de l'API (base USD) vers notre format
+        const newRates = {
+          USD: 1,
+          EUR: data.rates.EUR || exchangeRates.value.EUR,
+          GBP: data.rates.GBP || exchangeRates.value.GBP,
+          JPY: data.rates.JPY || exchangeRates.value.JPY,
+          CNY: data.rates.CNY || exchangeRates.value.CNY,
+          INR: data.rates.INR || exchangeRates.value.INR,
+          BRL: data.rates.BRL || exchangeRates.value.BRL,
+          CAD: data.rates.CAD || exchangeRates.value.CAD,
+          AUD: data.rates.AUD || exchangeRates.value.AUD,
+          CHF: data.rates.CHF || exchangeRates.value.CHF,
+          AED: data.rates.AED || exchangeRates.value.AED,
+          SAR: data.rates.SAR || exchangeRates.value.SAR,
+          TRY: data.rates.TRY || exchangeRates.value.TRY,
+          // Pour les devises africaines, utiliser des sources spécialisées ou garder les valeurs par défaut
+          // car elles ne sont pas toujours disponibles dans les APIs gratuites
+          XOF: data.rates.XOF || exchangeRates.value.XOF,
+          XAF: data.rates.XAF || exchangeRates.value.XAF,
+          NGN: data.rates.NGN || exchangeRates.value.NGN,
+          ZAR: data.rates.ZAR || exchangeRates.value.ZAR,
+          EGP: data.rates.EGP || exchangeRates.value.EGP,
+          MAD: data.rates.MAD || exchangeRates.value.MAD,
+          TND: data.rates.TND || exchangeRates.value.TND,
+          DZD: data.rates.DZD || exchangeRates.value.DZD,
+          GHS: data.rates.GHS || exchangeRates.value.GHS,
+          KES: data.rates.KES || exchangeRates.value.KES,
+          UGX: data.rates.UGX || exchangeRates.value.UGX,
+          TZS: data.rates.TZS || exchangeRates.value.TZS,
+          ETB: data.rates.ETB || exchangeRates.value.ETB,
+          RWF: data.rates.RWF || exchangeRates.value.RWF,
+          MZN: data.rates.MZN || exchangeRates.value.MZN,
+          AOA: data.rates.AOA || exchangeRates.value.AOA,
+          CDF: data.rates.CDF || exchangeRates.value.CDF
+        }
+        
+        updateRates(newRates)
+        console.log('✅ Taux de change mis à jour avec succès')
+        return true
+      }
+    } catch (error) {
+      console.warn('⚠️ Impossible de mettre à jour les taux de change depuis l\'API:', error.message)
+      console.log('📌 Utilisation des taux de change par défaut')
+      return false
+    }
+  }
+
+  /**
    * Charge les taux depuis localStorage ou API
    */
-  const loadRates = () => {
+  const loadRates = async () => {
     // Charger depuis localStorage
     const savedRates = localStorage.getItem('currencyRates')
     const savedHistory = localStorage.getItem('currencyRateHistory')
@@ -275,9 +339,8 @@ export const useCurrencyStore = defineStore('currency', () => {
       (new Date() - new Date(lastUpdate.value)) > 24 * 60 * 60 * 1000
     
     if (shouldUpdate) {
-      // Ici, on pourrait appeler une API pour mettre à jour les taux
-      // Pour l'instant, on garde les taux par défaut
-      console.log('Les taux de change devraient être mis à jour')
+      // Mettre à jour les taux depuis l'API
+      await fetchLatestRates()
     }
   }
 
@@ -314,6 +377,7 @@ export const useCurrencyStore = defineStore('currency', () => {
     formatPrice,
     updateRates,
     loadRates,
+    fetchLatestRates,
     setCurrency
   }
 })

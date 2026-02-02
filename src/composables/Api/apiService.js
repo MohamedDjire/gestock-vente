@@ -95,6 +95,21 @@ apiClient.interceptors.response.use(
     return response.data
   },
   (error) => {
+    // Détecter les problèmes CORS
+    if (error.message && error.message.includes('CORS')) {
+      console.error('❌ [CORS Error] Le serveur ne renvoie pas les headers CORS nécessaires')
+      console.error('❌ [CORS Error] Vérifiez que cors.php est bien déployé sur le serveur')
+      console.error('❌ [CORS Error] URL:', error.config?.url)
+    }
+    
+    // Détecter les problèmes CORS
+    if (error.message && (error.message.includes('CORS') || error.message.includes('Access-Control'))) {
+      console.error('❌ [CORS Error] Le serveur ne renvoie pas les headers CORS nécessaires')
+      console.error('❌ [CORS Error] Vérifiez que cors.php est bien déployé sur le serveur')
+      console.error('❌ [CORS Error] URL:', error.config?.url, 'BaseURL:', error.config?.baseURL)
+      console.error('❌ [CORS Error] Consultez DEPLOYMENT_CORS.md pour les instructions de déploiement')
+    }
+    
     // Vérifier si c'est une erreur de forfait expiré
     if (error.message === 'FORFAIT_EXPIRE' || (error.response && error.response.status === 403 && error.response.data?.message?.includes('forfait'))) {
       // Mettre à jour le statut du forfait
@@ -150,19 +165,34 @@ apiClient.interceptors.response.use(
       
       let message = 'Une erreur est survenue'
       
-      // Parser la réponse si c'est une string JSON
+      // Parser la réponse si c'est une string JSON ou HTML
       let parsedData = data
       if (typeof data === 'string') {
+        // Vérifier si c'est du HTML (erreur Varnish par exemple)
+        if (data.trim().startsWith('<!DOCTYPE') || data.trim().startsWith('<html')) {
+          if (status === 503) {
+            message = 'Le serveur backend est temporairement indisponible (503). Veuillez réessayer dans quelques instants.'
+          } else {
+            message = `Erreur serveur (${status}). Le serveur a renvoyé une page HTML au lieu d'une réponse JSON.`
+          }
+          console.error('❌ [HTML Response] Le serveur a renvoyé du HTML au lieu de JSON:', data.substring(0, 200))
+          return Promise.reject(new Error(message))
+        }
+        
         try {
           parsedData = JSON.parse(data)
         } catch (e) {
-          // Si ce n'est pas du JSON, utiliser la string directement
-          message = data
+          // Si ce n'est pas du JSON, utiliser la string directement (mais limiter la longueur)
+          message = data.length > 200 ? data.substring(0, 200) + '...' : data
           return Promise.reject(new Error(message))
         }
       }
       
-      if (status === 500) {
+      if (status === 503) {
+        // Erreur 503 : Service indisponible (souvent Varnish ou serveur backend down)
+        message = 'Le serveur est temporairement indisponible (503). Veuillez réessayer dans quelques instants. Si le problème persiste, contactez l\'administrateur.'
+        console.error('❌ [503 Error] Le backend est inaccessible. Vérifiez que le serveur PHP est démarré et accessible.')
+      } else if (status === 500) {
         message = parsedData?.message || parsedData?.error || 'Erreur serveur (500). Vérifiez que l\'API est accessible et que la base de données est configurée correctement.'
       } else if (parsedData?.message) {
         message = parsedData.message

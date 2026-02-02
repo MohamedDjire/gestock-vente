@@ -90,6 +90,14 @@
         <span v-if="currencyVariation" class="currency-variation" :class="{ positive: currencyVariation.isPositive, negative: !currencyVariation.isPositive }">
           {{ currencyVariation.isPositive ? '↑' : '↓' }} {{ Math.abs(currencyVariation.value).toFixed(2) }}%
         </span>
+        <button 
+          @click="updateExchangeRates" 
+          class="btn-update-rates"
+          :disabled="updatingRates"
+          title="Mettre à jour les taux de change"
+        >
+          {{ updatingRates ? '⏳' : '🔄' }}
+        </button>
       </div>
       <span class="notif-icon">🔔</span>
       <div class="profile" ref="profileMenuContainer" @click="showProfileMenu = !showProfileMenu">
@@ -195,6 +203,24 @@ provide('selectedCurrency', currencyCode)
 
 const handleCurrencyChange = () => {
   currencyStore.setCurrency(currencyCode.value)
+}
+
+const updatingRates = ref(false)
+const updateExchangeRates = async () => {
+  updatingRates.value = true
+  try {
+    const success = await currencyStore.fetchLatestRates()
+    if (success) {
+      // Afficher une notification de succès (si tu as un système de notifications)
+      console.log('✅ Taux de change mis à jour avec succès')
+    } else {
+      console.warn('⚠️ Impossible de mettre à jour les taux de change')
+    }
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour des taux:', error)
+  } finally {
+    updatingRates.value = false
+  }
 }
 
 function logout() {
@@ -447,6 +473,33 @@ onUnmounted(() => {
   background: #fee2e2;
   color: #991b1b;
 }
+
+.btn-update-rates {
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.btn-update-rates:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #1a5f4a;
+  transform: rotate(180deg);
+}
+
+.btn-update-rates:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .notif-icon {
   font-size: 1.5rem;
   color: #1a5f4a;

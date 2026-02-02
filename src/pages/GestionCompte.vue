@@ -475,9 +475,46 @@
                     <option value="Agent">Agent</option>
                   </select>
                 </div>
-                <div class="form-group">
-                  <label>{{ editingUser ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe *' }}</label>
-                  <input v-model="userForm.password" type="password" :required="!editingUser" />
+                <div v-if="editingUser" class="form-group">
+                  <label>Nouveau mot de passe (optionnel)</label>
+                  <input 
+                    v-model="userForm.password" 
+                    type="password" 
+                    placeholder="Laissez vide pour ne pas modifier le mot de passe"
+                    @input="checkPasswordChange"
+                  />
+                  <small style="display:block;color:#6b7280;margin-top:6px;">
+                    Min 6 caractères, au moins 1 lettre et 1 chiffre. Caractères spéciaux optionnels.
+                  </small>
+                </div>
+                <div v-if="editingUser && userForm.password && userForm.password.trim().length > 0" class="form-group">
+                  <label>
+                    Ancien mot de passe 
+                    <span v-if="editingUser.id_utilisateur === currentUserId" style="color:red;">*</span>
+                    <span v-else style="color:#6b7280;">(optionnel pour admin)</span>
+                  </label>
+                  <input 
+                    v-model="userForm.oldPassword" 
+                    type="password" 
+                    :placeholder="editingUser.id_utilisateur === currentUserId ? 'Entrez votre ancien mot de passe' : 'Optionnel : entrez l\'ancien mot de passe de l\'utilisateur'"
+                    :required="editingUser.id_utilisateur === currentUserId"
+                    :class="{ 'error-input': editingUser.id_utilisateur === currentUserId && userForm.password && userForm.password.trim().length > 0 && !userForm.oldPassword }"
+                  />
+                  <small v-if="editingUser.id_utilisateur === currentUserId" style="display:block;color:#ef4444;margin-top:6px;font-weight:500;">
+                    ⚠️ <strong>Requis</strong> : Vous devez entrer votre ancien mot de passe pour pouvoir le modifier
+                  </small>
+                  <small v-else style="display:block;color:#6b7280;margin-top:6px;">
+                    💡 En tant qu'administrateur, vous pouvez modifier le mot de passe sans connaître l'ancien
+                  </small>
+                </div>
+                <div v-if="!editingUser" class="form-group">
+                  <label>Mot de passe <span style="color:red;">*</span></label>
+                  <input 
+                    v-model="userForm.password" 
+                    type="password" 
+                    placeholder="Entrez le mot de passe"
+                    required
+                  />
                   <small style="display:block;color:#6b7280;margin-top:6px;">
                     Min 6 caractères, au moins 1 lettre et 1 chiffre. Caractères spéciaux optionnels.
                   </small>
@@ -797,6 +834,7 @@ const userForm = ref({
   username: '',
   role: '',
   password: '',
+  oldPassword: '', // Ancien mot de passe requis pour modifier
   telephone: '',
   permissions_entrepots: [],
   permissions_points_vente: [],
@@ -995,6 +1033,7 @@ const openAddUserModal = () => {
     username: '',
     role: '',
     password: '',
+    oldPassword: '', // Pas nécessaire pour la création
     telephone: '',
     photo: '',
     permissions_entrepots: [],
@@ -1013,6 +1052,7 @@ const editUser = (user) => {
     username: user.username || '',
     role: user.role || '',
     password: '',
+    oldPassword: '', // Réinitialiser l'ancien mot de passe
     telephone: user.telephone || '',
     photo: user.photo || '',
     permissions_entrepots: user.permissions_entrepots || [],
@@ -1025,12 +1065,43 @@ const editUser = (user) => {
 const closeUserModal = () => {
   showUserModal.value = false
   editingUser.value = null
+  // Réinitialiser le formulaire
+  userForm.value = {
+    nom: '',
+    prenom: '',
+    email: '',
+    username: '',
+    role: '',
+    password: '',
+    oldPassword: '',
+    telephone: '',
+    permissions_entrepots: [],
+    permissions_points_vente: [],
+    acces_comptabilite: false
+  }
+}
+
+// Fonction pour vérifier si le mot de passe change et rendre oldPassword requis
+const checkPasswordChange = () => {
+  // Cette fonction est appelée quand l'utilisateur tape dans le champ nouveau mot de passe
+  // Le champ oldPassword devient automatiquement requis via :required dans le template
 }
 
 const saveUser = async () => {
   savingUser.value = true
   try {
     if (editingUser.value) {
+      // Vérifier que l'ID utilisateur est valide
+      const userId = editingUser.value.id_utilisateur || editingUser.value.id
+      if (!userId) {
+        console.error('❌ Erreur: ID utilisateur manquant dans editingUser:', editingUser.value)
+        triggerSnackbar('Erreur: ID utilisateur manquant', 'error')
+        savingUser.value = false
+        return
+      }
+      
+      console.log('👤 Modification utilisateur - ID:', userId, 'Email:', editingUser.value.email, 'Username:', editingUser.value.username)
+      
       // Mise à jour
       let updateData = { ...userForm.value };
       if (!updateData.photo || updateData.photo === '') {
@@ -1038,22 +1109,97 @@ const saveUser = async () => {
       }
       // DEBUG : Afficher la valeur de photo envoyée
       console.log('Photo envoyée au backend :', updateData.photo);
-      if (!updateData.password) {
-        delete updateData.password
-      }
-      const response = await apiService.put(`/index.php?action=update&id=${editingUser.value.id_utilisateur}`, updateData)
-      if (response.success) {
-        // Si un nouveau mot de passe est fourni, le réinitialiser via endpoint admin dédié
-        if (userForm.value.password && userForm.value.password.trim().length > 0) {
-          await apiService.put(`/index.php?action=admin_reset_password&id=${editingUser.value.id_utilisateur}`, {
-            new_password: userForm.value.password
-          })
+      
+      // Si un nouveau mot de passe est fourni, le réinitialiser AVANT la mise à jour
+      if (userForm.value.password && userForm.value.password.trim().length > 0) {
+        // Vérifier si c'est l'utilisateur actuel qui change son propre mot de passe
+        const isChangingOwnPassword = userId === currentUserId.value
+        
+        // Si c'est l'utilisateur lui-même qui change son mot de passe, l'ancien mot de passe est requis
+        // Sinon (admin changeant le mot de passe d'un autre), l'ancien mot de passe n'est pas requis
+        if (isChangingOwnPassword) {
+          if (!userForm.value.oldPassword || userForm.value.oldPassword.trim().length === 0) {
+            triggerSnackbar('❌ L\'ancien mot de passe est requis pour modifier votre propre mot de passe', 'error')
+            savingUser.value = false
+            return
+          }
         }
-        triggerSnackbar('Utilisateur modifié avec succès !', 'success')
-        await loadUsers()
-        closeUserModal()
+        
+        console.log('🔐 Réinitialisation du mot de passe pour utilisateur ID:', userId)
+        console.log('🔐 Email de l\'utilisateur:', editingUser.value.email)
+        console.log('🔐 Username de l\'utilisateur:', editingUser.value.username)
+        console.log('🔐 Est-ce le propre mot de passe de l\'utilisateur?', isChangingOwnPassword)
+        console.log('🔐 ID utilisateur actuel:', currentUserId.value)
+        
+        try {
+          const passwordPayload = {
+            new_password: userForm.value.password
+          }
+          
+          // Inclure l'ancien mot de passe seulement si c'est l'utilisateur lui-même
+          if (isChangingOwnPassword && userForm.value.oldPassword) {
+            passwordPayload.old_password = userForm.value.oldPassword
+          }
+          
+          const passwordResponse = await apiService.put(`/index.php?action=admin_reset_password&id=${userId}`, passwordPayload)
+          
+          console.log('📦 Réponse reset password:', passwordResponse)
+          
+          if (!passwordResponse || !passwordResponse.success) {
+            const errorMsg = passwordResponse?.message || passwordResponse?.error || 'Erreur inconnue'
+            console.error('❌ Erreur reset password:', errorMsg)
+            triggerSnackbar('❌ Erreur lors de la modification du mot de passe: ' + errorMsg, 'error')
+            savingUser.value = false
+            return
+          }
+          
+          // Notification de succès spécifique pour le changement de mot de passe
+          console.log('✅ Mot de passe réinitialisé avec succès pour utilisateur ID:', userId)
+          const userDisplayName = editingUser.value.email || editingUser.value.username || 'l\'utilisateur'
+          triggerSnackbar('✅ Mot de passe modifié avec succès pour ' + userDisplayName, 'success')
+          
+          // Recharger la liste des utilisateurs pour refléter les changements
+          await loadUsers()
+          
+          // Fermer le modal après succès
+          closeUserModal()
+          
+          // Arrêter ici car le mot de passe a été modifié avec succès
+          savingUser.value = false
+          return
+          
+        } catch (passwordError) {
+          console.error('❌ Erreur reset password (exception):', passwordError)
+          const errorMsg = passwordError?.response?.data?.message || passwordError?.message || 'Erreur inconnue'
+          triggerSnackbar('❌ Erreur lors de la modification du mot de passe: ' + errorMsg, 'error')
+          savingUser.value = false
+          return
+        }
+      }
+      
+      // IMPORTANT: Retirer explicitement le champ password de updateData
+      // pour éviter qu'il soit envoyé à l'API update (même si l'API l'ignore)
+      delete updateData.password
+      delete updateData.mot_de_passe
+      delete updateData.oldPassword
+      
+      console.log('📝 Mise à jour des données utilisateur ID:', userId)
+      console.log('📝 Données envoyées (sans password):', JSON.stringify(updateData, null, 2))
+      
+      // Ensuite, mettre à jour les autres données utilisateur (si d'autres champs ont été modifiés)
+      const response = await apiService.put(`/index.php?action=update&id=${userId}`, updateData)
+      if (response.success) {
+        // Si le mot de passe a été modifié, on a déjà affiché une notification spécifique et fermé le modal
+        if (!(userForm.value.password && userForm.value.password.trim().length > 0)) {
+          triggerSnackbar('✅ Utilisateur modifié avec succès !', 'success')
+          // Recharger la liste des utilisateurs pour refléter les changements
+          await loadUsers()
+          // Fermer le modal
+          closeUserModal()
+        }
+        // Si le mot de passe a été modifié, le modal a déjà été fermé plus haut
       } else {
-        triggerSnackbar('Erreur lors de la modification', 'error')
+        triggerSnackbar('❌ Erreur lors de la modification: ' + (response.message || 'Erreur inconnue'), 'error')
       }
     } else {
       // Création
@@ -1776,6 +1922,17 @@ onMounted(async () => {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input.error-input {
+  border-color: #ef4444 !important;
+  border-width: 2px;
+}
+
+.form-group input.error-input:focus {
+  outline-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
 }
 
 .modal-hint {
