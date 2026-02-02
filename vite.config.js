@@ -86,6 +86,24 @@ export default defineConfig({
     proxy: {
       // /api-stock est géré par le plugin api-stock-proxy (middleware avec fetch + redirect: 'follow')
       // pour éviter que le navigateur reçoive une 302 vers aliadjame.com (CORS).
+      
+      '/api-stock/login.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+        // Pas de rewrite ici pour éviter /login.php/login.php
+      },
+      '/register.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api-stock': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+        rewrite: path => path.replace(/^\/api-stock/, ''),
+      },
       '/api_compta_ecritures.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,
@@ -179,7 +197,12 @@ export default defineConfig({
             console.log(`[Vite Proxy Response] ${req.url} -> Status: ${proxyRes.statusCode}`)
           })
         }
-      }
+      },
+      '/clients.php': {
+        target: 'https://aliadjame.com/api-stock',
+        changeOrigin: true,
+        secure: false,
+      },
     }
   }
 });

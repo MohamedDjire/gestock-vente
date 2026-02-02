@@ -1607,63 +1607,64 @@ const exportEntrepotPDF = async (entrepot) => {
       const products = response.data || []
       const doc = new jsPDF()
 
-      // Header chic : logo rond + nom entreprise + fond
+      // Header chic amélioré : logo rond + nom entreprise + fond dégradé
       doc.setFillColor(26, 95, 74)
-      doc.roundedRect(0, 0, 210, 30, 0, 0, 'F')
-      doc.setFillColor(255, 255, 255)
-      doc.circle(22, 15, 8, 'F')
-      doc.setTextColor(26, 95, 74)
-      doc.setFontSize(13)
+      doc.roundedRect(0, 0, 210, 32, 0, 0, 'F')
+      doc.setFillColor(255,255,255)
+      doc.circle(22, 16, 8, 'F')
+      doc.setTextColor(26,95,74)
+      doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.text('PS', 18, 18)
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(15)
-      const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l\'entreprise'
-      doc.text(entrepriseNom, 210 - 14, 18, { align: 'right' })
-
-      // Titre centré
+      doc.text('PS', 18, 20)
+      doc.setTextColor(255,255,255)
       doc.setFontSize(16)
-      doc.setTextColor(30, 30, 30)
-      doc.setFont('helvetica', 'bold')
-      doc.text(`Produits - ${entrepot.nom_entrepot}`, 105, 32, { align: 'center' })
+      const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l\'entreprise'
+      doc.text(entrepriseNom, 210-14, 20, { align: 'right' })
 
-      // Bloc statistiques
+      // Titre centré, police plus grande
+      doc.setFontSize(18)
+      doc.setTextColor(30,30,30)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Produits - ${entrepot.nom_entrepot}`, 105, 36, { align: 'center' })
+
+      // Bloc statistiques stylé
       const total = products.length
       const enStock = products.filter(p => p.quantite_stock > 0).length
       const enRupture = products.filter(p => p.quantite_stock === 0).length
       const enAlerte = products.filter(p => p.quantite_stock > 0 && p.quantite_stock <= p.seuil_minimum).length
       doc.setFontSize(11)
-      doc.setTextColor(60, 60, 60)
+      doc.setTextColor(60,60,60)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Total : ${total}   |   En stock : ${enStock}   |   En rupture : ${enRupture}   |   En alerte : ${enAlerte}`, 105, 42, { align: 'center' })
+      doc.text(`Total : ${total}   |   En stock : ${enStock}   |   En rupture : ${enRupture}   |   En alerte : ${enAlerte}`, 105, 44, { align: 'center' })
 
-      // Tableau
+      // Tableau harmonisé
       const rows = products.map(p => [
         p.code_produit,
         p.nom,
-        formatCurrency(p.prix_achat),
-        formatCurrency(p.prix_vente),
-        p.quantite_stock.toString(),
-        formatCurrency(p.valeur_stock_achat || 0),
-        formatCurrency(p.valeur_stock_vente || 0)
+        typeof p.prix_achat === 'number' ? p.prix_achat.toLocaleString() + ' FCFA' : String(p.prix_achat),
+        typeof p.prix_vente === 'number' ? p.prix_vente.toLocaleString() + ' FCFA' : String(p.prix_vente),
+        String(p.quantite_stock),
+        typeof p.valeur_stock_achat === 'number' ? p.valeur_stock_achat.toLocaleString() + ' FCFA' : String(p.valeur_stock_achat || 0),
+        typeof p.valeur_stock_vente === 'number' ? p.valeur_stock_vente.toLocaleString() + ' FCFA' : String(p.valeur_stock_vente || 0)
       ])
       
       autoTable(doc, {
         head: [['Code', 'Nom', 'Prix Achat', 'Prix Vente', 'Stock', 'Valeur (Achat)', 'Valeur (Vente)']],
         body: rows,
-        startY: 48,
+        startY: 50,
         theme: 'grid',
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [26, 95, 74] },
+        styles: { fontSize: 10, cellPadding: 2, lineColor: [26, 95, 74], lineWidth: 0.2 },
+        headStyles: { fillColor: [26, 95, 74], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [240, 248, 245] },
         margin: { left: 14, right: 14 }
       })
 
-      // Pied de page
+      // Pied de page stylé
       const pageCount = doc.internal.getNumberOfPages()
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         doc.setFontSize(9)
-        doc.setTextColor(120, 120, 120)
+        doc.setTextColor(120,120,120)
         doc.text('ProStock - Export PDF', 14, 290)
         doc.text(`Page ${i} / ${pageCount}`, 200, 290, { align: 'right' })
         doc.text(new Date().toLocaleDateString(), 105, 290, { align: 'center' })

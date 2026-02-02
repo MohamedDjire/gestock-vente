@@ -155,7 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      const response = await apiService.post('/login.php', {
+      const response = await apiService.post('/api-stock/index.php?action=login', {
         email,
         password
       })

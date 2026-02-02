@@ -1412,8 +1412,8 @@ const closeValidationModal = () => {
 const loadClients = async () => {
   loadingClients.value = true
   try {
-    // Utiliser apiClient comme dans Clients.vue pour avoir la même structure de réponse
-    const res = await apiClient.get('/clients.php')
+    // Utiliser apiService pour avoir la même structure de réponse
+    const res = await apiService.get('/clients.php')
     console.log('📋 [Ventes] Réponse API clients complète:', res)
     console.log('📋 [Ventes] res.data:', res?.data)
     console.log('📋 [Ventes] res.data est tableau?:', Array.isArray(res?.data))
@@ -1774,8 +1774,17 @@ const processSale = async () => {
           nom_client: cart.value[0]?.client_nom || null,
           piece_jointe: urlPieceJointe
         }
-        await apiCompta.addEcriture(ecriture)
-        console.log('Écriture comptable créée avec succès')
+        const apiRes = await apiCompta.addEcriture(ecriture)
+        console.log('[DEBUG API COMPTA] Réponse:', apiRes)
+        if (apiRes && apiRes.success) {
+          console.log('Écriture comptable créée avec succès, id:', apiRes.id)
+        } else {
+          console.error('Échec création écriture comptable:', apiRes)
+        }
+        // Rafraîchir la comptabilité si la fonction est disponible
+        if (typeof window !== 'undefined' && typeof window.reloadComptabilite === 'function') {
+          window.reloadComptabilite();
+        }
       } catch (err) {
         console.error('Erreur lors de la création de l\'écriture comptable:', err)
       }

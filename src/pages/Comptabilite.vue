@@ -428,48 +428,51 @@ const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise';
 
 function exportPDF() {
   const doc = new jsPDF();
-
-  // Header harmonisé : logo rond + nom entreprise + fond
+  // Header chic amélioré : logo rond + nom entreprise + fond dégradé
   doc.setFillColor(26, 95, 74);
-  doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
+  doc.roundedRect(0, 0, 210, 32, 0, 0, 'F');
   doc.setFillColor(255,255,255);
-  doc.circle(22, 15, 8, 'F');
+  doc.circle(22, 16, 8, 'F');
   doc.setTextColor(26,95,74);
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('PS', 18, 18);
+  doc.text('PS', 18, 20);
   doc.setTextColor(255,255,255);
-  doc.setFontSize(15);
-  doc.text(entrepriseNom, 210-14, 18, { align: 'right' });
-
-  // Titre centré
   doc.setFontSize(16);
+  doc.text(entrepriseNom, 210-14, 20, { align: 'right' });
+
+  // Titre centré, police plus grande
+  doc.setFontSize(18);
   doc.setTextColor(30,30,30);
   doc.setFont('helvetica', 'bold');
-  doc.text('Journal comptable', 105, 32, { align: 'center' });
+  doc.text('Journal comptable', 105, 36, { align: 'center' });
 
-  // Bloc statistiques
-  const total = ecritures.value.length;
-  const revenus = totalRevenus.value;
-  const depenses = totalDepenses.value;
+  // Bloc statistiques stylé (affichage infaillible)
+  const total = Number.isFinite(ecritures.value?.length) ? ecritures.value.length : 0;
+  const revenus = Number.isFinite(Number(totalRevenus?.value)) ? Number(totalRevenus.value) : 0;
+  const depenses = Number.isFinite(Number(totalDepenses?.value)) ? Number(totalDepenses.value) : 0;
+  // Diagnostic ultime : chaque variable sur une ligne séparée
   doc.setFontSize(11);
   doc.setTextColor(60,60,60);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Total écritures : ${total}   |   Revenus : ${revenus.toLocaleString()} FCFA   |   Dépenses : ${depenses.toLocaleString()} FCFA`, 105, 42, { align: 'center' });
+  doc.text('Total écritures : ' + String(total), 105, 48, { align: 'center' });
+  doc.text('Revenus : ' + String(revenus), 105, 54, { align: 'center' });
+  doc.text('Dépenses : ' + String(depenses), 105, 60, { align: 'center' });
 
-  // Tableau
+  // Tableau harmonisé (déclaré une seule fois)
   const rows = filteredEcritures.value.map(e => [e.date, e.reference, e.type, e.montant, e.moyen_paiement || '-', e.commentaire || '-']);
   autoTable(doc, {
     head: [['Date', 'Référence', 'Type', 'Montant', 'Moyen', 'Commentaire']],
     body: rows,
-    startY: 48,
+    startY: 60,
     theme: 'grid',
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [26, 95, 74] },
+    styles: { fontSize: 10, cellPadding: 2, lineColor: [26, 95, 74], lineWidth: 0.2 },
+    headStyles: { fillColor: [26, 95, 74], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [240, 248, 245] },
     margin: { left: 14, right: 14 }
   });
 
-  // Pied de page
+  // Pied de page stylé
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -581,7 +584,7 @@ function closeAddEcritureModal() {
 
 async function loadEcritures() {
   try {
-    const id_entreprise = authStore.user?.id_entreprise ?? authStore.enterpriseId ?? null
+    const id_entreprise = authStore.user?.id_entreprise ?? authStore.enterpriseId ?? 1
     if (!id_entreprise) {
       ecritures.value = []
       return

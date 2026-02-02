@@ -265,53 +265,49 @@ function exportExcel() {
 
 function exportPDF() {
   const doc = new jsPDF();
-
-  // Header chic : logo rond + nom entreprise + fond
+  // Header chic harmonisé : logo rond + nom entreprise + fond vert
   doc.setFillColor(26, 95, 74);
-  doc.roundedRect(0, 0, 210, 30, 0, 0, 'F');
+  doc.roundedRect(0, 0, 210, 32, 0, 0, 'F');
   doc.setFillColor(255,255,255);
-  doc.circle(22, 15, 8, 'F');
+  doc.circle(22, 16, 8, 'F');
   doc.setTextColor(26,95,74);
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('PS', 18, 18);
+  doc.text('PS', 18, 20);
   doc.setTextColor(255,255,255);
-  doc.setFontSize(15);
-  doc.text(entrepriseNom, 210-14, 18, { align: 'right' });
-
-  // Titre centré
   doc.setFontSize(16);
-  doc.setTextColor(26,95,74);
+  doc.text(entrepriseNom, 210-14, 20, { align: 'right' });
+
+  // Titre centré, police plus grande
+  doc.setFontSize(18);
+  doc.setTextColor(30,30,30);
   doc.setFont('helvetica', 'bold');
-  doc.text('Journal des mouvements', 105, 38, { align: 'center' });
+  doc.text('Journal des mouvements', 105, 36, { align: 'center' });
 
-  // Bloc stats
+  // Bloc statistiques stylé
   const total = filteredJournalEntries.value.length;
-  doc.setFillColor(240, 253, 244);
-  doc.roundedRect(40, 44, 130, 12, 4, 4, 'F');
   doc.setFontSize(11);
-  doc.setTextColor(26,95,74);
-  doc.text(`Total mouvements : ${total}`, 105, 52, { align: 'center' });
+  doc.setTextColor(60,60,60);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Total mouvements : ${total}`, 105, 44, { align: 'center' });
 
-  // Tableau stylé
+  // Tableau harmonisé
   const rows = filteredJournalEntries.value.map(e => [e.date, e.user, e.action, e.details]);
   autoTable(doc, {
     head: [['Date', 'Utilisateur', 'Action', 'Détails']],
     body: rows,
-    startY: 60,
-    theme: 'striped',
-    styles: { fontSize: 10, cellPadding: 2 },
+    startY: 50,
+    theme: 'grid',
+    styles: { fontSize: 10, cellPadding: 2, lineColor: [26, 95, 74], lineWidth: 0.2 },
     headStyles: { fillColor: [26, 95, 74], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [240, 253, 244] },
+    alternateRowStyles: { fillColor: [240, 248, 245] },
     margin: { left: 14, right: 14 }
   });
 
-  // Pied de page chic
+  // Pied de page stylé
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setDrawColor(220);
-    doc.line(14, 285, 196, 285);
     doc.setFontSize(9);
     doc.setTextColor(120,120,120);
     doc.text('ProStock - Export PDF', 14, 290);

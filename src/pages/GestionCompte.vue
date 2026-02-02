@@ -1035,7 +1035,7 @@ const loadUsers = async () => {
   try {
     const user = localStorage.getItem('prostock_user')
     const id_entreprise = user ? JSON.parse(user).id_entreprise : null
-    const response = await apiService.get(`/index.php?action=all&id_entreprise=${id_entreprise}`)
+    const response = await apiService.get(`/index.php?action=all&enterprise_id=${id_entreprise}`)
     if (response.success) {
       users.value = response.data || []
     }
