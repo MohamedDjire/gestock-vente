@@ -1,13 +1,7 @@
 <?php
-// Autoriser CORS pour le développement local (toujours AVANT tout output)
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-  http_response_code(200);
-  exit;
-}
-// API de gestion des écritures comptables
+require_once __DIR__ . '/cors.php';
+header('Content-Type: application/json');
+// API de gestion des écritures comptables - isolée par entreprise
 // Endpoint: /api_compta_ecritures.php
 require_once 'config.php';
 $dbPath = __DIR__ . '/config/database.php';
@@ -49,6 +43,37 @@ try {
     exit;
 }
 
+// =====================================================
+// AUTHENTIFICATION - chaque entreprise ne voit que ses écritures
+// =====================================================
+$middlewareFile = __DIR__ . '/middleware_auth.php';
+if (!file_exists($middlewareFile)) {
+    $middlewareFile = __DIR__ . '/functions/middleware_auth.php';
+}
+if (!file_exists($middlewareFile)) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Middleware d\'authentification introuvable']);
+    exit;
+}
+require_once $middlewareFile;
+if (!function_exists('authenticateAndAuthorize')) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Authentification non disponible']);
+    exit;
+}
+try {
+    $currentUser = authenticateAndAuthorize($bdd);
+    $enterpriseId = (int)($currentUser['enterprise_id'] ?? $currentUser['user_enterprise_id'] ?? 0);
+} catch (Exception $e) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Non autorisé', 'error' => $e->getMessage()]);
+    exit;
+}
+if ($enterpriseId <= 0) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Entreprise non identifiée']);
+    exit;
+}
 
 header('Content-Type: application/json');
 
@@ -62,12 +87,10 @@ $fields = [
 
 switch ($method) {
   case 'GET':
-    $id_entreprise = $_GET['id_entreprise'] ?? null;
-    $sql = $id_entreprise ?
-      "SELECT * FROM stock_compta_ecritures WHERE id_entreprise = :id_entreprise ORDER BY date_ecriture DESC" :
-      "SELECT * FROM stock_compta_ecritures ORDER BY date_ecriture DESC";
+    // Toujours filtrer par l'entreprise de l'utilisateur connecté (ignorer id_entreprise du client pour la sécurité)
+    $sql = "SELECT * FROM stock_compta_ecritures WHERE id_entreprise = :id_entreprise ORDER BY date_ecriture DESC";
     $stmt = $bdd->prepare($sql);
-    if ($id_entreprise) $stmt->bindParam(':id_entreprise', $id_entreprise, PDO::PARAM_INT);
+    $stmt->bindParam(':id_entreprise', $enterpriseId, PDO::PARAM_INT);
     $stmt->execute();
     $ecritures = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode($ecritures);
@@ -75,15 +98,16 @@ switch ($method) {
 
   case 'POST':
     $data = json_decode(file_get_contents('php://input'), true);
-    // Suppression via POST/action=delete
+    // Suppression via POST/action=delete - vérifier que l'écriture appartient à l'entreprise
     if (isset($data['action']) && $data['action'] === 'delete' && !empty($data['id_compta'])) {
-      $id = $data['id_compta'];
-      $sql = "DELETE FROM stock_compta_ecritures WHERE id_compta = :id_compta";
-      $stmt = $bdd->prepare($sql);
-      $stmt->execute(['id_compta' => $id]);
+      $id = (int)$data['id_compta'];
+      $stmt = $bdd->prepare("DELETE FROM stock_compta_ecritures WHERE id_compta = :id_compta AND id_entreprise = :id_entreprise");
+      $stmt->execute(['id_compta' => $id, 'id_entreprise' => $enterpriseId]);
       echo json_encode(['success' => true, 'deleted_id' => $id]);
       break;
     }
+    // Forcer id_entreprise à l'entreprise de l'utilisateur connecté
+    $data['id_entreprise'] = $enterpriseId;
     // Mapping automatique des champs frontend vers backend
     if (isset($data['date']) && empty($data['date_ecriture'])) {
       $data['date_ecriture'] = $data['date'];
@@ -133,6 +157,7 @@ switch ($method) {
       echo json_encode(['error' => 'id_compta manquant']);
       exit;
     }
+    $data['id_entreprise'] = $enterpriseId;
     $params = [];
     foreach ($fields as $f) {
       $params[$f] = isset($data[$f]) ? $data[$f] : null;
@@ -140,7 +165,8 @@ switch ($method) {
     $params['id_compta'] = $data['id_compta'];
     $sql = "UPDATE stock_compta_ecritures SET ";
     $sql .= implode(", ", array_map(function($f){return "$f=:$f";}, array_keys($params)));
-    $sql .= " WHERE id_compta=:id_compta";
+    $sql .= " WHERE id_compta=:id_compta AND id_entreprise=:id_entreprise";
+    $params['id_entreprise'] = $enterpriseId;
     $stmt = $bdd->prepare($sql);
     $stmt->execute($params);
     echo json_encode(['success' => true]);
@@ -156,9 +182,9 @@ switch ($method) {
       echo json_encode(['error' => 'id_compta manquant']);
       exit;
     }
-    $sql = "DELETE FROM stock_compta_ecritures WHERE id_compta = :id_compta";
+    $sql = "DELETE FROM stock_compta_ecritures WHERE id_compta = :id_compta AND id_entreprise = :id_entreprise";
     $stmt = $bdd->prepare($sql);
-    $stmt->execute(['id_compta' => $id]);
+    $stmt->execute(['id_compta' => (int)$id, 'id_entreprise' => $enterpriseId]);
     echo json_encode(['success' => true]);
     break;
 

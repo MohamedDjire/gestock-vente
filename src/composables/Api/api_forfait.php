@@ -1,30 +1,30 @@
 <?php
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowed = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'https://aliadjame.com'
+];
+if (in_array($origin, $allowed)) {
+    header("Access-Control-Allow-Origin: $origin");
+}
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Requested-With");
+header("Access-Control-Allow-Credentials: true");
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 /**
  * API Forfait - Gestion des forfaits et abonnements
  * Endpoint: /api-stock/api_forfait.php
  */
-
-// Désactiver l'affichage des erreurs pour éviter qu'elles polluent la réponse JSON
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
-
-// Headers CORS - DOIT être défini avant toute sortie
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Max-Age: 86400');
 header('Content-Type: application/json; charset=utf-8');
-
-// Initialiser l'action dès le début pour éviter les warnings
 $action = $_GET['action'] ?? '';
-
-// Répondre immédiatement aux requêtes OPTIONS (préflight) - AVANT TOUT AUTRE TRAITEMENT
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit(0);
-}
 
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
@@ -472,12 +472,7 @@ try {
     }
     
 } catch (Exception $e) {
-    // S'assurer que les en-têtes CORS sont toujours envoyés même en cas d'erreur
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
     header('Content-Type: application/json; charset=utf-8');
-    
     http_response_code(500);
     echo json_encode([
         'success' => false,

@@ -1,33 +1,16 @@
 <?php
+require_once __DIR__ . '/cors.php';
 /**
  * API Stock Produit - Version simplifiée pour diagnostic
  * Endpoint: /api-stock/api_produit_simple.php
  */
-
-// ENVOYER LES HEADERS CORS EN PREMIER (même avant les erreurs)
-@header('Access-Control-Allow-Origin: *');
-@header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-@header('Access-Control-Allow-Headers: Content-Type, Authorization');
-@header('Content-Type: application/json');
-
-// Répondre immédiatement aux requêtes OPTIONS
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    @http_response_code(200);
-    exit;
-}
-
-// Désactiver l'affichage des erreurs
+header('Content-Type: application/json');
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
 error_reporting(0);
-
-// Fonction pour envoyer une erreur avec CORS
 function sendError($message, $code = 500) {
-    @header('Access-Control-Allow-Origin: *');
-    @header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    @header('Access-Control-Allow-Headers: Content-Type, Authorization');
-    @header('Content-Type: application/json');
-    @http_response_code($code);
+    header('Content-Type: application/json');
+    http_response_code($code);
     echo json_encode(['success' => false, 'message' => $message], JSON_UNESCAPED_UNICODE);
     exit;
 }

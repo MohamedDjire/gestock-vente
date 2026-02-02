@@ -285,19 +285,22 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Sauvegarder les données d'authentification
+   * Nettoie le forfait stocké pour forcer un rechargement lié à la nouvelle entreprise.
    */
   function setAuthData(authToken, userData) {
     token.value = authToken
     user.value = userData
-    
-    // Sauvegarder dans localStorage
+
+    // Ne pas garder le forfait d'une autre entreprise / session
+    removeLocalStorage('forfait_status')
+    removeLocalStorage('forfait_last_check')
+
     localStorage.setItem('prostock_token', authToken)
     localStorage.setItem('prostock_user', JSON.stringify(userData))
-    
-    // Calculer et sauvegarder la date d'expiration depuis le JWT
+
     const payload = decodeJWT(authToken)
     if (payload && payload.exp) {
-      const expiresAt = payload.exp * 1000 // Convertir en millisecondes
+      const expiresAt = payload.exp * 1000
       localStorage.setItem('prostock_expires_at', expiresAt.toString())
     }
   }

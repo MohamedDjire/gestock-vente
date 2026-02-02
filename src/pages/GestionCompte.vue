@@ -164,6 +164,14 @@
             <h3 class="entreprise-title">{{ entreprise.nom || '—' }}</h3>
             <div class="entreprise-section">
               <h4 class="entreprise-section-title">Identité</h4>
+              <div class="entreprise-field entreprise-code-field" v-if="entreprise.slug">
+                <span class="entreprise-label">Code entreprise (pour les agents)</span>
+                <span class="entreprise-value code-value">
+                  <strong>{{ entreprise.slug }}</strong>
+                  <button type="button" class="btn-copy-code" @click="copyCodeEntreprise(entreprise.slug)" title="Copier le code">📋 Copier</button>
+                </span>
+              </div>
+              <p class="code-entreprise-hint" v-if="entreprise.slug">Donnez ce code à 8 caractères aux agents pour qu'ils s'inscrivent et soient rattachés à votre entreprise. Ne le communiquez qu'aux personnes autorisées.</p>
               <div class="entreprise-field"><span class="entreprise-label">Sigle</span><span class="entreprise-value">{{ entreprise.sigle || '—' }}</span></div>
               <div class="entreprise-field"><span class="entreprise-label">Numéro d'identification</span><span class="entreprise-value">{{ entreprise.num || '—' }}</span></div>
               <div class="entreprise-field"><span class="entreprise-label">NCC</span><span class="entreprise-value">{{ entreprise.ncc || '—' }}</span></div>
@@ -634,7 +642,7 @@ import { useCurrency } from '../composables/useCurrency.js'
             // Onglet Entreprise — Paramètres de l'entreprise
             const entreprise = ref({
               nom: '', adresse: '', devise: '', sigle: '', num: '', ncc: '', num_banque: '',
-              email: '', telephone: '', site_web: '', logo: ''
+              email: '', telephone: '', site_web: '', logo: '', slug: ''
             })
             const loadingEntreprise = ref(false)
             const savingEntreprise = ref(false)
@@ -666,7 +674,8 @@ import { useCurrency } from '../composables/useCurrency.js'
                     email: data.email || '',
                     telephone: data.telephone || '',
                     site_web: data.site_web || '',
-                    logo: data.logo || ''
+                    logo: data.logo || '',
+                    slug: data.slug || ''
                   }
                 }
               } catch (e) {
@@ -726,6 +735,20 @@ import { useCurrency } from '../composables/useCurrency.js'
               }
             }
 
+            function copyCodeEntreprise(code) {
+              if (!code) return
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => triggerSnackbar('Code copié dans le presse-papier', 'success')).catch(() => {})
+              } else {
+                const ta = document.createElement('textarea')
+                ta.value = code
+                document.body.appendChild(ta)
+                ta.select()
+                document.execCommand('copy')
+                document.body.removeChild(ta)
+                triggerSnackbar('Code copié', 'success')
+              }
+            }
             onMounted(() => { loadEntreprise() })
             const uploadingPhoto = ref(false)
             const photoError = ref('')
@@ -1865,6 +1888,12 @@ onMounted(async () => {
 .entreprise-field { display: flex; justify-content: space-between; gap: 1rem; padding: 0.35rem 0; font-size: 0.95rem; }
 .entreprise-label { color: #64748b; }
 .entreprise-value { font-weight: 500; color: #1e293b; }
+.entreprise-code-field { align-items: center; }
+.entreprise-code-field .code-value { display: flex; align-items: center; gap: 0.75rem; }
+.entreprise-code-field .code-value strong { letter-spacing: 0.15em; font-size: 1.1rem; color: #1a5f4a; }
+.btn-copy-code { padding: 0.35rem 0.75rem; font-size: 0.85rem; background: #1a5f4a; color: #fff; border: none; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btn-copy-code:hover { background: #14503d; }
+.code-entreprise-hint { margin: 0 0 0.75rem 0; font-size: 0.85rem; color: #64748b; line-height: 1.4; }
 
 .action-buttons {
   display: flex;

@@ -17,111 +17,114 @@
           <p class="auth-subtitle">Bienvenue sur ProStock - Créons votre compte</p>
         </div>
 
-        <!-- Sign Up Form -->
-        <form @submit.prevent="handleSignUp" class="auth-form">
+        <!-- Étape 0 : Choix du type de compte -->
+        <div v-if="step === 0" class="auth-form">
+          <p class="step-label">Vous êtes :</p>
+          <div class="role-choice">
+            <button type="button" class="role-btn" :class="{ active: formData.role === 'Agent' }" @click="formData.role = 'Agent'">
+              <span class="role-icon">👤</span>
+              <span class="role-name">Agent</span>
+              <span class="role-desc">J'ai reçu un ID entreprise de mon administrateur</span>
+            </button>
+            <button type="button" class="role-btn" :class="{ active: formData.role === 'Admin' }" @click="formData.role = 'Admin'">
+              <span class="role-icon">⚙️</span>
+              <span class="role-name">Administrateur</span>
+              <span class="role-desc">Je crée le compte de mon entreprise</span>
+            </button>
+          </div>
+          <button type="button" class="auth-button" @click="step = 1">
+            Continuer
+          </button>
+        </div>
+
+        <!-- Étape 1 : Formulaire utilisateur (Agent ou Admin) -->
+        <form v-else-if="step === 1" @submit.prevent="goStep2OrSubmit" class="auth-form">
           <div class="form-group">
             <label for="nom">Nom</label>
-            <input
-              id="nom"
-              v-model="formData.nom"
-              type="text"
-              placeholder="Entrez votre nom"
-              required
-              class="form-input"
-            />
+            <input id="nom" v-model="formData.nom" type="text" placeholder="Entrez votre nom" required class="form-input" />
           </div>
-
           <div class="form-group">
             <label for="prenom">Prénom</label>
-            <input
-              id="prenom"
-              v-model="formData.prenom"
-              type="text"
-              placeholder="Entrez votre prénom"
-              required
-              class="form-input"
-            />
+            <input id="prenom" v-model="formData.prenom" type="text" placeholder="Entrez votre prénom" required class="form-input" />
           </div>
-
           <div class="form-group">
             <label for="username">Nom d'utilisateur</label>
-            <input
-              id="username"
-              v-model="formData.username"
-              type="text"
-              placeholder="Choisissez un nom d'utilisateur"
-              required
-              class="form-input"
-            />
+            <input id="username" v-model="formData.username" type="text" placeholder="Choisissez un nom d'utilisateur" required class="form-input" />
           </div>
-
           <div class="form-group">
             <label for="email">Email</label>
-            <input
-              id="email"
-              v-model="formData.email"
-              type="email"
-              placeholder="Entrez votre email"
-              required
-              class="form-input"
-            />
+            <input id="email" v-model="formData.email" type="email" placeholder="Entrez votre email" required class="form-input" />
           </div>
-
           <div class="form-group">
             <label for="telephone">Téléphone (optionnel)</label>
-            <input
-              id="telephone"
-              v-model="formData.telephone"
-              type="tel"
-              placeholder="Entrez votre numéro de téléphone"
-              class="form-input"
-            />
+            <input id="telephone" v-model="formData.telephone" type="tel" placeholder="Entrez votre numéro de téléphone" class="form-input" />
           </div>
-
-          <div class="form-group">
-            <label for="id_entreprise">ID Entreprise <span class="required">*</span></label>
+          <!-- Code entreprise : uniquement pour les agents (Admin : généré automatiquement à la création) -->
+          <div v-if="formData.role === 'Agent'" class="form-group">
+            <label for="code_entreprise">Code entreprise <span class="required">*</span></label>
             <input
-              id="id_entreprise"
-              v-model.number="formData.id_entreprise"
-              type="number"
-              placeholder="Entrez l'ID de l'entreprise"
+              id="code_entreprise"
+              v-model.trim="formData.code_entreprise"
+              type="text"
+              placeholder="8 caractères (ex: KXM7NPQR)"
               required
+              maxlength="8"
               class="form-input"
+              style="text-transform: uppercase; letter-spacing: 0.1em;"
             />
-            <small class="form-hint">Contactez l'administrateur pour obtenir un ID entreprise</small>
+            <small class="form-hint">Code à 8 caractères (lettres et chiffres), fourni par l'administrateur. Il vous dirige vers votre entreprise.</small>
           </div>
-
           <div class="form-group">
             <label for="password">Mot de passe</label>
-            <input
-              id="password"
-              v-model="formData.password"
-              type="password"
-              placeholder="Créez un mot de passe"
-              required
-              class="form-input"
-            />
+            <input id="password" v-model="formData.password" type="password" placeholder="Créez un mot de passe" required class="form-input" />
           </div>
-
           <div class="form-group">
             <label for="confirmPassword">Confirmer le mot de passe</label>
-            <input
-              id="confirmPassword"
-              v-model="formData.confirmPassword"
-              type="password"
-              placeholder="Confirmez votre mot de passe"
-              required
-              class="form-input"
-            />
+            <input id="confirmPassword" v-model="formData.confirmPassword" type="password" placeholder="Confirmez votre mot de passe" required class="form-input" />
           </div>
-
-          <div v-if="localError || authStore.error" class="error-message">
-            {{ localError || authStore.error }}
+          <div v-if="localError || authStore.error" class="error-message">{{ localError || authStore.error }}</div>
+          <div class="form-actions">
+            <button type="button" class="auth-button secondary" @click="step = 0">Retour</button>
+            <button type="submit" class="auth-button" :disabled="loading">
+              {{ formData.role === 'Admin' ? 'Suivant – Informations entreprise' : "S'inscrire" }}
+            </button>
           </div>
+        </form>
 
-          <button type="submit" class="auth-button" :disabled="loading">
-            {{ loading ? 'Création du compte...' : "S'inscrire" }}
-          </button>
+        <!-- Étape 2 : Informations entreprise (Admin uniquement) -->
+        <form v-else-if="step === 2" @submit.prevent="handleSignUp" class="auth-form">
+          <p class="step-label">Informations de votre entreprise</p>
+          <div class="form-group">
+            <label for="nom_entreprise">Nom de l'entreprise <span class="required">*</span></label>
+            <input id="nom_entreprise" v-model="formData.nom_entreprise" type="text" placeholder="Ex: Ma Société SARL" required class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="sigle">Sigle (optionnel)</label>
+            <input id="sigle" v-model="formData.sigle" type="text" placeholder="Ex: MS" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="email_entreprise">Email entreprise (optionnel)</label>
+            <input id="email_entreprise" v-model="formData.email_entreprise" type="email" placeholder="contact@entreprise.com" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="telephone_entreprise">Téléphone entreprise (optionnel)</label>
+            <input id="telephone_entreprise" v-model="formData.telephone_entreprise" type="tel" placeholder="+33 1 23 45 67 89" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="adresse">Adresse (optionnel)</label>
+            <input id="adresse" v-model="formData.adresse" type="text" placeholder="Adresse postale" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="ville">Ville (optionnel)</label>
+            <input id="ville" v-model="formData.ville" type="text" placeholder="Ville" class="form-input" />
+          </div>
+          <div v-if="localError || authStore.error" class="error-message">{{ localError || authStore.error }}</div>
+          <div class="form-actions">
+            <button type="button" class="auth-button secondary" @click="step = 1">Retour</button>
+            <button type="submit" class="auth-button" :disabled="loading">
+              {{ loading ? 'Création du compte...' : "S'inscrire" }}
+            </button>
+          </div>
         </form>
 
         <!-- Log In Link -->
@@ -201,91 +204,128 @@ const router = useRouter()
 const authStore = useAuthStore()
 const { signUp, loading } = authStore
 
-// Créer une référence locale pour les erreurs du formulaire
+const step = ref(0)
 const localError = ref('')
 
 const formData = ref({
+  role: 'Agent', // 'Agent' | 'Admin'
   nom: '',
   prenom: '',
   username: '',
   email: '',
   telephone: '',
-  id_entreprise: null,
+  code_entreprise: '',
   password: '',
-  confirmPassword: ''
+  confirmPassword: '',
+  // Entreprise (Admin uniquement)
+  nom_entreprise: '',
+  sigle: '',
+  email_entreprise: '',
+  telephone_entreprise: '',
+  adresse: '',
+  ville: ''
 })
 
-const handleSignUp = async () => {
-  // Réinitialiser les erreurs
-  localError.value = ''
-  authStore.error = null
-  
-  // Nettoyer le localStorage avant l'inscription pour éviter les conflits
-  localStorage.removeItem('prostock_token')
-  localStorage.removeItem('prostock_user')
-  localStorage.removeItem('prostock_expires_at')
-  
-  console.log('📝 Tentative d\'inscription avec email:', formData.value.email)
-  
-  // Vérifier que les mots de passe correspondent
+function validatePassword() {
+  const password = formData.value.password
   if (formData.value.password !== formData.value.confirmPassword) {
     localError.value = 'Les mots de passe ne correspondent pas'
-    return
+    return false
   }
-  
-  // Vérifier la politique de mot de passe (min 6 caractères, 1 lettre, 1 chiffre)
-  const password = formData.value.password
   if (password.length < 6) {
     localError.value = 'Le mot de passe doit contenir au moins 6 caractères'
-    return
+    return false
   }
   if (!/[A-Za-z]/.test(password)) {
     localError.value = 'Le mot de passe doit contenir au moins une lettre'
-    return
+    return false
   }
   if (!/\d/.test(password)) {
     localError.value = 'Le mot de passe doit contenir au moins un chiffre'
-    return
+    return false
   }
+  return true
+}
 
-  // Préparer les données pour l'API
+function goStep2OrSubmit() {
+  localError.value = ''
+  authStore.error = null
+  if (!validatePassword()) return
+  if (formData.value.role === 'Admin') {
+    step.value = 2
+  } else {
+    handleSignUp()
+  }
+}
+
+/** Message d'erreur adapté : ancienne erreur serveur "ID entreprise requis" pour Admin = serveur non mis à jour */
+function formatSignUpError(errorMsg, isAdmin) {
+  const msg = typeof errorMsg === 'string' ? errorMsg : 'Erreur lors de la création du compte'
+  if (isAdmin && (msg.includes('ID entreprise est requis') || msg.includes('id_entreprise') && msg.includes('requis'))) {
+    return "Le serveur utilise une ancienne version. Déployez le fichier register.php (dossier src/composables/Api/) sur votre serveur (ex. aliadjame.com) pour activer l'inscription administrateur sans ID entreprise."
+  }
+  if (msg.includes('foreign key') || msg.includes('Integrity constraint') || msg.includes('code entreprise')) {
+    return "Le code entreprise n'existe pas ou n'est pas valide. Vérifiez le code fourni par l'administrateur."
+  }
+  return msg
+}
+
+async function handleSignUp() {
+  localError.value = ''
+  authStore.error = null
+  if (step.value === 1 && formData.value.role === 'Agent' && !validatePassword()) return
+  if (step.value === 2 && !validatePassword()) return
+
+  localStorage.removeItem('prostock_token')
+  localStorage.removeItem('prostock_user')
+  localStorage.removeItem('prostock_expires_at')
+
+  const isAdmin = formData.value.role === 'Admin'
   const signUpData = {
+    role: formData.value.role,
     nom: formData.value.nom,
     prenom: formData.value.prenom,
     username: formData.value.username,
     email: formData.value.email,
     telephone: formData.value.telephone || null,
-    id_entreprise: formData.value.id_entreprise,
     password: formData.value.password,
-    mot_de_passe: formData.value.password // Pour compatibilité avec l'API
+    mot_de_passe: formData.value.password
+  }
+  if (isAdmin) {
+    // Admin : uniquement infos entreprise, JAMAIS id_entreprise (généré côté serveur)
+    signUpData.nom_entreprise = formData.value.nom_entreprise
+    if (formData.value.sigle) signUpData.sigle = formData.value.sigle
+    if (formData.value.email_entreprise) signUpData.email_entreprise = formData.value.email_entreprise
+    if (formData.value.telephone_entreprise) signUpData.telephone_entreprise = formData.value.telephone_entreprise
+    if (formData.value.adresse) signUpData.adresse = formData.value.adresse
+    if (formData.value.ville) signUpData.ville = formData.value.ville
+    delete signUpData.id_entreprise
+    delete signUpData.code_entreprise
+  } else {
+    const code = (formData.value.code_entreprise || '').replace(/\s/g, '').toUpperCase()
+    signUpData.code_entreprise = code
+    signUpData.id_entreprise = code
   }
 
   try {
     const result = await signUp(signUpData)
-    
     if (result.success) {
-      console.log('✅ Inscription réussie pour:', result.user?.email)
-      
-      // Rediriger vers le dashboard après inscription réussie
-      router.push({ name: 'Dashboard' })
-      // Attendre un peu pour s'assurer que le store est complètement mis à jour
-      await new Promise(resolve => setTimeout(resolve, 200))
-      
-      // Vérifier que l'utilisateur est bien authentifié avant de rediriger
-      if (authStore.isAuthenticated) {
-        window.location.href = '/dashboard'
+      // Admin sans forfait : redirection vers souscription
+      const role = (result.user?.role || authStore.user?.role || '').toLowerCase()
+      if (role === 'admin' || role === 'superadmin') {
+        router.push({ name: 'GestionCompte' })
       } else {
-        window.location.href = '/dashboard'
+        router.push({ name: 'Dashboard' })
+      }
+      await new Promise(r => setTimeout(r, 200))
+      if (authStore.isAuthenticated) {
+        window.location.href = (role === 'admin' || role === 'superadmin') ? '/gestion-compte' : '/dashboard'
       }
     } else {
-      // Afficher l'erreur du store ou une erreur par défaut
-      const errorMsg = result.error || authStore.error || 'Erreur lors de la création du compte'
-      localError.value = errorMsg
-      console.error('❌ Échec de l\'inscription:', errorMsg)
+      localError.value = formatSignUpError(result.error || authStore.error, isAdmin)
     }
   } catch (err) {
-    console.error('❌ Erreur lors de l\'inscription:', err)
-    localError.value = err.message || 'Une erreur est survenue lors de la création du compte'
+    localError.value = formatSignUpError(err.message, isAdmin)
   }
 }
 </script>
@@ -455,6 +495,77 @@ const handleSignUp = async () => {
 
 .auth-link:hover {
   text-decoration: underline;
+}
+
+.step-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.role-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.role-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  text-align: left;
+}
+
+.role-btn:hover {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.role-btn.active {
+  border-color: #1a5f4a;
+  background: #ecfdf5;
+}
+
+.role-icon {
+  font-size: 1.5rem;
+}
+
+.role-name {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.role-desc {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.form-actions .auth-button {
+  flex: 1;
+}
+
+.auth-button.secondary {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.auth-button.secondary:hover:not(:disabled) {
+  background: #d1d5db;
 }
 
 /* Right Panel Styles */

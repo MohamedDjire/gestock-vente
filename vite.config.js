@@ -1,9 +1,65 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+const API_PROXY_TARGET = 'https://aliadjame.com'
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    {
+      name: 'api-stock-proxy',
+      configureServer(server) {
+        const handler = async (req, res, next) => {
+          if (!req.url || !req.url.startsWith('/api-stock')) return next()
+          const [pathPart, qsPart] = req.url.split('?')
+          const path = pathPart.replace(/^\/api-stock\/?/, '') || ''
+          const qs = qsPart ? '?' + qsPart : ''
+          const targetUrl = `${API_PROXY_TARGET}/api-stock/${path}${qs}`
+          const origin = req.headers.origin || '*'
+          try {
+            const headers = {
+              Accept: req.headers.accept || 'application/json',
+              Host: new URL(API_PROXY_TARGET).host
+            }
+            if (req.headers.authorization) headers['Authorization'] = req.headers.authorization
+            if (req.headers['content-type']) headers['Content-Type'] = req.headers['content-type']
+            const opts = { method: req.method || 'GET', headers, redirect: 'follow' }
+            if (['POST', 'PUT', 'PATCH'].includes(req.method) && parseInt(req.headers['content-length'], 10) > 0) {
+              const body = await new Promise((resolve, reject) => {
+                const chunks = []
+                req.on('data', (c) => chunks.push(c))
+                req.on('end', () => resolve(Buffer.concat(chunks)))
+                req.on('error', reject)
+              })
+              if (body && body.length) opts.body = body
+            }
+            const response = await fetch(targetUrl, opts)
+            const contentType = response.headers.get('content-type') || 'application/json'
+            res.writeHead(response.status, {
+              'Content-Type': contentType,
+              'Access-Control-Allow-Origin': origin,
+              'Access-Control-Allow-Credentials': 'true',
+              'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Token, X-Requested-With'
+            })
+            const buffer = await response.arrayBuffer()
+            res.end(Buffer.from(buffer))
+          } catch (err) {
+            console.error('[API Proxy]', err.message)
+            if (!res.headersSent) {
+              res.writeHead(502, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': origin
+              })
+              res.end(JSON.stringify({ success: false, message: 'Proxy error: ' + err.message }))
+            }
+          }
+        }
+        server.middlewares.stack.unshift({ route: '', handle: handler })
+      }
+    }
+  ],
   optimizeDeps: {
     include: [
       'chart.js/auto',
@@ -28,13 +84,8 @@ export default defineConfig({
       clientPort: 5173,
     },
     proxy: {
-      // Proxy pour contourner CORS en développement
-      // Toutes les requêtes vers /api-stock/* seront proxifiées vers https://aliadjame.com/api-stock/*
-      '/api-stock': {
-        target: 'https://aliadjame.com/api-stock',
-        changeOrigin: true,
-        secure: false,
-      },
+      // /api-stock est géré par le plugin api-stock-proxy (middleware avec fetch + redirect: 'follow')
+      // pour éviter que le navigateur reçoive une 302 vers aliadjame.com (CORS).
       '/api_compta_ecritures.php': {
         target: 'https://aliadjame.com/api-stock',
         changeOrigin: true,

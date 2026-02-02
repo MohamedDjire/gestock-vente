@@ -65,9 +65,52 @@ function searchEnterprises($bdd, $query, $currentUser) {
 }
 
 /**
- * Crée une nouvelle entreprise
+ * Génère un code entreprise alphanumérique unique de 8 caractères.
+ * Règles : plus de lettres que de chiffres, non déductible du nom de l'entreprise
+ * (évite qu'un tiers devine le code). Utilisé par les agents pour s'inscrire
+ * et être rattachés à l'entreprise.
+ */
+function generateCodeEntreprise($bdd, $nom_entreprise, $sigle = null) {
+    $letters = 'ABCDEFGHJKMNPQRSTUVWXYZ'; // sans I, L, O pour éviter confusion
+    $digits = '23456789';                  // sans 0, 1
+    $maxAttempts = 30;
+    for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+        $code = '';
+        $numLetters = 5 + random_int(0, 1); // 5 ou 6 lettres
+        $numDigits = 8 - $numLetters;        // 3 ou 2 chiffres
+        $pool = [];
+        for ($i = 0; $i < $numLetters; $i++) {
+            $pool[] = $letters[random_int(0, strlen($letters) - 1)];
+        }
+        for ($i = 0; $i < $numDigits; $i++) {
+            $pool[] = $digits[random_int(0, strlen($digits) - 1)];
+        }
+        shuffle($pool);
+        $code = implode('', $pool);
+        $stmt = $bdd->prepare("SELECT id_entreprise FROM stock_entreprise WHERE slug = :slug LIMIT 1");
+        $stmt->execute(['slug' => $code]);
+        if ($stmt->fetch() === false) {
+            return $code;
+        }
+    }
+    return strtoupper(substr(bin2hex(random_bytes(5)), 0, 8));
+}
+
+/**
+ * Crée une nouvelle entreprise.
+ * id_entreprise : généré automatiquement par la base (auto-increment).
+ * slug (code entreprise) : généré automatiquement en 8 caractères alphanumériques si non fourni.
  */
 function createEnterprise($bdd, $data) {
+    $slug = isset($data['slug']) ? trim((string)$data['slug']) : null;
+    if ($slug === '' || $slug === null) {
+        $slug = generateCodeEntreprise(
+            $bdd,
+            $data['nom_entreprise'] ?? '',
+            $data['sigle'] ?? null
+        );
+    }
+
     $stmt = $bdd->prepare("
         INSERT INTO stock_entreprise (
             nom_entreprise, slug, sigle, telephone, email, adresse, ville, pays, code_postal, logo, registre_commerce, ncc, devise, site_web, fax, capital_social, forme_juridique, numero_tva, date_abonnement, date_expiration_abonnement, statut, date_creation, date_modification
@@ -76,7 +119,7 @@ function createEnterprise($bdd, $data) {
         )
     ");
     $stmt->bindValue(':nom_entreprise', $data['nom_entreprise'], PDO::PARAM_STR);
-    $stmt->bindValue(':slug', $data['slug'] ?? null, PDO::PARAM_STR);
+    $stmt->bindValue(':slug', $slug, PDO::PARAM_STR);
     $stmt->bindValue(':sigle', $data['sigle'] ?? null, PDO::PARAM_STR);
     $stmt->bindValue(':telephone', $data['telephone'] ?? null, PDO::PARAM_STR);
     $stmt->bindValue(':email', $data['email'] ?? null, PDO::PARAM_STR);

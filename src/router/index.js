@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import Login from '../views/Login.vue'
-import SignUp from '../views/SignUp.vue'
 
 import Dashboard from '../pages/Dashboard.vue'
 import Products from '../pages/Products.vue'
@@ -29,7 +28,7 @@ const routes = [
   {
     path: '/signup',
     name: 'SignUp',
-    component: SignUp,
+    component: () => import('../views/SignUp.vue'),
     meta: { requiresAuth: false }
   },
   {
@@ -128,17 +127,13 @@ const routes = [
     path: '/comptabilite',
     name: 'Comptabilite',
     component: () => import('../pages/Comptabilite.vue'),
-<<<<<<< Updated upstream
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, requiresCompta: true }
   },
   {
     path: '/historique-ventes',
     name: 'HistoriqueVentes',
     component: () => import('../pages/HistoriqueVentes.vue'),
     meta: { requiresAuth: true }
-=======
-    meta: { requiresAuth: true, requiresCompta: true }
->>>>>>> Stashed changes
   }
 ]
 
@@ -159,16 +154,20 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
-  // Si déjà connecté, empêcher l'accès à login/signup et rediriger vers dashboard
+  // Si déjà connecté, empêcher l'accès à login/signup → rediriger vers Dashboard (plus de blocage forfait)
   if ((to.name === 'Login' || to.name === 'SignUp') && authStore.isAuthenticated) {
     next({ name: 'Dashboard' });
+    return;
   }
   // Si la route nécessite l'authentification et que l'utilisateur n'est pas connecté
-  else if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login' });
+    return;
   }
+  // Ne plus bloquer l'accès aux pages pour admin sans forfait : ils peuvent naviguer partout,
+  // un bandeau ou message les incitera à souscrire depuis Gestion du compte.
   // Si la route nécessite les droits admin et que l'utilisateur n'est pas admin
-  else if (to.meta.requiresAdmin && authStore.isAuthenticated) {
+  if (to.meta.requiresAdmin && authStore.isAuthenticated) {
     const userRole = authStore.userRole?.toLowerCase();
     if (userRole !== 'admin' && userRole !== 'superadmin') {
       next({ name: 'Dashboard' });

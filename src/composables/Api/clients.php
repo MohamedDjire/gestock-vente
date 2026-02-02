@@ -1,59 +1,72 @@
-
 <?php
-// Fallback pour serveurs qui ne supportent pas PUT/DELETE
+require_once __DIR__ . '/cors.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['_method'])) {
-    if ($_GET['_method'] === 'PUT') {
-        $_SERVER['REQUEST_METHOD'] = 'PUT';
-    } elseif ($_GET['_method'] === 'DELETE') {
-        $_SERVER['REQUEST_METHOD'] = 'DELETE';
-    }
+    if ($_GET['_method'] === 'PUT') $_SERVER['REQUEST_METHOD'] = 'PUT';
+    elseif ($_GET['_method'] === 'DELETE') $_SERVER['REQUEST_METHOD'] = 'DELETE';
 }
-// Affichage des erreurs PHP pour le debug (à retirer en production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-// Autoriser CORS pour le développement local (toujours AVANT tout output)
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('Content-Type: application/json');
-    http_response_code(200);
-    exit;
-}
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
 header('Content-Type: application/json');
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/functions/middleware_auth.php';
+$middlewareFile = __DIR__ . '/functions/middleware_auth.php';
+if (!file_exists($middlewareFile)) {
+    $middlewareFile = __DIR__ . '/middleware_auth.php';
+}
+require_once $middlewareFile;
 $pdo = createDatabaseConnection();
 
+// Authentification : récupérer l'entreprise de l'utilisateur connecté (JWT)
+$currentUser = null;
+try {
+    if (function_exists('authenticateAndAuthorize')) {
+        $currentUser = authenticateAndAuthorize($pdo);
+    }
+} catch (Exception $e) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Non autorisé', 'message' => $e->getMessage()]);
+    exit;
+}
+$enterpriseId = $currentUser['enterprise_id'] ?? null;
+if ($enterpriseId === null) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Entreprise non identifiée']);
+    exit;
+}
 
-
-// GET : liste ou détail
+// GET : liste ou détail — uniquement les clients de l'entreprise connectée
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $clientEnterpriseId = isset($_GET['enterprise_id']) ? (int)$_GET['enterprise_id'] : null;
+    if ($clientEnterpriseId !== null && $clientEnterpriseId !== $enterpriseId) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Accès non autorisé à cette entreprise']);
+        exit;
+    }
     if (isset($_GET['id'])) {
         $stmt = $pdo->prepare('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise, pv.nom_point_vente 
                                FROM stock_clients c
                                JOIN stock_utilisateur u ON c.id_utilisateur = u.id_utilisateur
                                JOIN stock_entreprise e ON c.id_entreprise = e.id_entreprise
                                LEFT JOIN stock_point_vente pv ON c.id_point_vente = pv.id_point_vente
-                               WHERE c.id = ?');
-        $stmt->execute([$_GET['id']]);
+                               WHERE c.id = ? AND c.id_entreprise = ?');
+        $stmt->execute([$_GET['id'], $enterpriseId]);
         $client = $stmt->fetch();
         if ($client && $client['type'] === 'entreprise') {
             $client['nom'] = $client['nom_entreprise'];
             $client['prenom'] = $client['nom_entreprise'];
         }
-        echo json_encode($client);
+        echo json_encode($client ?? null);
     } else {
-        $stmt = $pdo->query('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise, pv.nom_point_vente 
+        $stmt = $pdo->prepare('SELECT c.*, u.nom AS nom_utilisateur, e.nom_entreprise, pv.nom_point_vente 
                              FROM stock_clients c
                              JOIN stock_utilisateur u ON c.id_utilisateur = u.id_utilisateur
                              JOIN stock_entreprise e ON c.id_entreprise = e.id_entreprise
                              LEFT JOIN stock_point_vente pv ON c.id_point_vente = pv.id_point_vente
+                             WHERE c.id_entreprise = :id_entreprise
                              ORDER BY c.date_creation DESC');
-        $clients = $stmt->fetchAll();
+        $stmt->execute(['id_entreprise' => $enterpriseId]);
+        $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($clients as &$client) {
             if ($client['type'] === 'entreprise') {
                 $client['nom'] = $client['nom_entreprise'];
@@ -66,12 +79,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 
-// POST : ajout
+// POST : ajout — l'entreprise du client est toujours celle de l'utilisateur connecté
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Fusion universelle : récupère toutes les données du POST (JSON et x-www-form-urlencoded)
     $data = json_decode(file_get_contents('php://input'), true);
     if (!is_array($data)) $data = [];
     $data = array_merge($_POST, $data);
+    $data['id_entreprise'] = $enterpriseId;
     // Détection robuste du type de client
     $type = isset($data['type']) ? strtolower(trim($data['type'])) : '';
     // Si nom_entreprise est renseigné et nom/prenom sont vides, on force le type à entreprise
@@ -191,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// PUT : modification
+// PUT : modification — vérifier que le client appartient à l'entreprise connectée
 if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     $raw = file_get_contents('php://input');
     error_log('PUT RAW INPUT: ' . $raw);
@@ -228,11 +241,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             $stmtInsertE->execute([$data['nom_entreprise']]);
             $id_entreprise = $pdo->lastInsertId();
         }
-        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=?, id_point_vente=? WHERE id=?');
+        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=?, id_point_vente=? WHERE id=? AND id_entreprise=?');
         $stmt->execute([
-            $data['nom_entreprise'], // nom = nom de l'entreprise
-            $data['nom_entreprise'], // prenom = nom de l'entreprise
-            $id_entreprise,
+            $data['nom_entreprise'],
+            $data['nom_entreprise'],
+            $enterpriseId,
             $data['id_utilisateur'],
             isset($data['email']) ? $data['email'] : null,
             isset($data['telephone']) ? $data['telephone'] : null,
@@ -240,7 +253,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             isset($data['statut']) ? $data['statut'] : 'actif',
             'entreprise',
             isset($data['id_point_vente']) ? $data['id_point_vente'] : null,
-            $data['id']
+            $data['id'],
+            $enterpriseId
         ]);
         // Journaliser la modification du client avec le nom
         $nomJournal = ($type === 'entreprise') ? ($data['nom_entreprise'] ?? $data['nom']) : ($data['nom'] . ' ' . $data['prenom']);
@@ -265,21 +279,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
                 exit;
             }
         }
-        // Gestion entreprise associée si renseignée
-        $id_entreprise = isset($data['id_entreprise']) ? $data['id_entreprise'] : null;
-        if (!empty($data['nom_entreprise'])) {
-            $stmtE = $pdo->prepare('SELECT id_entreprise FROM stock_entreprise WHERE nom_entreprise = ? LIMIT 1');
-            $stmtE->execute([$data['nom_entreprise']]);
-            $rowE = $stmtE->fetch();
-            if ($rowE && isset($rowE['id_entreprise'])) {
-                $id_entreprise = $rowE['id_entreprise'];
-            } else {
-                $stmtInsertE = $pdo->prepare('INSERT INTO stock_entreprise (nom_entreprise) VALUES (?)');
-                $stmtInsertE->execute([$data['nom_entreprise']]);
-                $id_entreprise = $pdo->lastInsertId();
-            }
-        }
-        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=?, id_point_vente=? WHERE id=?');
+        $id_entreprise = $enterpriseId;
+        $stmt = $pdo->prepare('UPDATE stock_clients SET nom=?, prenom=?, id_entreprise=?, id_utilisateur=?, email=?, telephone=?, adresse=?, statut=?, type=?, id_point_vente=? WHERE id=? AND id_entreprise=?');
         $stmt->execute([
             $data['nom'],
             $data['prenom'],
@@ -291,7 +292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
             isset($data['statut']) ? $data['statut'] : 'actif',
             'particulier',
             isset($data['id_point_vente']) ? $data['id_point_vente'] : null,
-            $data['id']
+            $data['id'],
+            $enterpriseId
         ]);
         echo json_encode([
             'success' => true,
@@ -302,8 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'PUT') {
     }
 }
 
-
-// DELETE : suppression
+// DELETE : suppression — uniquement les clients de l'entreprise connectée
 if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
     $raw = file_get_contents('php://input');
     $data = json_decode($raw, true);
@@ -321,20 +322,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
         echo json_encode(['error' => 'ID manquant pour suppression', 'raw' => $raw, 'data' => $data, 'get' => $_GET]);
         exit;
     }
-    $stmt = $pdo->prepare('DELETE FROM stock_clients WHERE id=?');
-    // Récupérer le nom du client avant suppression (nom_entreprise n'existe pas dans stock_clients)
-    $stmtNom = $pdo->prepare('SELECT nom, prenom, type FROM stock_clients WHERE id=?');
-    $stmtNom->execute([$id]);
+    $stmtNom = $pdo->prepare('SELECT nom, prenom, type FROM stock_clients WHERE id=? AND id_entreprise=?');
+    $stmtNom->execute([$id, $enterpriseId]);
     $client = $stmtNom->fetch(PDO::FETCH_ASSOC);
-    if ($client) {
-        // Pour les entreprises, le nom est dupliqué dans nom et prenom
-        $nomJournal = ($client['type'] === 'entreprise') ? $client['nom'] : ($client['nom'] . ' ' . $client['prenom']);
-        $nomUtilisateur = $client['nom'] ?? 'Utilisateur';
-    } else {
-        $nomJournal = '(client inconnu)';
-        $nomUtilisateur = 'Utilisateur';
+    if (!$client) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Client introuvable ou non autorisé']);
+        exit;
     }
-    $stmt->execute([$id]);
+    $nomJournal = ($client['type'] === 'entreprise') ? $client['nom'] : ($client['nom'] . ' ' . $client['prenom']);
+    $nomUtilisateur = $client['nom'] ?? 'Utilisateur';
+    $stmt = $pdo->prepare('DELETE FROM stock_clients WHERE id=? AND id_entreprise=?');
+    $stmt->execute([$id, $enterpriseId]);
     // Journaliser la suppression du client avec le nom (jamais l'ID)
     $journalStmt = $pdo->prepare('INSERT INTO stock_journal (date, user, action, details) VALUES (NOW(), ?, ?, ?)');
     $journalStmt->execute([

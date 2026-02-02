@@ -10,6 +10,7 @@ export function useForfait() {
   const loading = ref(false)
   const lastCheck = ref(null)
   const checkInterval = ref(null)
+  const firstCheckTimer = ref(null)
 
   /**
    * Vérifie le statut du forfait
@@ -40,8 +41,9 @@ export function useForfait() {
         localStorage.setItem('forfait_status', JSON.stringify(forfaitStatus.value))
       }
     } catch (error) {
-      console.error('❌ Erreur lors de la vérification du forfait:', error)
-      // En cas d'erreur, créer un statut par défaut pour l'affichage
+      const isCorsOrNetwork = error.message && (error.message.includes('CORS') || error.message.includes('réponse du serveur') || error.message.includes('Network'))
+      if (!isCorsOrNetwork) console.error('❌ Erreur lors de la vérification du forfait:', error)
+      // En cas d'erreur (ex. CORS en dev), utiliser un statut par défaut pour ne pas bloquer la page
       forfaitStatus.value = {
         actif: false,
         date_fin: null,
@@ -73,26 +75,36 @@ export function useForfait() {
   }
 
   /**
-   * Démarre la vérification automatique toutes les 5 minutes
+   * Démarre la vérification automatique (1 appel différé + toutes les 5 min).
+   * On diffère le premier appel pour ne pas saturer le serveur au login.
    */
   const startAutoCheck = () => {
-    // Vérifier immédiatement
-    checkForfait()
-    
-    // Puis toutes les 5 minutes (300000 ms)
+    loadFromStorage()
+    if (firstCheckTimer.value) {
+      clearTimeout(firstCheckTimer.value)
+      firstCheckTimer.value = null
+    }
     if (checkInterval.value) {
       clearInterval(checkInterval.value)
+      checkInterval.value = null
     }
-    
+    firstCheckTimer.value = setTimeout(() => {
+      firstCheckTimer.value = null
+      checkForfait()
+    }, 1500)
     checkInterval.value = setInterval(() => {
       quickCheck()
-    }, 5 * 60 * 1000) // 5 minutes
+    }, 5 * 60 * 1000)
   }
 
   /**
    * Arrête la vérification automatique
    */
   const stopAutoCheck = () => {
+    if (firstCheckTimer.value) {
+      clearTimeout(firstCheckTimer.value)
+      firstCheckTimer.value = null
+    }
     if (checkInterval.value) {
       clearInterval(checkInterval.value)
       checkInterval.value = null

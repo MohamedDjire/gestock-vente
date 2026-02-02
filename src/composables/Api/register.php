@@ -46,6 +46,14 @@ require_once __DIR__ . '/config.php';
 
 // Inclure middleware_auth pour utiliser generateJWT
 require_once __DIR__ . '/functions/middleware_auth.php';
+// Pour création entreprise (inscription Admin)
+$functionsEntreprise = __DIR__ . '/functions_entreprise.php';
+if (!file_exists($functionsEntreprise)) {
+    $functionsEntreprise = __DIR__ . '/functions/functions_entreprise.php';
+}
+if (file_exists($functionsEntreprise)) {
+    require_once $functionsEntreprise;
+}
 
 /**
  * Générer un token JWT sécurisé à partir des données utilisateur
@@ -135,12 +143,33 @@ function getUserById($bdd, $userId) {
 }
 
 /**
+ * Résout l'identifiant entreprise : accepte un id numérique ou un code alphanumérique (slug, 8 caractères).
+ */
+function resolveIdEntreprise($bdd, $value) {
+    if ($value === null || $value === '') {
+        return null;
+    }
+    if (is_numeric($value)) {
+        $id = (int) $value;
+        return $id > 0 ? $id : null;
+    }
+    $code = strtoupper(trim(preg_replace('/[^A-Za-z0-9]/', '', (string)$value)));
+    if (strlen($code) < 1) {
+        return null;
+    }
+    $stmt = $bdd->prepare("SELECT id_entreprise FROM stock_entreprise WHERE slug = :slug LIMIT 1");
+    $stmt->execute(['slug' => $code]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $row ? (int) $row['id_entreprise'] : null;
+}
+
+/**
  * Créer un nouvel utilisateur (inscription publique)
- * Note: Pour l'inscription publique, l'utilisateur doit fournir un id_entreprise valide
- * ou nous devons créer une entreprise par défaut
+ * - Admin : nom_entreprise requis ; id_entreprise et code (slug) sont générés automatiquement à la création de l'entreprise.
+ * - Agent : code entreprise ou id entreprise requis (fourni par l'administrateur).
  */
 function registerUser($bdd, $data) {
-    // Vérifier les champs requis
+    // Champs requis communs
     if (empty($data['nom']) && empty($data['user_last_name'])) {
         throw new Exception("Le nom est requis");
     }
@@ -157,35 +186,66 @@ function registerUser($bdd, $data) {
         throw new Exception("Le mot de passe est requis");
     }
     
-    // Vérifier si l'email existe déjà
     if (emailExists($bdd, $data['email'])) {
         throw new Exception("Cet email est déjà utilisé");
     }
-    
-    // Vérifier si le username existe déjà
     if (usernameExists($bdd, $data['username'])) {
         throw new Exception("Ce nom d'utilisateur est déjà utilisé");
     }
     
-    // Récupérer ou créer une entreprise par défaut
-    // Pour l'instant, on exige un id_entreprise
-    // Vous pouvez modifier cela pour créer une entreprise par défaut si nécessaire
-    if (empty($data['id_entreprise'])) {
-        // Option 1: Créer une entreprise par défaut pour les nouveaux utilisateurs
-        // Option 2: Exiger un id_entreprise (actuel)
-        throw new Exception("L'ID entreprise est requis pour l'inscription. Contactez l'administrateur.");
+    // Décision Admin vs Agent : si nom_entreprise est fourni, c'est TOUJOURS une inscription Admin (jamais demander id_entreprise)
+    $hasNomEntreprise = !empty(trim((string)($data['nom_entreprise'] ?? '')));
+    $role = isset($data['role']) ? trim((string)$data['role']) : '';
+    $role = in_array($role, ['Admin', 'admin', 'Agent', 'agent'], true) ? $role : 'Agent';
+    $isAdmin = $hasNomEntreprise || (strtolower($role) === 'admin');
+
+    $idEntreprise = null;
+
+    if ($isAdmin) {
+        // Inscription Admin : créer l'entreprise d'abord
+        if (!$hasNomEntreprise) {
+            throw new Exception("Le nom de l'entreprise est requis pour un compte administrateur.");
+        }
+        if (!function_exists('createEnterprise')) {
+            throw new Exception("Création d'entreprise non disponible sur ce serveur.");
+        }
+        $entrepriseData = [
+            'nom_entreprise' => $data['nom_entreprise'],
+            'sigle' => $data['sigle'] ?? null,
+            'telephone' => $data['telephone_entreprise'] ?? $data['telephone'] ?? null,
+            'email' => $data['email_entreprise'] ?? $data['email'] ?? null,
+            'adresse' => $data['adresse'] ?? null,
+            'ville' => $data['ville'] ?? null,
+            'pays' => $data['pays'] ?? 'France',
+            'code_postal' => $data['code_postal'] ?? null,
+            'statut' => 'actif'
+        ];
+        $resultEnt = createEnterprise($bdd, $entrepriseData);
+        $idEntreprise = (int) $resultEnt['id_entreprise'];
+    } else {
+        // Agent : code entreprise 8 caractères alphanumériques (fourni par l'admin)
+        $codeRaw = $data['id_entreprise'] ?? $data['code_entreprise'] ?? null;
+        if ($codeRaw === null || $codeRaw === '') {
+            throw new Exception("Le code entreprise est requis. L'administrateur vous fournit ce code (8 caractères alphanumériques).");
+        }
+        $code = strtoupper(trim(preg_replace('/[^A-Za-z0-9]/', '', (string)$codeRaw)));
+        if (strlen($code) !== 8) {
+            throw new Exception("Le code entreprise doit comporter exactement 8 caractères alphanumériques.");
+        }
+        $idEntreprise = resolveIdEntreprise($bdd, $code);
+        if ($idEntreprise === null || $idEntreprise <= 0) {
+            throw new Exception("Ce code entreprise n'existe pas ou n'est pas valide. Vérifiez le code fourni par l'administrateur.");
+        }
     }
     
-    // Hasher le mot de passe
     $password = $data['password'] ?? $data['mot_de_passe'];
     validatePasswordPolicy($password);
     $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
     
-    // Préparer les données
     $nom = $data['nom'] ?? $data['user_last_name'];
     $prenom = $data['prenom'] ?? $data['user_first_name'];
+    $roleStored = $isAdmin ? 'Admin' : 'Agent';
     
-    // Insérer l'utilisateur
     $stmt = $bdd->prepare("
         INSERT INTO stock_utilisateur (
             id_entreprise, nom, prenom, username, email, telephone,
@@ -197,14 +257,14 @@ function registerUser($bdd, $data) {
     ");
     
     $stmt->execute([
-        'id_entreprise' => $data['id_entreprise'],
+        'id_entreprise' => $idEntreprise,
         'nom' => $nom,
         'prenom' => $prenom,
         'username' => $data['username'],
         'email' => $data['email'],
         'telephone' => $data['telephone'] ?? null,
         'mot_de_passe' => $hashedPassword,
-        'role' => $data['role'] ?? 'Agent',
+        'role' => $roleStored,
         'photo' => $data['photo'] ?? null,
         'statut' => $data['statut'] ?? 'actif',
         'date_naissance' => $data['date_naissance'] ?? null,

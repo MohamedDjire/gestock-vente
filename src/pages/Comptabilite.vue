@@ -581,8 +581,11 @@ function closeAddEcritureModal() {
 
 async function loadEcritures() {
   try {
-    // À adapter selon la gestion d'entreprise (id_entreprise)
-    const id_entreprise = 1
+    const id_entreprise = authStore.user?.id_entreprise ?? authStore.enterpriseId ?? null
+    if (!id_entreprise) {
+      ecritures.value = []
+      return
+    }
     const res = await apiService.get(`/api_compta_ecritures.php?id_entreprise=${id_entreprise}`)
     console.log('[DEBUG API] Réponse brute écritures:', res)
     // Mapping backend -> frontend pour chaque écriture
@@ -644,7 +647,12 @@ async function submitEcriture() {
       urlPiece = await uploadToCloudinary(form.value.piece_jointe)
     }
     // Préparer la donnée à envoyer
-    const id_entreprise = authStore.user?.id_entreprise || 1;
+    const id_entreprise = authStore.user?.id_entreprise ?? authStore.enterpriseId ?? null;
+    if (!id_entreprise) {
+      isSubmitting.value = false;
+      alert('Entreprise non identifiée. Veuillez vous reconnecter.');
+      return;
+    }
     const data = {
       ...form.value,
       url_piece_jointe: urlPiece,

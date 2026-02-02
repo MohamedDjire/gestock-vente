@@ -43,12 +43,14 @@ const isVentesPage = computed(() => route.name === 'Ventes')
 // Computed pour déterminer l'état du forfait et les alertes
 const showForfaitAlert = computed(() => {
   if (!forfaitStatus.value) return false
+  if (forfaitStatus.value.no_subscription === true) return true
   const etat = forfaitStatus.value.etat
   return etat === 'warning' || etat === 'grace' || etat === 'bloque'
 })
 
 const isBlocked = computed(() => {
   if (!forfaitStatus.value) return false
+  if (forfaitStatus.value.no_subscription === true) return false
   return forfaitStatus.value.etat === 'bloque' || forfaitStatus.value.bloque === true
 })
 
@@ -68,6 +70,7 @@ const alertClass = computed(() => {
 
 const alertIcon = computed(() => {
   if (!forfaitStatus.value) return '⚠️'
+  if (forfaitStatus.value.no_subscription === true) return 'ℹ️'
   const etat = forfaitStatus.value.etat
   if (etat === 'bloque') return '🚫'
   if (etat === 'grace') return '⏰'
@@ -98,6 +101,7 @@ const alertMessage = computed(() => {
 
 const alertButtonText = computed(() => {
   if (!forfaitStatus.value) return 'Renouveler'
+  if (forfaitStatus.value.no_subscription === true) return 'Choisir un forfait'
   const etat = forfaitStatus.value.etat
   if (etat === 'bloque' || etat === 'grace') return 'Renouveler maintenant'
   return 'Renouveler'
@@ -109,11 +113,9 @@ const goToForfait = () => {
 }
 
 onMounted(() => {
-  // Rafraîchir l'utilisateur depuis l'API pour synchroniser la photo et les infos
   if (authStore.isAuthenticated) {
-    authStore.refreshUserFromApi()
-    checkForfait()
-    // Écouter les événements de changement de forfait
+    // Rafraîchir l'utilisateur en différé pour ne pas bloquer l'affichage (Topbar fait déjà checkForfait)
+    setTimeout(() => authStore.refreshUserFromApi(), 2000)
     window.addEventListener('forfait-expired', checkForfait)
     window.addEventListener('storage', (e) => {
       if (e.key === 'forfait_status') {

@@ -3,8 +3,8 @@
     <router-link to="/gestion-compte" class="back-link">← Retour</router-link>
 
     <div v-if="!forfaitValid" class="error-card">
-      <p>Forfait introuvable. Choisissez un forfait depuis Gestion du compte.</p>
-      <router-link to="/gestion-compte" class="btn-back">Retour</router-link>
+      <p>Aucun forfait sélectionné. Choisissez un forfait dans <strong>Gestion du compte</strong> pour souscrire.</p>
+      <router-link to="/gestion-compte" class="btn-back">Aller à Gestion du compte</router-link>
     </div>
 
     <div v-else class="payment-card-wrap">

@@ -125,7 +125,7 @@
 
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import apiJournal from '../composables/Api/apiJournal.js';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -183,18 +183,37 @@ const paginatedJournalEntries = computed(() => {
   return filteredJournalEntries.value.slice(start, start + pageSize)
 })
 
-const fetchJournal = async () => {
-  loading.value = true;
-  try {
-    journalEntries.value = await apiJournal.getJournal();
-  } catch (e) {
-    error.value = 'Erreur lors du chargement du journal';
-  } finally {
-    loading.value = false;
-  }
-};
+const currentEnterpriseId = computed(() => authStore.user?.id_entreprise ?? authStore.enterpriseId ?? null)
 
-onMounted(fetchJournal);
+const fetchJournal = async () => {
+  const eid = currentEnterpriseId.value
+  loading.value = true
+  error.value = null
+  journalEntries.value = []
+  try {
+    const data = await apiJournal.getJournal(eid)
+    const raw = Array.isArray(data) ? data : []
+    // Filtre de sécurité : n'afficher que les entrées de l'entreprise connectée (évite mélange si le backend renvoie d'autres données)
+    journalEntries.value = eid != null
+      ? raw.filter((entry) => entry.id_entreprise == null || Number(entry.id_entreprise) === Number(eid))
+      : raw
+  } catch (e) {
+    error.value = 'Erreur lors du chargement du journal.'
+    journalEntries.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(currentEnterpriseId, () => {
+  journalEntries.value = []
+  fetchJournal()
+}, { immediate: false })
+
+onMounted(() => {
+  journalEntries.value = []
+  fetchJournal()
+})
 
 // Fonction pour formater la date du journal
 function formatJournalDate(dateString) {

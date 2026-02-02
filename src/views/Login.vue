@@ -58,9 +58,8 @@
           </button>
         </form>
 
-        <!-- Sign Up Link -->
         <div class="auth-footer">
-          <p>Vous n'avez pas de compte ? <router-link to="/signup" class="auth-link">S'inscrire</router-link></p>
+          <p class="auth-footer-info">Vous n'avez pas de compte ? <router-link to="/signup" class="auth-link">Créer un compte</router-link> (agent avec ID entreprise ou administrateur).</p>
         </div>
       </div>
     </div>
@@ -387,6 +386,11 @@ const handleLogin = async () => {
   text-align: center;
   color: #6b7280;
   font-size: 0.875rem;
+}
+
+.auth-footer-info {
+  margin: 0;
+  line-height: 1.4;
 }
 
 .auth-link {

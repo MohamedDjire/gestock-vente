@@ -1,95 +1,75 @@
-# 🔧 Guide de Déploiement - Correction CORS
+# CORS – Solution définitive
 
-## ⚠️ Problème Actuel
+## 1. Frontend : URL absolue (déjà en place)
 
-Le frontend en local (`http://localhost:5173`) ne peut pas communiquer avec l'API sur `https://aliadjame.com` à cause de **CORS**.
+Dans `src/composables/Api/apiService.js` :
 
-## ✅ Solution : Déployer `cors.php` sur le Serveur
+- **Correct** : `baseURL: 'https://aliadjame.com/api-stock'`
+- **À éviter** : `baseURL: '/api-stock'` (provoque des redirections et des erreurs CORS)
 
-### Étape 1 : Vérifier que `cors.php` est bien déployé
+Surcharge possible via `VITE_API_BASE_URL` (ex. en prod si l’API est sur le même domaine).
 
-Le fichier `src/composables/Api/cors.php` doit être déployé sur le serveur à :
-```
-https://aliadjame.com/api-stock/cors.php
-```
+---
 
-### Étape 2 : Vérifier que tous les fichiers API incluent `cors.php`
+## 2. Serveur : CORS en tout premier dans chaque API
 
-**IMPORTANT** : Tous les fichiers API doivent inclure `cors.php` **tout en haut**, avant tout autre code :
+Sur **aliadjame.com**, chaque fichier API (dont `api_forfait.php`) doit envoyer les en-têtes CORS **tout en haut**, avant tout autre code.
+
+**Rien avant** : pas d’espace, pas de BOM, pas de `require` ni `echo` avant ces en-têtes.
+
+Exemple à mettre en **tout début** du fichier (ou via `require_once __DIR__ . '/cors.php';` en première ligne après `<?php`) :
 
 ```php
 <?php
-// CORS - OBLIGATOIRE EN PREMIER
-require_once __DIR__ . '/cors.php';
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-// Ensuite le reste du code...
+$allowed = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'https://aliadjame.com'
+];
+
+if (in_array($origin, $allowed)) {
+    header("Access-Control-Allow-Origin: $origin");
+}
+
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Requested-With");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 ```
 
-### Étape 3 : Tester les headers CORS
+**Interdit** : utiliser ensemble `Access-Control-Allow-Origin: *` et `Access-Control-Allow-Credentials: true` (le navigateur bloque).
 
-Teste directement dans ton navigateur ou avec curl :
+---
 
-```bash
-curl -I https://aliadjame.com/api-stock/login.php
-```
+## 3. Test de vérification
 
-Tu dois voir dans les headers :
-```
-Access-Control-Allow-Origin: http://localhost:5173
-Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token
-```
+1. Ouvrir :  
+   `https://aliadjame.com/api-stock/api_forfait.php?action=status`
+2. Dans DevTools → **Network** → cliquer sur la requête → **Response Headers**.
+3. Vérifier la présence de :  
+   `Access-Control-Allow-Origin: http://localhost:5173`
 
-### Étape 4 : Vérifier les fichiers à déployer
+Si ce header n’apparaît pas, le problème reste côté serveur (fichier non déployé ou CORS pas en premier).
 
-Assure-toi que ces fichiers sont bien sur le serveur :
+---
 
-- ✅ `api-stock/cors.php`
-- ✅ `api-stock/login.php` (qui inclut cors.php)
-- ✅ `api-stock/index.php` (qui inclut cors.php)
-- ✅ `api-stock/api_forfait.php` (qui inclut cors.php)
-- ✅ Tous les autres fichiers API
+## 4. Fichiers à déployer sur aliadjame.com
 
-## 🔍 Vérification Rapide
+- `api-stock/cors.php` (version à jour)
+- `api-stock/api_forfait.php` (CORS en tout premier)
+- `api-stock/login.php`, `register.php`, `index.php` (incluent `cors.php` en premier)
+- Tous les autres fichiers API appelés depuis le front
 
-Ouvre la console du navigateur (F12) et teste :
+---
 
-```javascript
-fetch('https://aliadjame.com/api-stock/login.php', {
-  method: 'OPTIONS',
-  headers: {
-    'Origin': 'http://localhost:5173'
-  }
-})
-.then(r => {
-  console.log('Headers CORS:', r.headers.get('access-control-allow-origin'))
-})
-```
+## 5. Règle à retenir
 
-Si tu vois `null` ou une erreur CORS → le problème est côté serveur.
-
-## 📝 Fichiers Modifiés
-
-- ✅ `vite.config.js` - Proxy amélioré
-- ✅ `src/composables/Api/cors.php` - Détection d'origine améliorée
-- ✅ `src/views/Login.vue` - Nettoyage localStorage avant connexion
-
-## 🚀 Après Déploiement
-
-1. **Redémarrer le serveur Vite** : `npm run dev`
-2. **Vider le cache du navigateur** : Ctrl+Shift+R
-3. **Tester la connexion**
-
-## ⚡ Solution Alternative Temporaire (si le proxy ne fonctionne toujours pas)
-
-Si le proxy Vite ne fonctionne toujours pas après redémarrage, tu peux temporairement utiliser directement l'URL complète en développement :
-
-Dans `src/composables/Api/apiService.js`, change temporairement :
-
-```javascript
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'https://aliadjame.com/api-stock'  // Direct (nécessite CORS côté serveur)
-  : '/api-stock'
-```
-
-**⚠️ Mais cela nécessite que le serveur renvoie bien les headers CORS !**
+- **API distante** = URL absolue dans le frontend + CORS correct côté serveur.
+- Ne pas utiliser d’URL relative pour une API externe (sinon redirections + CORS).

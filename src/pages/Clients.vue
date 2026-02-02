@@ -128,10 +128,6 @@
               </div>
               <div class="form-group">
                 <label>Adresse</label>
-<<<<<<< HEAD
-                
-=======
->>>>>>> ee0f7847ac77f42f048b728f3fd50c38a5456a6b
                 <input v-model="form.adresse" placeholder="Adresse du client" class="form-input" />
               </div>
               <div class="form-group">
@@ -258,18 +254,23 @@ const getEnterpriseId = () => {
 
 const authStore = useAuthStore()
 const entrepriseNom = authStore.user?.nom_entreprise || 'Nom de l’entreprise'
+const currentEnterpriseId = computed(() => authStore.user?.id_entreprise ?? authStore.enterpriseId ?? null)
 
 const fetchClients = async () => {
   loading.value = true
   error.value = null
+  clients.value = []
   try {
-    const res = await apiClient.get('/clients.php')
+    const eid = currentEnterpriseId.value
+    const res = await apiClient.get('/clients.php', { params: eid != null ? { enterprise_id: eid } : {} })
+    let raw = []
     if (res && res.data) {
-      clients.value = Array.isArray(res.data) ? res.data : []
-      console.log('Clients rechargés', clients.value)
-    } else {
-      clients.value = []
+      raw = Array.isArray(res.data) ? res.data : []
     }
+    // Filtre de sécurité : n'afficher que les clients de l'entreprise connectée
+    clients.value = eid != null
+      ? raw.filter((c) => c.id_entreprise == null || Number(c.id_entreprise) === Number(eid))
+      : raw
   } catch (err) {
     console.error('Erreur lors du chargement des clients:', err)
     error.value = err.message || 'Erreur lors du chargement des clients'
@@ -287,7 +288,13 @@ const fetchPointsVente = async () => {
   }
 }
 
+watch(currentEnterpriseId, () => {
+  clients.value = []
+  fetchClients()
+}, { immediate: false })
+
 onMounted(() => {
+  clients.value = []
   fetchClients()
   fetchPointsVente()
 })

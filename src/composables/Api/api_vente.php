@@ -1,28 +1,14 @@
 <?php
+require_once __DIR__ . '/cors.php';
 /**
  * API Vente - Gestion des ventes
  * Endpoint: /api-stock/api_vente.php
  */
-// Capturer toute sortie parasite (BOM, espaces de includes) avant le JSON
 ob_start();
-
-// Désactiver l'affichage des erreurs pour éviter qu'elles polluent la réponse JSON
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
-
-// Headers CORS - DOIT être défini avant toute sortie
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
-header('Access-Control-Allow-Credentials: true');
 header('Content-Type: application/json; charset=utf-8');
-
-// Répondre immédiatement aux requêtes OPTIONS (préflight)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
 
 // =====================================================
 // CONFIGURATION BASE DE DONNÉES
@@ -804,11 +790,7 @@ try {
     
 } catch (PDOException $e) {
     if (ob_get_level()) ob_end_clean();
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
     header('Content-Type: application/json; charset=utf-8');
-    
     $errMsg = $e->getMessage() ?: 'Erreur de base de données';
     error_log("Erreur PDO dans api_vente.php: " . $errMsg);
     error_log("Trace: " . $e->getTraceAsString());
@@ -822,11 +804,7 @@ try {
     exit;
 } catch (Throwable $e) {
     if (ob_get_level()) ob_end_clean();
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Auth-Token, Accept');
     header('Content-Type: application/json; charset=utf-8');
-    
     $errMsg = $e->getMessage() ?: 'Erreur inconnue';
     error_log("Erreur dans api_vente.php: " . $errMsg);
     error_log("Trace: " . $e->getTraceAsString());
