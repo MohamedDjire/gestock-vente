@@ -127,21 +127,13 @@ const routes = [
     path: '/comptabilite',
     name: 'Comptabilite',
     component: () => import('../pages/Comptabilite.vue'),
-<<<<<<< Updated upstream
-    meta: { requiresAuth: true, requiresCompta: true }
-=======
-    meta: { requiresAuth: true }
->>>>>>> Stashed changes
+      meta: { requiresAuth: true, requiresCompta: true }
   },
   {
     path: '/historique-ventes',
     name: 'HistoriqueVentes',
     component: () => import('../pages/HistoriqueVentes.vue'),
-<<<<<<< Updated upstream
-    meta: { requiresAuth: true }
-=======
     meta: { requiresAuth: true, requiresCompta: true }
->>>>>>> Stashed changes
   }
 ]
 

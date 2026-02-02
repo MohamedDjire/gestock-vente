@@ -7,12 +7,13 @@ import { getLocalStorage, setLocalStorage, removeLocalStorage } from '../../util
  * Utilise safeStorage pour éviter les erreurs si "Tracking Prevention" bloque l'accès.
  */
 
-// URL de base de l'API
-// - En dev: on passe par le proxy Vite (/) pour éviter CORS
-// - En prod: par défaut on utilise aussi / (même origine), sauf si surchargé par VITE_API_BASE_URL
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  '/'
+
+// Détection environnement local (localhost ou 127.0.0.1)
+const isLocalhost = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+// En dev, forcer le proxy local (chemin relatif)
+const API_BASE_URL = isLocalhost ? '/' : (import.meta.env.VITE_API_BASE_URL || '/');
 
 // Créer une instance axios
 const apiClient = axios.create({
